@@ -78,7 +78,7 @@ export function Hero() {
       </div>
 
       {/* Container with min-height matching viewport minus header */}
-      <div className='container relative z-10 max-w-screen-2xl px-4 sm:px-8 flex min-h-screen pt-28 items-center'>
+      <div className='container relative z-10 max-w-screen-2xl px-4 sm:px-8 flex min-h-screen pt-16 md:pt-28 items-center'>
         <div className='grid gap-8 lg:grid-cols-2 lg:gap-12 items-center w-full py-8 md:py-12'>
           {/* Mobile: Graphic first, then text. Desktop: Text left, graphic right */}
           <div className='flex flex-col justify-center space-y-6 max-w-[65ch] order-2 lg:order-1'>

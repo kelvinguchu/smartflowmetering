@@ -65,7 +65,7 @@ export function ProductShowcase() {
                     </div>
                     <Button
                       size='icon'
-                      className='rounded-full h-10 w-10 shrink-0 shadow-sm opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300'>
+                      className='rounded-full h-10 w-10 shrink-0 shadow-sm transition-all duration-300 group-hover:bg-primary group-hover:text-primary-foreground'>
                       <MdArrowForward className='text-lg' />
                     </Button>
                   </div>
