@@ -1,0 +1,26 @@
+{
+  "short_name": "Ohm Kenya",
+  "name": "Ohm Kenya Limited - Prepaid Utility Metering",
+  "description": "Prepaid utility metering solutions for electricity, water, and gas in Kenya.",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#fb6200",
+  "background_color": "#ffffff"
+}

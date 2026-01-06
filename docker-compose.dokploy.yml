@@ -1,0 +1,234 @@
+# ==============================================
+# OHMKenya Docker Compose - Dokploy Configuration
+# ==============================================
+# This file is optimized for deployment with Dokploy.
+# 
+# Key features:
+# - Traefik integration for automatic SSL
+# - Dokploy network for service discovery
+# - Environment variable management via Dokploy UI
+# - Health checks for all services
+# - Automated backups with retention policy
+# ==============================================
+
+services:
+  # ==========================================
+  # Admin Dashboard
+  # ==========================================
+  admin-dashboard:
+    build:
+      context: ./apps/admin-dashboard
+      dockerfile: Dockerfile
+      args:
+        # Set in Dokploy environment variables:
+        # VITE_API_URL: https://api.ohmkenya.com
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    container_name: ohmkenya-admin-dashboard
+    restart: unless-stopped
+    networks:
+      - backend
+      - dokploy-network
+    # Traefik labels for automatic SSL (configure domain in Dokploy UI)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ohmkenya-admin-dashboard.rule=Host(`${WEB_DOMAIN:-ohmkenya.com}`)"
+      - "traefik.http.routers.ohmkenya-admin-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.ohmkenya-admin-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.ohmkenya-admin-dashboard.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # API (OHMKenya Backend)
+  # ==========================================
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: ohmkenya-api
+    restart: unless-stopped
+    networks:
+      - backend
+      - dokploy-network
+    # Traefik labels for automatic SSL (configure domain in Dokploy UI)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ohmkenya-api.rule=Host(`${API_DOMAIN:-api.ohmkenya.com}`)"
+      - "traefik.http.routers.ohmkenya-api.entrypoints=websecure"
+      - "traefik.http.routers.ohmkenya-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.ohmkenya-api.loadbalancer.server.port=3000"
+    environment:
+      # Application Logic
+      NODE_ENV: production
+      PORT: 3000
+
+      # Internal Network Connection
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ohmkenya}
+      REDIS_URL: redis://redis:6379
+
+      # External Logic (Set in Dokploy environment variables)
+      MPESA_SHORTCODE: ${MPESA_SHORTCODE}
+      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET}
+      MPESA_PASSKEY: ${MPESA_PASSKEY}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+
+      # CORS - include your production domains
+      CORS_ORIGINS: "https://ohmkenya.com,https://api.ohmkenya.com"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # Database (PostgreSQL 17)
+  # ==========================================
+  postgres:
+    image: postgres:17-alpine
+    container_name: ohmkenya-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ohmkenya}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # Use Docker Named Volume for Dokploy backup compatibility
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-ohmkenya}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Database Admin (Adminer)
+  # ==========================================
+  # NOTE: In production, consider removing this or 
+  # securing with additional authentication
+  adminer:
+    image: adminer:latest
+    container_name: ohmkenya-adminer
+    restart: unless-stopped
+    networks:
+      - backend
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ohmkenya-adminer.rule=Host(`${ADMINER_DOMAIN:-db.ohmkenya.com}`)"
+      - "traefik.http.routers.ohmkenya-adminer.entrypoints=websecure"
+      - "traefik.http.routers.ohmkenya-adminer.tls.certresolver=letsencrypt"
+      # Basic auth middleware for security (set ADMINER_AUTH in Dokploy)
+      - "traefik.http.routers.ohmkenya-adminer.middlewares=adminer-auth"
+      - "traefik.http.middlewares.adminer-auth.basicauth.users=${ADMINER_AUTH:-admin:$$apr1$$ruca84Hq$$mbjdMZBAG.KWn7vfN/SNK/}"
+      - "traefik.http.services.ohmkenya-adminer.loadbalancer.server.port=8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+  # ==========================================
+  # Queue (Redis)
+  # ==========================================
+  redis:
+    image: redis:7.4-alpine
+    container_name: ohmkenya-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Automated Database Backups
+  # ==========================================
+  # Creates automatic backups with configurable retention:
+  # - Every 15 minutes for 7 days (financial data protection)
+  # - Daily backups kept for 4 weeks  
+  # - Weekly backups kept for 6 months
+  # - Monthly backups kept for 1 year
+  # ==========================================
+  backup:
+    image: prodrigestivill/postgres-backup-local:17-alpine
+    container_name: ohmkenya-backup
+    restart: unless-stopped
+    volumes:
+      # Use named volume for Dokploy backup management
+      - backup_data:/backups
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database connection
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-ohmkenya}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      
+      # Backup schedule (cron format)
+      # Every 15 minutes - for financial data, minimize data loss risk
+      # Max data loss: 15 min = ~150 transactions at 10tx/min
+      SCHEDULE: "*/15 * * * *"
+      
+      # Retention policy (adjusted for 15-min backups)
+      BACKUP_KEEP_HOURS: 672         # Keep 15-min backups for 7 days (96/day * 7)
+      BACKUP_KEEP_DAYS: 28           # Keep daily backups for 4 weeks
+      BACKUP_KEEP_WEEKS: 24          # Keep weekly backups for 6 months
+      BACKUP_KEEP_MONTHS: 12         # Keep monthly backups for 1 year
+      
+      # Compression and naming
+      BACKUP_SUFFIX: .sql.gz
+      POSTGRES_EXTRA_OPTS: --clean --if-exists --no-owner --no-acl
+      
+      # Health check URL (optional - for external monitoring)
+      # HEALTHCHECK_URL: https://hc-ping.com/your-uuid
+
+      # Cloudflare R2 Remote Backup (S3 Compatible)
+      # These must be set in Dokploy Environment Variables
+      S3_BUCKET: ${R2_BUCKET}
+      S3_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      S3_ENDPOINT: https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com
+      S3_REGION: auto
+      S3_PATH: backups
+
+# ==========================================
+# Networks
+# ==========================================
+networks:
+  backend:
+    driver: bridge
+  # Dokploy's external network for Traefik routing
+  dokploy-network:
+    external: true
+
+# ==========================================
+# Volumes (Docker Named Volumes for persistence)
+# ==========================================
+volumes:
+  postgres_data:
+    name: ohmkenya_postgres_data
+  redis_data:
+    name: ohmkenya_redis_data
+  backup_data:
+    name: ohmkenya_backup_data

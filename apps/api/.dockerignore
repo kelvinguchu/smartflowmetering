@@ -1,0 +1,28 @@
+# Dependencies - these are installed fresh in the container
+node_modules
+.pnp
+.pnp.js
+
+# Environment files - these are set via docker-compose
+.env
+.env.*
+!.env.example
+
+# Development/IDE
+.git
+.gitignore
+.vscode
+.idea
+*.log
+
+# Testing
+coverage
+
+# Build artifacts
+dist
+build
+
+# Misc
+.DS_Store
+*.pem
+*.bun
