@@ -130,7 +130,7 @@ export function Hero() {
               initial={{ opacity: 0, y: 30, rotateX: 10 }}
               animate={{ opacity: 1, y: 0, rotateX: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
-              className='relative w-[400px] md:w-[450px] bg-slate-100 dark:bg-slate-900 rounded-[2rem] lg:rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] border-4 border-slate-200 dark:border-slate-800 p-3 lg:p-5 flex flex-col gap-3 lg:gap-5 transform hover:scale-[1.01] transition-transform duration-500 scale-100 sm:scale-100 lg:scale-95 xl:scale-100 origin-center'
+              className='relative w-[350px] md:w-[450px] bg-slate-100 dark:bg-slate-900 rounded-[2rem] lg:rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] border-4 border-slate-200 dark:border-slate-800 p-3 lg:p-5 flex flex-col gap-3 lg:gap-5 transform hover:scale-[1.01] transition-transform duration-500 scale-100 sm:scale-100 lg:scale-95 xl:scale-100 origin-center'
               style={{ perspective: 1000 }}>
               {/* Device Reflection/Gloss */}
               <div className='absolute inset-0 rounded-4xl lg:rounded-[2.5rem] bg-linear-to-tr from-white/40 to-transparent pointer-events-none' />
