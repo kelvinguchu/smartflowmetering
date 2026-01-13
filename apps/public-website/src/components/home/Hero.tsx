@@ -91,7 +91,7 @@ export function Hero() {
           {/* Left Column: Text Content */}
           <div className='flex flex-col justify-center space-y-6 lg:space-y-8 max-w-xl order-2 lg:order-1 text-center lg:text-left mx-auto lg:mx-0'>
             <div className='space-y-3 lg:space-y-4'>
-              <h1 className='text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl/tight'>
+              <h1 className='text-2xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl/tight'>
                 Smart Utility Management <br />
                 <span className='text-primary'>For Modern Living</span>
               </h1>
