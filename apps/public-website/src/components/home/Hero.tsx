@@ -1,15 +1,76 @@
-import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
-import { MdBolt, MdWaterDrop, MdCheck, MdBarChart } from "react-icons/md";
-
 import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export function Hero() {
+  const [displayText, setDisplayText] = useState("ENTER TOKEN");
+  const [cursorVisible, setCursorVisible] = useState(true);
+  const isMountedRef = useRef(false);
+
+  // Simulation Sequence
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    const sequence = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!isMountedRef.current) return;
+
+      // Reset
+      setDisplayText("ENTER TOKEN");
+      await new Promise((r) => setTimeout(r, 2000));
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!isMountedRef.current) return;
+
+      // Type Token
+      const token = "4512 8900 3321 5567 8901";
+      setDisplayText("");
+
+      for (const char of token) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (!isMountedRef.current) return;
+        setDisplayText((prev) => prev + char);
+        // Random typing speed
+        await new Promise((r) => setTimeout(r, Math.random() * 150 + 50));
+      }
+
+      await new Promise((r) => setTimeout(r, 500));
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!isMountedRef.current) return;
+
+      // Success
+      setDisplayText("CONNECTING...");
+      await new Promise((r) => setTimeout(r, 1500));
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!isMountedRef.current) return;
+
+      setDisplayText("SUCCESS: 50.0 Kwh");
+      await new Promise((r) => setTimeout(r, 3000));
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (isMountedRef.current) {
+        sequence(); // Loop
+      }
+    };
+
+    sequence();
+
+    // Blinking cursor
+    const cursorInterval = setInterval(() => {
+      setCursorVisible((v) => !v);
+    }, 500);
+
+    return () => {
+      isMountedRef.current = false;
+      clearInterval(cursorInterval);
+    };
+  }, []);
+
   return (
-    <section className='relative overflow-hidden bg-background'>
-      {/* CSS Graphic Background with Motion */}
+    <section className='relative h-screen overflow-hidden bg-background flex flex-col justify-center'>
+      {/* Background Ambience */}
       <div className='absolute inset-0 z-0 overflow-hidden pointer-events-none'>
-        {/* Deep Background Elements - Bottom Layer */}
+        {/* Rotating dashed circles */}
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
@@ -20,91 +81,38 @@ export function Hero() {
           transition={{ duration: 80, repeat: Infinity, ease: "linear" }}
           className='absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full border-[3px] border-secondary border-dashed opacity-20'
         />
-        <motion.div
-          animate={{
-            y: [0, -40, 0],
-            x: [0, 20, 0],
-            opacity: [0.5, 0.8, 0.5],
-          }}
-          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-          className='absolute top-[20%] left-[10%] w-32 h-32 bg-primary/40 rounded-full blur-2xl'
-        />
-        <motion.div
-          animate={{
-            y: [0, 60, 0],
-            x: [0, -30, 0],
-            opacity: [0.5, 0.8, 0.5],
-          }}
-          transition={{
-            duration: 18,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 2,
-          }}
-          className='absolute bottom-[30%] right-[20%] w-48 h-48 bg-secondary/40 rounded-full blur-[50px]'
-        />
-
-        <motion.div
-          animate={{
-            x: [0, 100, 0],
-            y: [0, -50, 0],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className='absolute left-[20%] top-0 h-[800px] w-[800px] -translate-x-1/2 -translate-y-[20%] rounded-full bg-primary/5 blur-[120px]'
-        />
-        <motion.div
-          animate={{
-            x: [0, -70, 0],
-            y: [0, 100, 0],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className='absolute right-0 top-[20%] h-[600px] w-[600px] translate-x-1/3 rounded-full bg-secondary/30 blur-[100px] opacity-60'
-        />
-        <motion.div
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-          className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 blur-[150px] rounded-full'
-        />
+        {/* Blur effects */}
+        <div className='absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px]' />
+        <div className='absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-accent/5 rounded-full blur-[100px]' />
       </div>
 
-      {/* Container with min-height matching viewport minus header */}
-      <div className='container relative z-10 max-w-screen-2xl px-4 sm:px-8 flex min-h-screen pt-16 md:pt-28 items-center'>
-        <div className='grid gap-8 lg:grid-cols-2 lg:gap-12 items-center w-full py-8 md:py-12'>
-          {/* Mobile: Graphic first, then text. Desktop: Text left, graphic right */}
-          <div className='flex flex-col justify-center space-y-6 max-w-[65ch] order-2 lg:order-1'>
-            <div className='space-y-4'>
-              <h1 className='text-4xl font-extrabold tracking-tight sm:text-5xl xl:text-6xl/none font-heading'>
-                Smart Utility Management for{" "}
-                <span className='text-primary'>Modern Living</span>
+      <div className='container relative z-10 max-w-7xl px-4 sm:px-8 flex h-full pt-16 items-center justify-center'>
+        <div className='grid gap-8 lg:gap-8 lg:grid-cols-[1fr_auto] items-center'>
+          {/* Left Column: Text Content */}
+          <div className='flex flex-col justify-center space-y-6 lg:space-y-8 max-w-xl order-2 lg:order-1 text-center lg:text-left mx-auto lg:mx-0'>
+            <div className='space-y-3 lg:space-y-4'>
+              <h1 className='text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl/tight'>
+                Smart Utility Management <br />
+                <span className='text-primary'>For Modern Living</span>
               </h1>
-              <p className='text-muted-foreground md:text-xl leading-relaxed'>
+              <p className='text-muted-foreground text-base sm:text-lg lg:text-xl leading-relaxed max-w-xl mx-auto lg:mx-0'>
                 Take control of electricity, water, and gas with our seamless
                 prepaid metering platform. Automated billing, remote monitoring,
                 and instant tokens.
               </p>
             </div>
 
-            <div className='flex flex-col sm:flex-row gap-4'>
+            <div className='flex flex-col sm:flex-row gap-3 lg:gap-4 items-center justify-center lg:justify-start'>
               <Button
                 asChild
                 size='lg'
-                className='bg-primary hover:bg-primary/90 text-white shadow-xl shadow-primary/20 text-lg px-8 h-12 rounded-full cursor-pointer'>
-                <Link to='/register'>Register</Link>
+                className='w-fit bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25 text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full cursor-pointer transition-transform hover:-translate-y-0.5'>
+                <Link to='/register'>Get Started</Link>
               </Button>
               <Button
                 size='lg'
                 variant='outline'
-                className='text-lg px-8 h-12 rounded-full border-2 hover:bg-secondary/50 cursor-pointer'
+                className='w-fit text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full border-2 hover:bg-secondary/50 cursor-pointer transition-transform hover:-translate-y-0.5'
                 onClick={() => {
                   document
                     .getElementById("how-it-works")
@@ -115,100 +123,89 @@ export function Hero() {
             </div>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className='relative mx-auto w-full max-w-[500px] lg:max-w-none flex flex-col justify-center items-center lg:items-end order-1 lg:order-2'>
-            {/* Abstract back glow for depth since card is gone */}
-            <div className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-contain bg-center opacity-20 pointer-events-none radial-gradient(circle, var(--primary) 0%, transparent 70%)' />
+          {/* Right Column: Calculator/Meter Graphic */}
+          <div className='relative flex justify-center items-center order-1 lg:order-2 h-full max-h-[60vh] lg:max-h-none'>
+            {/* Device Container */}
+            <motion.div
+              initial={{ opacity: 0, y: 30, rotateX: 10 }}
+              animate={{ opacity: 1, y: 0, rotateX: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className='relative w-[400px] md:w-[450px] bg-slate-100 dark:bg-slate-900 rounded-[2rem] lg:rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] border-4 border-slate-200 dark:border-slate-800 p-3 lg:p-5 flex flex-col gap-3 lg:gap-5 transform hover:scale-[1.01] transition-transform duration-500 scale-100 sm:scale-100 lg:scale-95 xl:scale-100 origin-center'
+              style={{ perspective: 1000 }}>
+              {/* Device Reflection/Gloss */}
+              <div className='absolute inset-0 rounded-4xl lg:rounded-[2.5rem] bg-linear-to-tr from-white/40 to-transparent pointer-events-none' />
 
-            <div className='relative w-full max-w-[500px] space-y-6'>
-              {/* Floating Chart Element */}
-              <motion.div
-                animate={{ y: [0, -15, 0] }}
-                transition={{
-                  duration: 6,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                className='bg-card rounded-2xl shadow-2xl border border-border/50 p-6 relative overflow-hidden transform hover:scale-[1.02] transition-transform duration-500'>
-                <div className='absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -z-10' />
-                <div className='flex justify-between items-center mb-6'>
-                  <div className='h-4 w-32 bg-foreground/10 rounded-full' />
-                  <div className='h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary'>
-                    <MdBarChart className='text-xl' />
-                  </div>
+              {/* Header / Brand Area */}
+              <div className='flex justify-between items-center px-1 lg:px-2'>
+                <div className='flex gap-2 items-center'>
+                  <div className='w-2 h-2 lg:w-2.5 lg:h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]' />
+                  <span className='text-[9px] lg:text-[10px] font-bold tracking-widest text-slate-400'>
+                    OHM KENYA
+                  </span>
                 </div>
-                <div className='flex items-end justify-between h-40 gap-2'>
-                  {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ height: 0 }}
-                      animate={{ height: `${h}%` }}
-                      transition={{ duration: 0.8, delay: i * 0.1 }}
-                      className='w-full bg-primary rounded-t-sm'
-                      style={{ opacity: 0.6 + i * 0.05 }}
-                    />
-                  ))}
+                <div className='px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded text-[0.5rem] lg:text-[0.55rem] font-mono text-slate-500'>
+                  S/N: 8900231
                 </div>
-              </motion.div>
-
-              {/* Floating Grid Elements */}
-              <div className='grid grid-cols-2 gap-4'>
-                <motion.div
-                  animate={{ y: [0, 10, 0] }}
-                  transition={{
-                    duration: 5,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    delay: 1,
-                  }}
-                  className='h-24 bg-card rounded-2xl shadow-xl border border-border/50 p-4 flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300'>
-                  <div className='flex justify-between items-start'>
-                    <div className='h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center text-primary text-xl'>
-                      <MdBolt size={24} />
-                    </div>
-                    <div className='h-2 w-8 bg-green-500/20 rounded-full' />
-                  </div>
-                  <div className='h-3 w-20 bg-foreground/10 rounded-full' />
-                </motion.div>
-                <motion.div
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{
-                    duration: 5.5,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    delay: 0.5,
-                  }}
-                  className='h-24 bg-card rounded-2xl shadow-xl border border-border/50 p-4 flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300'>
-                  <div className='flex justify-between items-start'>
-                    <div className='h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-500 text-xl'>
-                      <MdWaterDrop size={24} />
-                    </div>
-                    <div className='h-2 w-8 bg-green-500/20 rounded-full' />
-                  </div>
-                  <div className='h-3 w-20 bg-foreground/10 rounded-full' />
-                </motion.div>
               </div>
 
-              {/* Floating Success Badge */}
-              <motion.div
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className='hidden sm:block absolute right-0 sm:-right-4 top-1/2 -translate-y-1/2 bg-card p-4 rounded-xl shadow-xl border border-border'>
-                <div className='flex items-center gap-3'>
-                  <div className='h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600'>
-                    <MdCheck size={20} />
+              {/* LCD Screen */}
+              <div className='bg-[#9ca3af] dark:bg-[#788583] rounded-lg lg:rounded-xl p-2.5 lg:p-3 shadow-inner border-4 border-slate-300 dark:border-slate-700 relative overflow-hidden'>
+                <div className='absolute inset-0 bg-linear-to-b from-transparent to-black/5 pointer-events-none' />
+                <div className='h-16 lg:h-20 flex flex-col justify-between font-mono'>
+                  <div className='flex justify-between text-[0.6rem] lg:text-[0.65rem] text-slate-700 font-bold opacity-70'>
+                    <span>L1</span>
+                    <span>KwH</span>
                   </div>
-                  <div>
-                    <div className='h-2 w-20 bg-foreground/10 rounded-full mb-1' />
-                    <div className='h-2 w-12 bg-foreground/5 rounded-full' />
+                  <div className='text-right text-lg sm:text-xl lg:text-2xl font-bold text-slate-800 tracking-widest break-all leading-tight font-[monospace]'>
+                    {displayText}
+                    <span
+                      className={`${cursorVisible ? "opacity-100" : "opacity-0"} inline-block w-1.5 h-4 lg:w-1.5 lg:h-5 bg-slate-800 ml-1 align-middle`}
+                    />
                   </div>
                 </div>
-              </motion.div>
-            </div>
-          </motion.div>
+              </div>
+
+              {/* Keypad Grid */}
+              <div className='grid grid-cols-3 gap-2 px-1'>
+                {[
+                  "1",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "del",
+                  "0",
+                  "enter",
+                ].map((key) => {
+                  const isAction = key === "del" || key === "enter";
+                  return (
+                    <motion.button
+                      key={key}
+                      whileTap={{ scale: 0.9 }}
+                      className={`
+                              h-10 lg:h-12 rounded-full font-bold text-base lg:text-lg shadow-md border-b-4 active:border-b-0 active:translate-y-1 transition-all
+                              ${
+                                isAction
+                                  ? "bg-primary text-white border-primary/40" // Blue keys for actions
+                                  : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700" // Standard keys
+                              }
+                              ${key === "enter" ? "bg-linear-to-r from-green-500 to-emerald-600 border-green-700" : ""}
+                              ${key === "del" ? "bg-linear-to-r from-red-500 to-rose-600 border-red-700 text-sm" : ""}
+                           `}>
+                      {key === "enter" ? "↵" : key === "del" ? "DEL" : key}
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              {/* Bottom Slot */}
+              <div className='mx-auto w-1/3 h-1 bg-slate-300 dark:bg-slate-700 rounded-full' />
+            </motion.div>
+          </div>
         </div>
       </div>
     </section>
