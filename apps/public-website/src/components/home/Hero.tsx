@@ -86,7 +86,7 @@ export function Hero() {
         <div className='absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-accent/5 rounded-full blur-[100px]' />
       </div>
 
-      <div className='container relative z-10 max-w-7xl px-4 sm:px-8 flex h-full pt-16 items-center justify-center'>
+      <div className='container relative z-10 w-full px-4 sm:px-8 flex h-full pt-16 items-center justify-center'>
         <div className='grid gap-8 lg:gap-8 lg:grid-cols-[1fr_auto] items-center'>
           {/* Left Column: Text Content */}
           <div className='flex flex-col justify-center space-y-6 lg:space-y-8 max-w-xl order-2 lg:order-1 text-center lg:text-left mx-auto lg:mx-0'>
@@ -106,13 +106,13 @@ export function Hero() {
               <Button
                 asChild
                 size='lg'
-                className='w-fit bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25 text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full cursor-pointer transition-transform hover:-translate-y-0.5'>
+                className='w-[200px] sm:w-auto bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25 text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full cursor-pointer transition-transform hover:-translate-y-0.5'>
                 <Link to='/register'>Get Started</Link>
               </Button>
               <Button
                 size='lg'
                 variant='outline'
-                className='w-fit text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full border-2 hover:bg-secondary/50 cursor-pointer transition-transform hover:-translate-y-0.5'
+                className='w-[200px] sm:w-auto text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full border-2 hover:bg-secondary/50 cursor-pointer transition-transform hover:-translate-y-0.5'
                 onClick={() => {
                   document
                     .getElementById("how-it-works")
