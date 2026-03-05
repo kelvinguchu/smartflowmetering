@@ -1,23 +1,21 @@
-import { t } from "elysia";
+import { z } from "zod";
 
-// Create tariff schema
-export const createTariffSchema = t.Object({
-  name: t.String({ minLength: 1, maxLength: 100 }),
-  ratePerKwh: t.String(), // Stored as string to preserve decimal precision
-  currency: t.Optional(t.String({ default: "KES" })),
-  validFrom: t.Optional(t.String({ format: "date-time" })),
-  validTo: t.Optional(t.String({ format: "date-time" })),
+export const createTariffSchema = z.object({
+  name: z.string().min(1).max(100),
+  ratePerKwh: z.string(),
+  currency: z.string().default("KES").optional(),
+  validFrom: z.string().datetime().optional(),
+  validTo: z.string().datetime().optional(),
 });
 
-export type CreateTariff = typeof createTariffSchema.static;
+export type CreateTariff = z.infer<typeof createTariffSchema>;
 
-// Update tariff schema
-export const updateTariffSchema = t.Partial(
-  t.Object({
-    name: t.String({ minLength: 1, maxLength: 100 }),
-    ratePerKwh: t.String(),
-    validTo: t.String({ format: "date-time" }),
+export const updateTariffSchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    ratePerKwh: z.string().optional(),
+    validTo: z.string().datetime().optional(),
   })
-);
+  .strict();
 
-export type UpdateTariff = typeof updateTariffSchema.static;
+export type UpdateTariff = z.infer<typeof updateTariffSchema>;

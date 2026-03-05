@@ -1,10 +1,10 @@
 #!/bin/bash
 # ==============================================
-# OHMKenya PostgreSQL Restore Script
+# Smart Flow Metering PostgreSQL Restore Script
 # ==============================================
 # Usage: ./restore.sh <backup_file.sql.gz>
 #
-# Example: ./restore.sh ohmkenya_20260103_120000.sql.gz
+# Example: ./restore.sh smartflowmetering_20260103_120000.sql.gz
 # ==============================================
 
 set -e
@@ -36,7 +36,7 @@ else
 fi
 
 echo "==================================="
-echo "OHMKenya Database Restore"
+echo "Smart Flow Metering Database Restore"
 echo "==================================="
 echo ""
 echo "WARNING: This will REPLACE the current database with the backup!"
@@ -58,7 +58,7 @@ docker compose stop api 2>/dev/null || true
 
 # Restore the backup
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring database from: ${FULL_PATH}"
-gunzip -c "${FULL_PATH}" | docker compose exec -T postgres psql -U postgres -d ohmkenya
+gunzip -c "${FULL_PATH}" | docker compose exec -T postgres psql -U postgres -d smartflowmetering
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Database restored successfully!"
 

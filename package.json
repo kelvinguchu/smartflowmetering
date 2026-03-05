@@ -1,5 +1,5 @@
 {
-  "name": "ohmkenya",
+  "name": "smartflowmetering",
   "private": true,
   "scripts": {
     "build": "turbo run build",

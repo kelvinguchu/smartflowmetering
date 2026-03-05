@@ -23,15 +23,15 @@ const KNOWN_SAFARICOM_IPS = [
  * @returns true if the IP is from a known Safaricom range or in MPESA_ALLOWED_IPS
  */
 export function isValidMpesaIP(ip: string | null | undefined): boolean {
-  if (!ip) return false;
-
-  // Clean the IP (remove ::ffff: prefix for IPv4-mapped IPv6)
-  const cleanIP = ip.replace(/^::ffff:/, "");
-
   // In non-production, allow all IPs for testing
   if (env.NODE_ENV !== "production") {
     return true;
   }
+
+  if (!ip) return false;
+
+  // Clean the IP (remove ::ffff: prefix for IPv4-mapped IPv6)
+  const cleanIP = ip.replace(/^::ffff:/, "");
 
   // Check against known Safaricom IP ranges
   for (const prefix of KNOWN_SAFARICOM_IPS) {
@@ -80,7 +80,6 @@ export function getClientIP(headers: Headers, server?: unknown): string | null {
     return cfIP.trim();
   }
 
-  // Fallback: Try to get from server connection (Bun-specific)
-  // This would require accessing the underlying socket
+  // Fallback: requires runtime-specific socket access (not implemented)
   return null;
 }

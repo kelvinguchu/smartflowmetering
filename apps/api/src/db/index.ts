@@ -21,3 +21,8 @@ export * as schema from "./schema/index";
 
 // Export type for db instance
 export type Database = typeof db;
+
+// Graceful shutdown hook for tests and process termination
+export async function closeDbConnection(): Promise<void> {
+  await queryClient.end();
+}

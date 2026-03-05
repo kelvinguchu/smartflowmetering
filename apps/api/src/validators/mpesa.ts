@@ -1,82 +1,78 @@
-import { t } from "elysia";
+import { z } from "zod";
 
-// M-Pesa C2B Callback payload schema
-// Reference: Safaricom Daraja API documentation
-export const mpesaC2BCallbackSchema = t.Object({
-  TransactionType: t.String(),
-  TransID: t.String(), // M-Pesa Receipt Number
-  TransTime: t.String(), // Format: YYYYMMDDHHmmss
-  TransAmount: t.Union([t.String(), t.Number()]), // Amount paid
-  BusinessShortCode: t.String(), // Paybill number
-  BillRefNumber: t.String(), // Account number (meter number)
-  InvoiceNumber: t.Optional(t.String()),
-  OrgAccountBalance: t.Optional(t.Union([t.String(), t.Number()])),
-  ThirdPartyTransID: t.Optional(t.String()),
-  MSISDN: t.String(), // Phone number (254...)
-  FirstName: t.Optional(t.String()),
-  MiddleName: t.Optional(t.String()),
-  LastName: t.Optional(t.String()),
+const stringOrNumberSchema = z.union([z.string(), z.number()]);
+
+export const mpesaC2BCallbackSchema = z.object({
+  TransactionType: z.string(),
+  TransID: z.string(),
+  TransTime: z.string(),
+  TransAmount: stringOrNumberSchema,
+  BusinessShortCode: z.string(),
+  BillRefNumber: z.string(),
+  InvoiceNumber: z.string().optional(),
+  OrgAccountBalance: stringOrNumberSchema.optional(),
+  ThirdPartyTransID: z.string().optional(),
+  MSISDN: z.string(),
+  FirstName: z.string().optional(),
+  MiddleName: z.string().optional(),
+  LastName: z.string().optional(),
 });
 
-export type MpesaC2BCallback = typeof mpesaC2BCallbackSchema.static;
+export type MpesaC2BCallback = z.infer<typeof mpesaC2BCallbackSchema>;
 
-// M-Pesa Validation Request (for URL validation)
-export const mpesaValidationSchema = t.Object({
-  TransactionType: t.String(),
-  TransID: t.String(),
-  TransTime: t.String(),
-  TransAmount: t.Union([t.String(), t.Number()]),
-  BusinessShortCode: t.String(),
-  BillRefNumber: t.String(),
-  InvoiceNumber: t.Optional(t.String()),
-  OrgAccountBalance: t.Optional(t.Union([t.String(), t.Number()])),
-  ThirdPartyTransID: t.Optional(t.String()),
-  MSISDN: t.String(),
-  FirstName: t.Optional(t.String()),
-  MiddleName: t.Optional(t.String()),
-  LastName: t.Optional(t.String()),
+export const mpesaValidationSchema = z.object({
+  TransactionType: z.string(),
+  TransID: z.string(),
+  TransTime: z.string(),
+  TransAmount: stringOrNumberSchema,
+  BusinessShortCode: z.string(),
+  BillRefNumber: z.string(),
+  InvoiceNumber: z.string().optional(),
+  OrgAccountBalance: stringOrNumberSchema.optional(),
+  ThirdPartyTransID: z.string().optional(),
+  MSISDN: z.string(),
+  FirstName: z.string().optional(),
+  MiddleName: z.string().optional(),
+  LastName: z.string().optional(),
 });
 
-export type MpesaValidation = typeof mpesaValidationSchema.static;
+export type MpesaValidation = z.infer<typeof mpesaValidationSchema>;
 
-// STK Push Request Schema
-export const stkPushRequestSchema = t.Object({
-  phoneNumber: t.String({ minLength: 10, maxLength: 15 }), // 254XXXXXXXXX or 07XXXXXXXX
-  amount: t.Number({ minimum: 1 }),
-  meterNumber: t.Optional(t.String({ minLength: 1 })), // Optional meter number
-  accountReference: t.Optional(t.String({ minLength: 1 })), // Optional account reference
-  transactionDesc: t.Optional(t.String()), // Optional description
+export const stkPushRequestSchema = z.object({
+  phoneNumber: z.string().min(10).max(15),
+  amount: z.number().positive(),
+  meterNumber: z.string().min(1).optional(),
+  accountReference: z.string().min(1).optional(),
+  transactionDesc: z.string().optional(),
 });
 
-export type StkPushRequest = typeof stkPushRequestSchema.static;
+export type StkPushRequest = z.infer<typeof stkPushRequestSchema>;
 
-// STK Push Callback Schema (from Safaricom)
-export const stkPushCallbackSchema = t.Object({
-  Body: t.Object({
-    stkCallback: t.Object({
-      MerchantRequestID: t.String(),
-      CheckoutRequestID: t.String(),
-      ResultCode: t.Number(),
-      ResultDesc: t.String(),
-      CallbackMetadata: t.Optional(
-        t.Object({
-          Item: t.Array(
-            t.Object({
-              Name: t.String(),
-              Value: t.Optional(t.Union([t.String(), t.Number()])),
+export const stkPushCallbackSchema = z.object({
+  Body: z.object({
+    stkCallback: z.object({
+      MerchantRequestID: z.string(),
+      CheckoutRequestID: z.string(),
+      ResultCode: z.number(),
+      ResultDesc: z.string(),
+      CallbackMetadata: z
+        .object({
+          Item: z.array(
+            z.object({
+              Name: z.string(),
+              Value: stringOrNumberSchema.optional(),
             })
           ),
         })
-      ),
+        .optional(),
     }),
   }),
 });
 
-export type StkPushCallback = typeof stkPushCallbackSchema.static;
+export type StkPushCallback = z.infer<typeof stkPushCallbackSchema>;
 
-// STK Push Query Schema
-export const stkPushQuerySchema = t.Object({
-  checkoutRequestId: t.String(),
+export const stkPushQuerySchema = z.object({
+  checkoutRequestId: z.string(),
 });
 
-export type StkPushQuery = typeof stkPushQuerySchema.static;
+export type StkPushQuery = z.infer<typeof stkPushQuerySchema>;

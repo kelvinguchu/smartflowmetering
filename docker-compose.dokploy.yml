@@ -1,5 +1,5 @@
 # ==============================================
-# OHMKenya Docker Compose - Dokploy Configuration
+# Smart Flow Metering Docker Compose - Dokploy Configuration
 # ==============================================
 # This file is optimized for deployment with Dokploy.
 # 
@@ -21,9 +21,9 @@ services:
       dockerfile: Dockerfile
       args:
         # Set in Dokploy environment variables:
-        # VITE_API_URL: https://api.ohmkenya.com
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
-    container_name: ohmkenya-admin-dashboard
+        # VITE_API_URL: https://api.smartmetering.africa
+        VITE_API_URL: ${VITE_API_URL:-https://api.smartmetering.africa}
+    container_name: smartflowmetering-admin-dashboard
     restart: unless-stopped
     networks:
       - backend
@@ -31,10 +31,10 @@ services:
     # Traefik labels for automatic SSL (configure domain in Dokploy UI)
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ohmkenya-admin-dashboard.rule=Host(`${WEB_DOMAIN:-ohmkenya.com}`)"
-      - "traefik.http.routers.ohmkenya-admin-dashboard.entrypoints=websecure"
-      - "traefik.http.routers.ohmkenya-admin-dashboard.tls.certresolver=letsencrypt"
-      - "traefik.http.services.ohmkenya-admin-dashboard.loadbalancer.server.port=3000"
+      - "traefik.http.routers.smartflowmetering-admin-dashboard.rule=Host(`${WEB_DOMAIN:-smartmetering.africa}`) || Host(`${WEB_DOMAIN_WWW:-www.smartmetering.africa}`)"
+      - "traefik.http.routers.smartflowmetering-admin-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.smartflowmetering-admin-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.smartflowmetering-admin-dashboard.loadbalancer.server.port=3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
@@ -42,13 +42,13 @@ services:
       retries: 3
 
   # ==========================================
-  # API (OHMKenya Backend)
+  # API (Smart Flow Metering Backend)
   # ==========================================
   api:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
-    container_name: ohmkenya-api
+    container_name: smartflowmetering-api
     restart: unless-stopped
     networks:
       - backend
@@ -56,28 +56,51 @@ services:
     # Traefik labels for automatic SSL (configure domain in Dokploy UI)
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ohmkenya-api.rule=Host(`${API_DOMAIN:-api.ohmkenya.com}`)"
-      - "traefik.http.routers.ohmkenya-api.entrypoints=websecure"
-      - "traefik.http.routers.ohmkenya-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.ohmkenya-api.loadbalancer.server.port=3000"
+      - "traefik.http.routers.smartflowmetering-api.rule=Host(`${API_DOMAIN:-api.smartmetering.africa}`)"
+      - "traefik.http.routers.smartflowmetering-api.entrypoints=websecure"
+      - "traefik.http.routers.smartflowmetering-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.smartflowmetering-api.loadbalancer.server.port=3000"
     environment:
       # Application Logic
       NODE_ENV: production
       PORT: 3000
 
       # Internal Network Connection
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ohmkenya}
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-smartflowmetering}}
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379}
 
       # External Logic (Set in Dokploy environment variables)
       MPESA_SHORTCODE: ${MPESA_SHORTCODE}
       MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY}
       MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET}
       MPESA_PASSKEY: ${MPESA_PASSKEY}
+      MPESA_ENVIRONMENT: ${MPESA_ENVIRONMENT}
+      MPESA_ENV: ${MPESA_ENV}
+      MPESA_BASE_URL: ${MPESA_BASE_URL}
+      MPESA_CALLBACK_URL: ${MPESA_CALLBACK_URL}
+      MPESA_CALLBACK_BASE_URL: ${MPESA_CALLBACK_BASE_URL}
+      MPESA_REGISTER_TOKEN: ${MPESA_REGISTER_TOKEN}
+      MPESA_CALLBACK_TOKEN: ${MPESA_CALLBACK_TOKEN}
+      MPESA_CALLBACK_TOKEN_TRANSPORT: ${MPESA_CALLBACK_TOKEN_TRANSPORT}
+      MPESA_C2B_COMMAND_ID: ${MPESA_C2B_COMMAND_ID}
+      MPESA_TRANSACTION_STATUS_COMMAND_ID: ${MPESA_TRANSACTION_STATUS_COMMAND_ID}
+      MPESA_IDENTIFIER_TYPE: ${MPESA_IDENTIFIER_TYPE}
+      MPESA_ALLOWED_IPS: ${MPESA_ALLOWED_IPS}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      HOSTPINNACLE_API_URL: ${HOSTPINNACLE_API_URL}
+      HOSTPINNACLE_USER_ID: ${HOSTPINNACLE_USER_ID}
+      HOSTPINNACLE_PASSWORD: ${HOSTPINNACLE_PASSWORD}
+      HOSTPINNACLE_API_KEY: ${HOSTPINNACLE_API_KEY}
+      HOSTPINNACLE_SENDER_ID: ${HOSTPINNACLE_SENDER_ID}
+      GOMELONG_API_URL: ${GOMELONG_API_URL}
+      GOMELONG_USER_ID: ${GOMELONG_USER_ID}
+      GOMELONG_PASSWORD: ${GOMELONG_PASSWORD}
+      GOMELONG_BRANDS: ${GOMELONG_BRANDS}
+      GOMELONG_VENDING_TYPE: ${GOMELONG_VENDING_TYPE}
 
       # CORS - include your production domains
-      CORS_ORIGINS: "https://ohmkenya.com,https://api.ohmkenya.com"
+      CORS_ORIGINS: "https://smartmetering.africa,https://www.smartmetering.africa,https://api.smartmetering.africa"
     depends_on:
       postgres:
         condition: service_healthy
@@ -90,15 +113,15 @@ services:
       retries: 3
 
   # ==========================================
-  # Database (PostgreSQL 17)
+  # Database (PostgreSQL 18)
   # ==========================================
   postgres:
-    image: postgres:17-alpine
-    container_name: ohmkenya-postgres
+    image: postgres:18.3-alpine3.22
+    container_name: smartflowmetering-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-ohmkenya}
-      POSTGRES_USER: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-smartflowmetering}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       # Use Docker Named Volume for Dokploy backup compatibility
@@ -106,7 +129,7 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-ohmkenya}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-smartflowmetering}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -114,24 +137,14 @@ services:
   # ==========================================
   # Database Admin (Adminer)
   # ==========================================
-  # NOTE: In production, consider removing this or 
-  # securing with additional authentication
+  # NOTE: Enabled only with --profile ops for internal troubleshooting
   adminer:
-    image: adminer:latest
-    container_name: ohmkenya-adminer
+    image: adminer:5.4.2-standalone
+    container_name: smartflowmetering-adminer
     restart: unless-stopped
+    profiles: ["ops"]
     networks:
       - backend
-      - dokploy-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.ohmkenya-adminer.rule=Host(`${ADMINER_DOMAIN:-db.ohmkenya.com}`)"
-      - "traefik.http.routers.ohmkenya-adminer.entrypoints=websecure"
-      - "traefik.http.routers.ohmkenya-adminer.tls.certresolver=letsencrypt"
-      # Basic auth middleware for security (set ADMINER_AUTH in Dokploy)
-      - "traefik.http.routers.ohmkenya-adminer.middlewares=adminer-auth"
-      - "traefik.http.middlewares.adminer-auth.basicauth.users=${ADMINER_AUTH:-admin:$$apr1$$ruca84Hq$$mbjdMZBAG.KWn7vfN/SNK/}"
-      - "traefik.http.services.ohmkenya-adminer.loadbalancer.server.port=8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -142,16 +155,16 @@ services:
   # Queue (Redis)
   # ==========================================
   redis:
-    image: redis:7.4-alpine
-    container_name: ohmkenya-redis
+    image: redis:8.4.0-alpine3.22
+    container_name: smartflowmetering-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
       - backend
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -166,8 +179,8 @@ services:
   # - Monthly backups kept for 1 year
   # ==========================================
   backup:
-    image: prodrigestivill/postgres-backup-local:17-alpine
-    container_name: ohmkenya-backup
+    image: prodrigestivill/postgres-backup-local:18
+    container_name: smartflowmetering-backup
     restart: unless-stopped
     volumes:
       # Use named volume for Dokploy backup management
@@ -181,8 +194,8 @@ services:
       # Database connection
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-ohmkenya}
-      POSTGRES_USER: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-smartflowmetering}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       
       # Backup schedule (cron format)
@@ -227,8 +240,8 @@ networks:
 # ==========================================
 volumes:
   postgres_data:
-    name: ohmkenya_postgres_data
+    name: smartflowmetering_postgres_data
   redis_data:
-    name: ohmkenya_redis_data
+    name: smartflowmetering_redis_data
   backup_data:
-    name: ohmkenya_backup_data
+    name: smartflowmetering_backup_data

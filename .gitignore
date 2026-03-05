@@ -39,3 +39,5 @@ yarn-error.log*
 
 # Database backups (contain sensitive data)
 backups/
+AGENTS.md
+.env.example

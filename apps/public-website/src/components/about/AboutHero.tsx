@@ -11,7 +11,7 @@ export function AboutHero() {
         </div>
 
         <p className='text-base sm:text-lg text-muted-foreground text-center max-w-3xl mx-auto leading-relaxed'>
-          Founded in 2025, Ohm Kenya Limited is dedicated to transforming
+          Founded in 2025, Smart Flow Metering Limited is dedicated to transforming
           utility management for landlords and tenants across Kenya.
         </p>
       </div>

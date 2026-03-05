@@ -19,7 +19,7 @@ export function TermsOfService() {
               1. Acceptance of Terms
             </h2>
             <p className='text-muted-foreground leading-relaxed'>
-              By accessing and using Ohm Kenya Limited's services, including our
+              By accessing and using Smart Flow Metering Limited's services, including our
               prepaid utility metering platform, you agree to be bound by these
               Terms of Service. If you do not agree to these terms, please do
               not use our services.
@@ -31,7 +31,7 @@ export function TermsOfService() {
               2. Description of Services
             </h2>
             <p className='text-muted-foreground leading-relaxed'>
-              Ohm Kenya Limited provides prepaid utility metering solutions for
+              Smart Flow Metering Limited provides prepaid utility metering solutions for
               electricity, water, and gas. Our services include meter
               installation, token generation via M-Pesa, consumption monitoring,
               and utility management tools for landlords and tenants.
@@ -71,7 +71,7 @@ export function TermsOfService() {
               5. Limitation of Liability
             </h2>
             <p className='text-muted-foreground leading-relaxed'>
-              Ohm Kenya Limited shall not be liable for any indirect,
+              Smart Flow Metering Limited shall not be liable for any indirect,
               incidental, or consequential damages arising from the use of our
               services. We do not guarantee uninterrupted service and are not
               responsible for utility supply interruptions caused by third-party
@@ -110,9 +110,9 @@ export function TermsOfService() {
               For any questions regarding these Terms of Service, please contact
               us at{" "}
               <a
-                href='mailto:inquiries@ohmkenya.com'
+                href='mailto:inquiries@smartflowmetering.com'
                 className='text-primary hover:underline'>
-                inquiries@ohmkenya.com
+                inquiries@smartflowmetering.com
               </a>{" "}
               or call{" "}
               <a

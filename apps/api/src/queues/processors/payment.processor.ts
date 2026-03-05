@@ -98,6 +98,7 @@ async function handleRawCallback(body: MpesaRawCallbackJob) {
     amount: String(body.TransAmount),
     phoneNumber: body.MSISDN,
     mpesaReceiptNumber: body.TransID,
+    paymentMethod: "paybill",
   });
 }
 
@@ -188,7 +189,7 @@ async function processPaymentInternal(data: PaymentProcessingJob) {
       rateUsed: calculation.rateUsed,
       unitsPurchased: calculation.unitsPurchased,
       status: "processing",
-      paymentMethod: "paybill",
+      paymentMethod: data.paymentMethod ?? "paybill",
     })
     .returning();
 
@@ -204,6 +205,7 @@ async function processPaymentInternal(data: PaymentProcessingJob) {
       meterId: meter.id,
       meterNumber: meter.meterNumber,
       brand: meter.brand,
+      meterType: meter.meterType,
       units: calculation.unitsPurchased,
       supplyGroupCode: meter.supplyGroupCode,
       keyRevisionNumber: meter.keyRevisionNumber,

@@ -21,7 +21,7 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "Ohm Kenya Limited | Smart Utility Management",
+        title: "Smart Flow Metering Limited | Smart Utility Management",
       },
       {
         name: "description",

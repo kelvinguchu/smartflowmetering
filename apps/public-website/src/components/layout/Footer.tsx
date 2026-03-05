@@ -8,14 +8,14 @@ export function Footer() {
         <div className='flex flex-col md:flex-row justify-between items-start gap-8'>
           <div className='space-y-4 max-w-xs'>
             <img
-              src='/logo-assets/PNG/logo-horizontal-white.png'
-              alt='Ohm Kenya Limited Logo'
-              className='h-8 w-auto dark:hidden'
+              src='/logo-assets/PNG/logo-white.png'
+              alt='Smart Flow Metering Limited Logo'
+              className='h-20 w-auto object-contain dark:hidden'
             />
             <img
-              src='/logo-assets/PNG/logo-horizontal-black.png'
-              alt='Ohm Kenya Limited Logo'
-              className='h-8 w-auto hidden dark:block'
+              src='/logo-assets/PNG/logo-black.png'
+              alt='Smart Flow Metering Limited Logo'
+              className='hidden h-20 w-auto object-contain dark:block'
             />
             <p className='text-sm text-background/70'>
               Empowering landlords and property managers with seamless prepaid
@@ -94,9 +94,9 @@ export function Footer() {
               <ul className='space-y-2 text-sm text-background/70'>
                 <li>
                   <a
-                    href='mailto:inquiries@ohmkenya.com'
+                    href='mailto:inquiries@smartflowmetering.com'
                     className='hover:text-primary cursor-pointer'>
-                    inquiries@ohmkenya.com
+                    inquiries@smartflowmetering.com
                   </a>
                 </li>
                 <li>
@@ -113,7 +113,7 @@ export function Footer() {
 
         <div className='mt-12 border-t border-background/20 pt-8 text-center text-sm text-background/70'>
           <p>
-            &copy; {new Date().getFullYear()} Ohm Kenya Limited. All rights
+            &copy; {new Date().getFullYear()} Smart Flow Metering Limited. All rights
             reserved.
           </p>
         </div>

@@ -140,7 +140,7 @@ export function Hero() {
                 <div className='flex gap-2 items-center'>
                   <div className='w-2 h-2 lg:w-2.5 lg:h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]' />
                   <span className='text-[9px] lg:text-[10px] font-bold tracking-widest text-slate-400'>
-                    OHM KENYA
+                    SMART FLOW METERING
                   </span>
                 </div>
                 <div className='px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded text-[0.5rem] lg:text-[0.55rem] font-mono text-slate-500'>
@@ -196,7 +196,7 @@ export function Hero() {
                               ${key === "enter" ? "bg-linear-to-r from-green-500 to-emerald-600 border-green-700" : ""}
                               ${key === "del" ? "bg-linear-to-r from-red-500 to-rose-600 border-red-700 text-sm" : ""}
                            `}>
-                      {key === "enter" ? "↵" : key === "del" ? "DEL" : key}
+                      {key === "enter" ? "â†µ" : key === "del" ? "DEL" : key}
                     </motion.button>
                   );
                 })}

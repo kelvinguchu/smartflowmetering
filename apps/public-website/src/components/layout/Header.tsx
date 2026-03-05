@@ -33,13 +33,13 @@ export function Header() {
           ? "border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 shadow-sm"
           : "border-transparent bg-transparent"
       )}>
-      <div className='container flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-8'>
-        <div className='flex items-center gap-2'>
-          <Link to='/' className='flex items-center space-x-2 cursor-pointer'>
+      <div className='container flex h-20 max-w-screen-2xl items-center justify-between px-4 sm:px-8'>
+        <div className='flex items-center gap-2 shrink-0'>
+          <Link to='/' className='flex items-center cursor-pointer'>
             <img
-              src='/logo-assets/PNG/logo-horizontal.png'
-              alt='Ohm Kenya Limited Logo'
-              className='h-10 w-auto object-contain'
+              src='/logo-assets/PNG/logo-orange-black.png'
+              alt='Smart Flow Metering Limited Logo'
+              className='h-12 w-auto object-contain sm:h-14'
             />
           </Link>
         </div>

@@ -1,4 +1,6 @@
-import { Elysia, t } from "elysia";
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { db } from "../db";
 import { meters, tariffs, motherMeters } from "../db/schema";
 import {
@@ -7,288 +9,240 @@ import {
   meterQuerySchema,
 } from "../validators/meters";
 import { eq, and, desc } from "drizzle-orm";
-import { authMiddleware } from "../lib/auth-middleware";
+import {
+  requireAuth,
+  requireAdmin,
+  type AppBindings,
+} from "../lib/auth-middleware";
 
-/**
- * Meter Routes
- *
- * Handles:
- * - CRUD operations for sub-meters
- * - Meter lookup by number
- * - Meter status management
- */
-export const meterRoutes = new Elysia({ prefix: "/meters" })
-  // Apply auth middleware to this route group
-  .use(authMiddleware)
+const idParamSchema = z.object({
+  id: z.string().uuid(),
+});
 
-  /**
-   * List meters with optional filters (requires auth)
-   */
-  .get(
-    "/",
-    async ({ query }) => {
-      const conditions = [];
+const meterNumberParamSchema = z.object({
+  meterNumber: z.string(),
+});
 
-      if (query.status) {
-        conditions.push(eq(meters.status, query.status));
-      }
-      if (query.motherMeterId) {
-        conditions.push(eq(meters.motherMeterId, query.motherMeterId));
-      }
+export const meterRoutes = new Hono<AppBindings>();
 
-      const result = await db.query.meters.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-        with: {
-          tariff: {
-            columns: { id: true, name: true, ratePerKwh: true },
-          },
-          motherMeter: {
-            columns: { id: true, motherMeterNumber: true },
-          },
-        },
-        orderBy: [desc(meters.createdAt)],
-        limit: 50,
-      });
+meterRoutes.get(
+  "/",
+  requireAuth,
+  zValidator("query", meterQuerySchema),
+  async (c) => {
+    const query = c.req.valid("query");
+    const conditions = [];
 
-      return { data: result, count: result.length };
-    },
-    {
-      query: meterQuerySchema,
-      auth: true,
+    if (query.status) {
+      conditions.push(eq(meters.status, query.status));
     }
-  )
+    if (query.motherMeterId) {
+      conditions.push(eq(meters.motherMeterId, query.motherMeterId));
+    }
 
-  /**
-   * Get meter by ID
-   */
-  .get(
-    "/:id",
-    async ({ params, set }) => {
-      const meter = await db.query.meters.findFirst({
-        where: eq(meters.id, params.id),
-        with: {
-          tariff: true,
-          motherMeter: {
-            with: {
-              property: true,
-              landlord: true,
-            },
+    const result = await db.query.meters.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      with: {
+        tariff: {
+          columns: { id: true, name: true, ratePerKwh: true },
+        },
+        motherMeter: {
+          columns: { id: true, motherMeterNumber: true },
+        },
+      },
+      orderBy: [desc(meters.createdAt)],
+      limit: 50,
+    });
+
+    return c.json({ data: result, count: result.length });
+  }
+);
+
+meterRoutes.get(
+  "/:id",
+  requireAuth,
+  zValidator("param", idParamSchema),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const meter = await db.query.meters.findFirst({
+      where: eq(meters.id, id),
+      with: {
+        tariff: true,
+        motherMeter: {
+          with: {
+            property: true,
+            landlord: true,
           },
         },
-      });
+      },
+    });
 
-      if (!meter) {
-        set.status = 404;
-        return { error: "Meter not found" };
-      }
-
-      return { data: meter };
-    },
-    {
-      params: t.Object({
-        id: t.String({ format: "uuid" }),
-      }),
-      auth: true,
+    if (!meter) {
+      return c.json({ error: "Meter not found" }, 404);
     }
-  )
 
-  /**
-   * Lookup meter by meter number (for validation)
-   */
-  .get(
-    "/lookup/:meterNumber",
-    async ({ params, set }) => {
-      const meter = await db.query.meters.findFirst({
-        where: eq(meters.meterNumber, params.meterNumber),
-        with: {
-          tariff: {
-            columns: { id: true, name: true, ratePerKwh: true },
-          },
+    return c.json({ data: meter });
+  }
+);
+
+meterRoutes.get(
+  "/lookup/:meterNumber",
+  requireAuth,
+  zValidator("param", meterNumberParamSchema),
+  async (c) => {
+    const { meterNumber } = c.req.valid("param");
+    const meter = await db.query.meters.findFirst({
+      where: eq(meters.meterNumber, meterNumber),
+      with: {
+        tariff: {
+          columns: { id: true, name: true, ratePerKwh: true },
         },
-        columns: {
-          id: true,
-          meterNumber: true,
-          meterType: true,
-          brand: true,
-          status: true,
-        },
-      });
+      },
+      columns: {
+        id: true,
+        meterNumber: true,
+        meterType: true,
+        brand: true,
+        status: true,
+      },
+    });
 
-      if (!meter) {
-        set.status = 404;
-        return { error: "Meter not found", valid: false };
-      }
-
-      return {
-        valid: meter.status === "active",
-        data: meter,
-      };
-    },
-    {
-      params: t.Object({
-        meterNumber: t.String(),
-      }),
-      auth: true,
+    if (!meter) {
+      return c.json({ error: "Meter not found", valid: false }, 404);
     }
-  )
 
-  /**
-   * Create new meter
-   */
-  .post(
-    "/",
-    async ({ body, set }) => {
-      // Verify mother meter exists
-      const motherMeter = await db.query.motherMeters.findFirst({
-        where: eq(motherMeters.id, body.motherMeterId),
-      });
+    return c.json({
+      valid: meter.status === "active",
+      data: meter,
+    });
+  }
+);
 
-      if (!motherMeter) {
-        set.status = 400;
-        return { error: "Mother meter not found" };
-      }
+meterRoutes.post(
+  "/",
+  requireAuth,
+  zValidator("json", createMeterSchema),
+  async (c) => {
+    const body = c.req.valid("json");
 
-      // Verify tariff exists
+    const motherMeter = await db.query.motherMeters.findFirst({
+      where: eq(motherMeters.id, body.motherMeterId),
+    });
+
+    if (!motherMeter) {
+      return c.json({ error: "Mother meter not found" }, 400);
+    }
+
+    const tariff = await db.query.tariffs.findFirst({
+      where: eq(tariffs.id, body.tariffId),
+    });
+
+    if (!tariff) {
+      return c.json({ error: "Tariff not found" }, 400);
+    }
+
+    const existing = await db.query.meters.findFirst({
+      where: eq(meters.meterNumber, body.meterNumber),
+    });
+
+    if (existing) {
+      return c.json({ error: "Meter number already exists" }, 409);
+    }
+
+    const [meter] = await db
+      .insert(meters)
+      .values({
+        meterNumber: body.meterNumber,
+        meterType: body.meterType,
+        brand: body.brand,
+        motherMeterId: body.motherMeterId,
+        tariffId: body.tariffId,
+        supplyGroupCode: body.supplyGroupCode,
+        keyRevisionNumber: body.keyRevisionNumber ?? 1,
+        tariffIndex: body.tariffIndex ?? 1,
+      })
+      .returning();
+
+    return c.json({ data: meter }, 201);
+  }
+);
+
+meterRoutes.patch(
+  "/:id",
+  requireAuth,
+  zValidator("param", idParamSchema),
+  zValidator("json", updateMeterSchema),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const existing = await db.query.meters.findFirst({
+      where: eq(meters.id, id),
+    });
+
+    if (!existing) {
+      return c.json({ error: "Meter not found" }, 404);
+    }
+
+    if (body.tariffId) {
       const tariff = await db.query.tariffs.findFirst({
         where: eq(tariffs.id, body.tariffId),
       });
 
       if (!tariff) {
-        set.status = 400;
-        return { error: "Tariff not found" };
+        return c.json({ error: "Tariff not found" }, 400);
       }
-
-      // Check for duplicate meter number
-      const existing = await db.query.meters.findFirst({
-        where: eq(meters.meterNumber, body.meterNumber),
-      });
-
-      if (existing) {
-        set.status = 409;
-        return { error: "Meter number already exists" };
-      }
-
-      const [meter] = await db
-        .insert(meters)
-        .values({
-          meterNumber: body.meterNumber,
-          meterType: body.meterType,
-          brand: body.brand,
-          motherMeterId: body.motherMeterId,
-          tariffId: body.tariffId,
-          supplyGroupCode: body.supplyGroupCode,
-          keyRevisionNumber: body.keyRevisionNumber ?? 1,
-          tariffIndex: body.tariffIndex ?? 1,
-        })
-        .returning();
-
-      set.status = 201;
-      return { data: meter };
-    },
-    {
-      body: createMeterSchema,
-      auth: true,  // Users can register new meters
     }
-  )
 
-  /**
-   * Update meter
-   */
-  .patch(
-    "/:id",
-    async ({ params, body, set }) => {
-      // Verify meter exists
-      const existing = await db.query.meters.findFirst({
-        where: eq(meters.id, params.id),
-      });
+    const [updated] = await db
+      .update(meters)
+      .set({
+        ...body,
+        updatedAt: new Date(),
+      })
+      .where(eq(meters.id, id))
+      .returning();
 
-      if (!existing) {
-        set.status = 404;
-        return { error: "Meter not found" };
-      }
+    return c.json({ data: updated });
+  }
+);
 
-      // If updating tariff, verify it exists
-      if (body.tariffId) {
-        const tariff = await db.query.tariffs.findFirst({
-          where: eq(tariffs.id, body.tariffId),
-        });
+meterRoutes.post(
+  "/:id/suspend",
+  requireAdmin,
+  zValidator("param", idParamSchema),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const [updated] = await db
+      .update(meters)
+      .set({ status: "suspended", updatedAt: new Date() })
+      .where(eq(meters.id, id))
+      .returning();
 
-        if (!tariff) {
-          set.status = 400;
-          return { error: "Tariff not found" };
-        }
-      }
-
-      const [updated] = await db
-        .update(meters)
-        .set({
-          ...body,
-          updatedAt: new Date(),
-        })
-        .where(eq(meters.id, params.id))
-        .returning();
-
-      return { data: updated };
-    },
-    {
-      params: t.Object({
-        id: t.String({ format: "uuid" }),
-      }),
-      body: updateMeterSchema,
-      auth: true,  // Users can update meter details
+    if (!updated) {
+      return c.json({ error: "Meter not found" }, 404);
     }
-  )
 
-  /**
-   * Suspend meter
-   */
-  .post(
-    "/:id/suspend",
-    async ({ params, set }) => {
-      const [updated] = await db
-        .update(meters)
-        .set({ status: "suspended", updatedAt: new Date() })
-        .where(eq(meters.id, params.id))
-        .returning();
+    return c.json({ data: updated });
+  }
+);
 
-      if (!updated) {
-        set.status = 404;
-        return { error: "Meter not found" };
-      }
+meterRoutes.post(
+  "/:id/activate",
+  requireAdmin,
+  zValidator("param", idParamSchema),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const [updated] = await db
+      .update(meters)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(eq(meters.id, id))
+      .returning();
 
-      return { data: updated };
-    },
-    {
-      params: t.Object({
-        id: t.String({ format: "uuid" }),
-      }),
-      adminOnly: true,
+    if (!updated) {
+      return c.json({ error: "Meter not found" }, 404);
     }
-  )
 
-  /**
-   * Activate meter
-   */
-  .post(
-    "/:id/activate",
-    async ({ params, set }) => {
-      const [updated] = await db
-        .update(meters)
-        .set({ status: "active", updatedAt: new Date() })
-        .where(eq(meters.id, params.id))
-        .returning();
-
-      if (!updated) {
-        set.status = 404;
-        return { error: "Meter not found" };
-      }
-
-      return { data: updated };
-    },
-    {
-      params: t.Object({
-        id: t.String({ format: "uuid" }),
-      }),
-      adminOnly: true,
-    }
-  );
+    return c.json({ data: updated });
+  }
+);

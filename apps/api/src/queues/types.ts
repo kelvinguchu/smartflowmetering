@@ -10,6 +10,7 @@ export interface PaymentProcessingJob {
   amount: string;
   phoneNumber: string;
   mpesaReceiptNumber: string;
+  paymentMethod?: "paybill" | "stk_push" | "ussd";
 }
 
 /**
@@ -41,6 +42,7 @@ export interface TokenGenerationJob {
   meterId: string;
   meterNumber: string;
   brand: "hexing" | "stron" | "conlog";
+  meterType: "electricity" | "water" | "gas";
   units: string;
   supplyGroupCode: string;
   keyRevisionNumber: number;

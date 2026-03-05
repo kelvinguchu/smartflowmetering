@@ -24,9 +24,8 @@ function parseCost(cost: string | undefined): string | null {
  *
  * This job:
  * 1. Formats the token message
- * 2. Sends via primary provider (Africa's Talking)
- * 3. Falls back to secondary provider (Hostpinnacle) if primary fails
- * 4. Logs the delivery status
+ * 2. Sends via Hostpinnacle
+ * 3. Logs the delivery status
  */
 export async function processSmsDelivery(
   job: Job<SmsDeliveryJob>
@@ -48,12 +47,12 @@ export async function processSmsDelivery(
       transactionId,
       phoneNumber,
       messageBody: message,
-      provider: "africastalking",
+      provider: "hostpinnacle",
       status: "queued",
     })
     .returning();
 
-  // Send SMS with automatic fallback
+  // Send SMS
   const result = await sendSms(phoneNumber, message);
 
   // Update SMS log with result
@@ -61,7 +60,7 @@ export async function processSmsDelivery(
     .update(smsLogs)
     .set({
       status: result.success ? "sent" : "failed",
-      provider: result.provider ?? "africastalking",
+      provider: result.provider ?? "hostpinnacle",
       providerMessageId: result.messageId ?? null,
       cost: parseCost(result.cost),
       updatedAt: new Date(),
@@ -96,7 +95,7 @@ export async function processSmsResend(
     .set({ status: "queued", updatedAt: new Date() })
     .where(eq(smsLogs.id, smsLogId));
 
-  // Send SMS with automatic fallback
+  // Send SMS
   const result = await sendSms(phoneNumber, messageBody);
 
   // Update SMS log with result
@@ -104,7 +103,7 @@ export async function processSmsResend(
     .update(smsLogs)
     .set({
       status: result.success ? "sent" : "failed",
-      provider: result.provider ?? "africastalking",
+      provider: result.provider ?? "hostpinnacle",
       providerMessageId: result.messageId ?? null,
       cost: parseCost(result.cost),
       updatedAt: new Date(),

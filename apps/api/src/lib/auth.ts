@@ -5,7 +5,7 @@ import { db } from "../db";
 import { env } from "../config";
 
 /**
- * Better-Auth configuration for OHMKenya
+ * Better-Auth configuration for Smart Flow Metering
  *
  * Features:
  * - Email/password authentication
@@ -52,15 +52,12 @@ export const auth = betterAuth({
 
     // Two-factor authentication (TOTP)
     twoFactor({
-      issuer: "OHMKenya",
+      issuer: "Smart Flow Metering",
     }),
   ],
 
   // Trusted origins for CORS
-  trustedOrigins: [
-    "http://localhost:3000",
-    "http://localhost:3001",
-  ],
+  trustedOrigins: env.CORS_ORIGINS,
 });
 
 // Export types for use in routes

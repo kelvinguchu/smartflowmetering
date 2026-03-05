@@ -3,214 +3,127 @@ import { env } from "../config";
 /**
  * SMS Service
  *
- * Handles SMS delivery with:
- * - Sandbox/Live environment switching
- * - Africa's Talking (primary) + Hostpinnacle (fallback)
- * - Sender ID configuration
+ * Handles SMS delivery through Hostpinnacle.
  */
 
-// SMS result type
 export interface SmsResult {
   success: boolean;
   messageId?: string;
   cost?: string;
   error?: string;
-  provider?: "africastalking" | "hostpinnacle";
+  provider?: "hostpinnacle";
 }
 
-// Get the appropriate API key based on environment
-function getAfricasTalkingApiKey(): string {
-  if (env.AFRICASTALKING_ENVIRONMENT === "sandbox") {
-    return env.AFRICASTALKING_SANDBOX_API_KEY || env.AFRICASTALKING_API_KEY;
+function formatPhoneForSms(phoneNumber: string): string {
+  const cleanedPhoneNumber = phoneNumber.replace(/[^0-9+]/g, "");
+
+  if (cleanedPhoneNumber.startsWith("+")) {
+    return cleanedPhoneNumber.slice(1);
   }
-  return env.AFRICASTALKING_API_KEY;
+
+  if (cleanedPhoneNumber.startsWith("0")) {
+    return `254${cleanedPhoneNumber.slice(1)}`;
+  }
+
+  if (/^\d{9}$/.test(cleanedPhoneNumber)) {
+    return `254${cleanedPhoneNumber}`;
+  }
+
+  return cleanedPhoneNumber;
 }
 
-// Get the appropriate API URL based on environment
-function getAfricasTalkingApiUrl(): string {
-  if (env.AFRICASTALKING_ENVIRONMENT === "sandbox") {
-    return "https://api.sandbox.africastalking.com/version1/messaging";
-  }
-  return "https://api.africastalking.com/version1/messaging";
+function getMissingHostpinnacleEnvVars(): string[] {
+  const required: Array<[string, string | undefined]> = [
+    ["HOSTPINNACLE_API_URL", env.HOSTPINNACLE_API_URL],
+    ["HOSTPINNACLE_USER_ID", env.HOSTPINNACLE_USER_ID],
+    ["HOSTPINNACLE_PASSWORD", env.HOSTPINNACLE_PASSWORD],
+    ["HOSTPINNACLE_API_KEY", env.HOSTPINNACLE_API_KEY],
+    ["HOSTPINNACLE_SENDER_ID", env.HOSTPINNACLE_SENDER_ID],
+  ];
+
+  return required.filter(([, value]) => !value).map(([name]) => name);
 }
 
-// Get the username (sandbox uses 'sandbox', live uses configured username)
-function getAfricasTalkingUsername(): string {
-  if (env.AFRICASTALKING_ENVIRONMENT === "sandbox") {
-    return "sandbox";
-  }
-  return env.AFRICASTALKING_USERNAME;
-}
-
-/**
- * Send SMS via Africa's Talking
- */
-export async function sendViaAfricasTalking(
-  phoneNumber: string,
-  message: string
-): Promise<SmsResult> {
-  const apiKey = getAfricasTalkingApiKey();
-  const apiUrl = getAfricasTalkingApiUrl();
-  const username = getAfricasTalkingUsername();
-
-  if (!apiKey) {
-    console.warn("[SMS] Africa's Talking not configured");
-    return { success: false, error: "API key not configured" };
-  }
-
+function parseHostpinnacleResponse(rawBody: string): Record<string, unknown> {
   try {
-    // Build request params
-    const params = new URLSearchParams({
-      username,
-      to: phoneNumber,
-      message,
-    });
-
-    // Add sender ID if configured and verified (live only)
-    if (env.AFRICASTALKING_ENVIRONMENT === "live" && env.AFRICASTALKING_SENDER_ID) {
-      params.append("from", env.AFRICASTALKING_SENDER_ID);
-    }
-
-    console.log(`[SMS] Sending via Africa's Talking (${env.AFRICASTALKING_ENVIRONMENT})`);
-    console.log(`[SMS] URL: ${apiUrl}`);
-    console.log(`[SMS] Username: ${username}`);
-
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-        apiKey,
-      },
-      body: params.toString(),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(`[SMS] HTTP error: ${response.status}`, text);
-      return { success: false, error: `HTTP ${response.status}: ${text}` };
-    }
-
-    const data = (await response.json()) as {
-      SMSMessageData: {
-        Message: string;
-        Recipients: Array<{
-          messageId: string;
-          cost: string;
-          status: string;
-          statusCode: number;
-          number: string;
-        }>;
-      };
-    };
-
-    console.log(`[SMS] Response:`, JSON.stringify(data, null, 2));
-
-    const recipient = data.SMSMessageData.Recipients[0];
-
-    if (!recipient) {
-      return {
-        success: false,
-        error: data.SMSMessageData.Message || "No recipients in response",
-        provider: "africastalking",
-      };
-    }
-
-    // Check status code (101 = Sent, 100 = Processed)
-    if (recipient.statusCode === 101 || recipient.statusCode === 100 || recipient.status === "Success") {
-      return {
-        success: true,
-        messageId: recipient.messageId,
-        cost: recipient.cost,
-        provider: "africastalking",
-      };
-    }
-
-    // Map error codes to messages
-    const errorMessages: Record<number, string> = {
-      401: "RiskHold",
-      402: "InvalidSenderId",
-      403: "InvalidPhoneNumber",
-      404: "UnsupportedNumberType",
-      405: "InsufficientBalance",
-      406: "UserInBlacklist",
-      407: "CouldNotRoute",
-      409: "DoNotDisturbRejection",
-      500: "InternalServerError",
-      501: "GatewayError",
-      502: "RejectedByGateway",
-    };
-
-    return {
-      success: false,
-      error: errorMessages[recipient.statusCode] || recipient.status || "Unknown error",
-      provider: "africastalking",
-    };
-  } catch (error) {
-    console.error("[SMS] Africa's Talking error:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-      provider: "africastalking",
-    };
+    return JSON.parse(rawBody) as Record<string, unknown>;
+  } catch {
+    return {};
   }
 }
 
+function getResponseValue(response: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = response[key];
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+  return "";
+}
+
 /**
- * Send SMS via Hostpinnacle (fallback)
+ * Send SMS via Hostpinnacle.
  */
 export async function sendViaHostpinnacle(
   phoneNumber: string,
   message: string
 ): Promise<SmsResult> {
-  if (!env.HOSTPINNACLE_API_KEY) {
-    console.warn("[SMS] Hostpinnacle not configured");
-    return { success: false, error: "API key not configured" };
+  const missingEnv = getMissingHostpinnacleEnvVars();
+  if (missingEnv.length > 0) {
+    console.warn(`[SMS] Hostpinnacle not configured: ${missingEnv.join(", ")}`);
+    return {
+      success: false,
+      error: `Missing SMS configuration: ${missingEnv.join(", ")}`,
+      provider: "hostpinnacle",
+    };
   }
 
+  const formattedPhone = formatPhoneForSms(phoneNumber);
+  const payload = new URLSearchParams({
+    userid: env.HOSTPINNACLE_USER_ID,
+    password: env.HOSTPINNACLE_PASSWORD,
+    senderid: env.HOSTPINNACLE_SENDER_ID,
+    mobile: formattedPhone,
+    msg: message,
+    msgType: "text",
+    duplicatecheck: "true",
+    output: "json",
+    sendMethod: "quick",
+  });
+
   try {
-    console.log("[SMS] Sending via Hostpinnacle (fallback)");
+    const response = await fetch(env.HOSTPINNACLE_API_URL, {
+      method: "POST",
+      headers: {
+        apikey: env.HOSTPINNACLE_API_KEY,
+        "cache-control": "no-cache",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: payload,
+    });
 
-    const response = await fetch(
-      "https://smsportal.hostpinnacle.co.ke/SMSApi/send",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          apiKey: env.HOSTPINNACLE_API_KEY,
-          senderId: env.HOSTPINNACLE_SENDER_ID || "OHMKenya",
-          phone: phoneNumber,
-          message,
-        }),
-      }
-    );
+    const rawBody = await response.text();
+    const body = parseHostpinnacleResponse(rawBody);
 
-    if (!response.ok) {
-      return {
-        success: false,
-        error: `HTTP ${response.status}`,
-        provider: "hostpinnacle",
-      };
-    }
+    const status = getResponseValue(body, ["status", "responseCode"]).toLowerCase();
+    const messageId = getResponseValue(body, ["msgid", "messageId", "id"]);
+    const errorMessage =
+      getResponseValue(body, ["message", "error", "responseDescription"]) ||
+      (rawBody.trim() ? rawBody : `HTTP ${response.status}`);
 
-    const data = (await response.json()) as {
-      messageId?: string;
-      status?: string;
-    };
-
-    if (data.messageId) {
+    const successStatus = status === "success" || status === "ok" || status === "queued";
+    if ((response.ok && !status) || successStatus) {
       return {
         success: true,
-        messageId: data.messageId,
+        messageId: messageId || undefined,
         provider: "hostpinnacle",
       };
     }
 
     return {
       success: false,
-      error: data.status ?? "Unknown error",
+      error: errorMessage,
       provider: "hostpinnacle",
     };
   } catch (error) {
@@ -224,28 +137,17 @@ export async function sendViaHostpinnacle(
 }
 
 /**
- * Send SMS with automatic fallback
- *
- * Tries Africa's Talking first, falls back to Hostpinnacle if it fails
+ * Send SMS with the configured provider.
  */
 export async function sendSms(
   phoneNumber: string,
   message: string
 ): Promise<SmsResult> {
-  // Try primary provider
-  let result = await sendViaAfricasTalking(phoneNumber, message);
-
-  // Fallback to secondary if primary fails
-  if (!result.success) {
-    console.log("[SMS] Primary provider failed, trying fallback...");
-    result = await sendViaHostpinnacle(phoneNumber, message);
-  }
-
-  return result;
+  return sendViaHostpinnacle(phoneNumber, message);
 }
 
 /**
- * Format token SMS message
+ * Format token SMS message.
  */
 export function formatTokenSms(
   meterNumber: string,
@@ -253,10 +155,9 @@ export function formatTokenSms(
   units: string,
   amount: string
 ): string {
-  // Format token with dashes: 1234-5678-9012-3456-7890
   const formattedToken = token.replace(/(.{4})/g, "$1-").slice(0, -1);
 
-  return `OHMKenya: Token for meter ${meterNumber}
+  return `Smart Flow Metering: Token for meter ${meterNumber}
 Amount: KES ${amount}
 Units: ${units} kWh
 Token: ${formattedToken}
@@ -264,13 +165,13 @@ Enter this token on your meter.`;
 }
 
 /**
- * Mock SMS for development/testing
+ * Mock SMS for development/testing.
  */
 export function mockSmsSuccess(): SmsResult {
   return {
     success: true,
     messageId: `mock-${Date.now()}`,
     cost: "0.00",
-    provider: "africastalking",
+    provider: "hostpinnacle",
   };
 }

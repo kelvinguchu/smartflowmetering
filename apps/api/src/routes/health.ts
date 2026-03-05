@@ -1,85 +1,81 @@
-import { Elysia } from "elysia";
+import { Hono } from "hono";
 import { db } from "../db";
 import { getQueueHealth } from "../queues";
+import type { AppBindings } from "../lib/auth-middleware";
 
 /**
  * Health Check Routes
  *
  * Provides system health information
  */
-export const healthRoutes = new Elysia({ prefix: "/health" })
-  /**
-   * Basic health check
-   */
-  .get("/", () => ({
+export const healthRoutes = new Hono<AppBindings>();
+
+healthRoutes.get("/", (c) =>
+  c.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    service: "ohmkenya-api",
-  }))
-
-  /**
-   * Detailed health check with dependencies
-   */
-  .get("/detailed", async () => {
-    const checks: Record<
-      string,
-      { status: string; latency?: number; error?: string; data?: unknown }
-    > = {};
-
-    // Check database
-    const dbStart = Date.now();
-    try {
-      await db.execute("SELECT 1");
-      checks.database = {
-        status: "ok",
-        latency: Date.now() - dbStart,
-      };
-    } catch (error) {
-      checks.database = {
-        status: "error",
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-
-    // Check Redis/Queues
-    const queueStart = Date.now();
-    try {
-      const queueHealth = await getQueueHealth();
-      checks.queues = {
-        status: "ok",
-        latency: Date.now() - queueStart,
-        data: queueHealth,
-      };
-    } catch (error) {
-      checks.queues = {
-        status: "error",
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-
-    const allHealthy = Object.values(checks).every((c) => c.status === "ok");
-
-    return {
-      status: allHealthy ? "ok" : "degraded",
-      timestamp: new Date().toISOString(),
-      checks,
-    };
+    service: "smartflowmetering-api",
   })
+);
 
-  /**
-   * Queue status endpoint
-   */
-  .get("/queues", async () => {
-    try {
-      const queueHealth = await getQueueHealth();
-      return {
-        status: "ok",
-        queues: queueHealth,
-      };
-    } catch (error) {
-      return {
+healthRoutes.get("/detailed", async (c) => {
+  const checks: Record<
+    string,
+    { status: string; latency?: number; error?: string; data?: unknown }
+  > = {};
+
+  const dbStart = Date.now();
+  try {
+    await db.execute("SELECT 1");
+    checks.database = {
+      status: "ok",
+      latency: Date.now() - dbStart,
+    };
+  } catch (error) {
+    checks.database = {
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+
+  const queueStart = Date.now();
+  try {
+    const queueHealth = await getQueueHealth();
+    checks.queues = {
+      status: "ok",
+      latency: Date.now() - queueStart,
+      data: queueHealth,
+    };
+  } catch (error) {
+    checks.queues = {
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+
+  const allHealthy = Object.values(checks).every((result) => result.status === "ok");
+
+  return c.json({
+    status: allHealthy ? "ok" : "degraded",
+    timestamp: new Date().toISOString(),
+    checks,
+  });
+});
+
+healthRoutes.get("/queues", async (c) => {
+  try {
+    const queueHealth = await getQueueHealth();
+    return c.json({
+      status: "ok",
+      queues: queueHealth,
+    });
+  } catch (error) {
+    return c.json(
+      {
         status: "error",
         error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  });
+      },
+      500
+    );
+  }
+});
