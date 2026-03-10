@@ -16,9 +16,9 @@ export function MissionVision() {
               </h2>
             </div>
             <p className='text-muted-foreground leading-relaxed'>
-              To empower every Kenyan landlord and tenant with accessible,
-              reliable utility management—making electricity, water, and gas
-              payments as simple as a single tap on your phone, regardless of
+              To empower every Kenyan landlord and tenant with affordable
+              prepaid sub meters—making electricity, water, and gas token
+              purchases as simple as a single M-Pesa payment, regardless of
               where you are or what time it is.
             </p>
           </div>
@@ -36,8 +36,8 @@ export function MissionVision() {
             <p className='text-muted-foreground leading-relaxed'>
               A Kenya where no tenant ever sits in the dark waiting for
               electricity, and every landlord enjoys peace of mind knowing their
-              properties are efficiently managed—building communities powered by
-              trust, technology, and transparency.
+              prepaid sub meters are efficiently managed—building communities
+              powered by trust, technology, and transparency.
             </p>
           </div>
         </div>

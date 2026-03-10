@@ -10,7 +10,6 @@ import { transactions } from "./transactions";
 import { failedTransactions } from "./failed-transactions";
 import { generatedTokens } from "./generated-tokens";
 import { smsLogs } from "./sms-logs";
-import { adminNotifications } from "./admin-notifications";
 
 export {
   user,

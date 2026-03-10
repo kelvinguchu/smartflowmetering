@@ -1,14 +1,13 @@
 /* Google Fonts Import */
-@import url("https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap");
-
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&family=Sora:wght@100..800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Google Sans", sans-serif;
-  --font-heading: "Raleway", sans-serif;
+  --font-sans: "Manrope", sans-serif;
+  --font-heading: "Sora", sans-serif;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -84,6 +83,9 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  html{
+    @apply scroll-smooth overflow-x-hidden;
   }
   body {
     @apply bg-background text-foreground font-sans m-0;

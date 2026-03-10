@@ -27,14 +27,14 @@
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.12.5",
-    "postgres": "^3.4.7"
+    "postgres": "^3.4.7",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.3.3",
     "drizzle-kit": "^0.31.8",
     "typescript": "^5.9.2",
-    "tsx": "^4.21.0",
-    "zod": "^4.3.6"
+    "tsx": "^4.21.0"
   },
   "module": "src/index.js"
 }

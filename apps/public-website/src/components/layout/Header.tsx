@@ -31,21 +31,21 @@ export function Header() {
         "fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300",
         isScrolled
           ? "border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 shadow-sm"
-          : "border-transparent bg-transparent"
+          : "border-transparent bg-transparent",
       )}>
       <div className='container flex h-20 max-w-screen-2xl items-center justify-between px-4 sm:px-8'>
         <div className='flex items-center gap-2 shrink-0'>
           <Link to='/' className='flex items-center cursor-pointer'>
             <img
-              src='/logo-assets/PNG/logo-orange-black.png'
+              src='/logo-assets/PNG/logo-black-orange-horizontal.png'
               alt='Smart Flow Metering Limited Logo'
-              className='h-12 w-auto object-contain sm:h-14'
+              className='h-10 w-auto object-contain sm:h-12'
             />
           </Link>
         </div>
 
         {/* Desktop Navigation */}
-        <nav className='hidden md:flex items-center gap-6 text-sm font-medium'>
+        <nav className='hidden md:flex items-center gap-8 text-base font-medium'>
           <Link
             to='/'
             className='transition-colors hover:text-primary cursor-pointer'>
@@ -59,24 +59,93 @@ export function Header() {
 
           {/* Solutions Dropdown - Pure CSS Hover */}
           <div className='relative group'>
-            <button className='flex items-center gap-1 transition-colors hover:text-primary cursor-pointer outline-none'>
+            <button className='flex items-center gap-1.5 transition-colors hover:text-primary cursor-pointer outline-none'>
               Solutions
-              <MdKeyboardArrowDown className='text-lg transition-transform duration-200 group-hover:rotate-180' />
+              <MdKeyboardArrowDown className='text-xl transition-transform duration-200 group-hover:rotate-180' />
             </button>
 
             {/* Dropdown Menu */}
-            <div className='absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200'>
-              <div className='bg-card rounded-xl shadow-xl border border-border/50 py-2 min-w-55'>
-                {products.map((product) => (
-                  <Link
-                    key={product.id}
-                    to='/meters/$meterId'
-                    params={{ meterId: product.id }}
-                    className='flex items-center gap-2 px-4 py-2.5 hover:bg-secondary cursor-pointer transition-colors'>
-                    <product.icon className={cn("text-base", product.color)} />
-                    <span className='font-medium text-sm'>{product.name}</span>
-                  </Link>
-                ))}
+            <div className='absolute top-full -left-32 pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200'>
+              <div className='bg-card/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/40 p-5 w-130'>
+                {/* Group by type */}
+                <div className='grid grid-cols-2 gap-4'>
+                  {/* Electricity column */}
+                  <div className='space-y-1.5'>
+                    <span className='text-[0.7rem] font-bold uppercase tracking-widest text-muted-foreground/70 px-2'>
+                      Electricity
+                    </span>
+                    {products
+                      .filter((p) => p.type === "Electricity")
+                      .map((product) => (
+                        <Link
+                          key={product.id}
+                          to='/meters/$meterId'
+                          params={{ meterId: product.id }}
+                          className='flex items-start gap-3 px-2 py-2.5 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group/item'>
+                          <div
+                            className={cn(
+                              "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                              product.bgColor,
+                            )}>
+                            <product.icon
+                              className={cn("text-lg", product.color)}
+                            />
+                          </div>
+                          <div className='min-w-0'>
+                            <p className='text-sm font-semibold leading-tight group-hover/item:text-primary transition-colors'>
+                              {product.name}
+                            </p>
+                            <p className='text-xs text-muted-foreground mt-0.5 leading-snug'>
+                              {product.tagline}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                  </div>
+
+                  {/* Water & Gas column */}
+                  <div className='space-y-1.5'>
+                    <span className='text-[0.7rem] font-bold uppercase tracking-widest text-muted-foreground/70 px-2'>
+                      Water & Gas
+                    </span>
+                    {products
+                      .filter((p) => p.type === "Water" || p.type === "Gas")
+                      .map((product) => (
+                        <Link
+                          key={product.id}
+                          to='/meters/$meterId'
+                          params={{ meterId: product.id }}
+                          className='flex items-start gap-3 px-2 py-2.5 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group/item'>
+                          <div
+                            className={cn(
+                              "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                              product.bgColor,
+                            )}>
+                            <product.icon
+                              className={cn("text-lg", product.color)}
+                            />
+                          </div>
+                          <div className='min-w-0'>
+                            <p className='text-sm font-semibold leading-tight group-hover/item:text-primary transition-colors'>
+                              {product.name}
+                            </p>
+                            <p className='text-xs text-muted-foreground mt-0.5 leading-snug'>
+                              {product.tagline}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+
+                    {/* CTA */}
+                    <div className='mt-3 pt-3 border-t border-border/30 px-2'>
+                      <Link
+                        to='/contact'
+                        className='text-xs font-semibold text-primary hover:underline cursor-pointer'>
+                        Need help choosing? Contact us &rarr;
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -91,7 +160,7 @@ export function Header() {
         <div className='flex items-center gap-4'>
           <Button
             asChild
-            className='hidden sm:inline-flex bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 cursor-pointer'>
+            className='hidden sm:inline-flex bg-primary hover:bg-primary/90 text-white text-base shadow-lg shadow-primary/20 cursor-pointer'>
             <Link to='/register'>Register</Link>
           </Button>
 

@@ -5,7 +5,7 @@ export { tariffRoutes } from "./tariffs";
 export { transactionRoutes } from "./transactions";
 export { healthRoutes } from "./health";
 export { smsRoutes } from "./sms";
-export { gomelongRoutes } from "./gomelong";
+export { gomelongRoutes } from "./meter-providers/gomelong";
 export { applicationRoutes } from "./applications";
 export { motherMeterRoutes } from "./mother-meters";
 export { notificationRoutes } from "./notifications";

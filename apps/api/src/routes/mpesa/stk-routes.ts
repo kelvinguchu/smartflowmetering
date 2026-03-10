@@ -17,9 +17,22 @@ import {
   stkPushQuerySchema,
   stkPushRequestSchema,
 } from "../../validators/mpesa";
-import { formatMpesaTimestamp, rejectIfInvalidMpesaSource, type MpesaRouter } from "./shared";
+import {
+  formatMpesaTimestamp,
+  rejectIfInvalidMpesaSource,
+  type MpesaRouter,
+} from "./shared";
 
 export function registerStkRoutes(router: MpesaRouter) {
+  const guardStkCallbackSource = async (c: any, next: () => Promise<void>) => {
+    const rejection = await rejectIfInvalidMpesaSource(c, "STK Callback", {
+      ResultCode: 1,
+      ResultDesc: "Forbidden",
+    });
+    if (rejection) return rejection;
+    await next();
+  };
+
   router.post(
     "/stk-push",
     requireAuth,
@@ -27,13 +40,20 @@ export function registerStkRoutes(router: MpesaRouter) {
     zValidator("json", stkPushRequestSchema),
     async (c) => {
       const body = c.req.valid("json");
-      const { phoneNumber, amount, accountReference, meterNumber, transactionDesc } = body;
+      const {
+        phoneNumber,
+        amount,
+        accountReference,
+        meterNumber,
+        transactionDesc,
+      } = body;
       const formattedPhone = formatPhoneNumber(phoneNumber);
 
       if (!/^254[17]\d{8}$/.test(formattedPhone)) {
         return c.json({
           success: false,
-          error: "Invalid phone number format. Must be a valid Kenyan phone number.",
+          error:
+            "Invalid phone number format. Must be a valid Kenyan phone number.",
         });
       }
 
@@ -51,7 +71,8 @@ export function registerStkRoutes(router: MpesaRouter) {
           phoneNumber: formattedPhone,
           amount,
           accountReference: reference,
-          transactionDesc: transactionDesc || "Smart Flow Metering Token Purchase",
+          transactionDesc:
+            transactionDesc || "Smart Flow Metering Token Purchase",
         });
 
         if (!result.success) {
@@ -81,7 +102,8 @@ export function registerStkRoutes(router: MpesaRouter) {
 
         return c.json({
           success: true,
-          message: "STK Push initiated. Check your phone for the payment prompt.",
+          message:
+            "STK Push initiated. Check your phone for the payment prompt.",
           checkoutRequestId: result.checkoutRequestId,
           merchantRequestId: result.merchantRequestId,
         });
@@ -92,20 +114,16 @@ export function registerStkRoutes(router: MpesaRouter) {
           error: "Failed to initiate STK Push. Please try again.",
         });
       }
-    }
+    },
   );
 
   router.post(
     "/stk-push/callback",
     mpesaRateLimit,
+    guardStkCallbackSource,
     zValidator("json", stkPushCallbackSchema),
     async (c) => {
       const body = c.req.valid("json");
-      const rejection = await rejectIfInvalidMpesaSource(c, "STK Callback", {
-        ResultCode: 1,
-        ResultDesc: "Forbidden",
-      });
-      if (rejection) return rejection;
 
       console.log("[STK Callback] Received:", JSON.stringify(body, null, 2));
 
@@ -118,7 +136,10 @@ export function registerStkRoutes(router: MpesaRouter) {
           .limit(1);
 
         if (!existingTx) {
-          console.error("[STK Callback] Transaction not found:", parsed.checkoutRequestId);
+          console.error(
+            "[STK Callback] Transaction not found:",
+            parsed.checkoutRequestId,
+          );
           return c.json({ ResultCode: "0", ResultDesc: "Accepted" });
         }
 
@@ -138,16 +159,16 @@ export function registerStkRoutes(router: MpesaRouter) {
             "process-stk-payment",
             {
               mpesaTransactionId: existingTx.id,
-            meterNumber: existingTx.billRefNumber,
-            amount: existingTx.transAmount,
-            phoneNumber: existingTx.msisdn,
-            mpesaReceiptNumber: parsed.mpesaReceiptNumber,
-            paymentMethod: "stk_push",
-          },
+              meterNumber: existingTx.billRefNumber,
+              amount: existingTx.transAmount,
+              phoneNumber: existingTx.msisdn,
+              mpesaReceiptNumber: parsed.mpesaReceiptNumber,
+              paymentMethod: "stk_push",
+            },
             {
               attempts: 3,
               backoff: { type: "exponential", delay: 5000 },
-            }
+            },
           );
         } else {
           const existingPayload =
@@ -169,7 +190,7 @@ export function registerStkRoutes(router: MpesaRouter) {
       }
 
       return c.json({ ResultCode: "0", ResultDesc: "Accepted" });
-    }
+    },
   );
 
   router.get(
@@ -212,6 +233,6 @@ export function registerStkRoutes(router: MpesaRouter) {
           error: "Failed to query STK Push status",
         });
       }
-    }
+    },
   );
 }

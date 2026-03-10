@@ -2,16 +2,8 @@ import type { Job } from "bullmq";
 import { db } from "../../db";
 import { smsLogs } from "../../db/schema";
 import { eq } from "drizzle-orm";
-import type {
-  SmsDeliveryJob,
-  SmsJob,
-  SmsNotificationJob,
-  SmsResendJob,
-} from "../types";
-import {
-  sendSms,
-  formatTokenSms,
-} from "../../services/sms.service";
+import type { SmsJob, SmsNotificationJob, SmsResendJob } from "../types";
+import { sendSms, formatTokenSms } from "../../services/sms.service";
 
 /**
  * Parse cost string from provider (e.g., "KES 0.8000" -> "0.8000")
@@ -32,17 +24,22 @@ function parseCost(cost: string | undefined): string | null {
  * 3. Logs the delivery status
  */
 export async function processSmsDelivery(
-  job: Job<SmsJob>
+  job: Job<SmsJob>,
 ): Promise<{ messageId: string }> {
+  if (isResendJob(job.data)) {
+    return processResendSms(job.data);
+  }
+
   if (isNotificationJob(job.data)) {
     return processNotificationSms(job.data);
   }
 
-  const { transactionId, phoneNumber, meterNumber, token, units, amount } = job.data;
+  const { transactionId, phoneNumber, meterNumber, token, units, amount } =
+    job.data;
   const message = formatTokenSms(meterNumber, token, units, amount);
 
   console.log(
-    `[SMS] Sending to ${phoneNumber}: ${message.substring(0, 50)}...`
+    `[SMS] Sending to ${phoneNumber}: ${message.substring(0, 50)}...`,
   );
 
   // Create SMS log entry
@@ -77,33 +74,26 @@ export async function processSmsDelivery(
   }
 
   console.log(
-    `[SMS] Delivered to ${phoneNumber}, messageId: ${result.messageId}`
+    `[SMS] Delivered to ${phoneNumber}, messageId: ${result.messageId}`,
   );
 
   return { messageId: result.messageId! };
 }
 
-/**
- * SMS Resend Processor
- * For manual resends triggered by admin
- */
-export async function processSmsResend(
-  job: Job<SmsResendJob>
+async function processResendSms(
+  data: SmsResendJob,
 ): Promise<{ messageId: string }> {
-  const { smsLogId, phoneNumber, messageBody } = job.data;
+  const { smsLogId, phoneNumber, messageBody } = data;
 
   console.log(`[SMS] Resending to ${phoneNumber}`);
 
-  // Update existing log to show retry
   await db
     .update(smsLogs)
     .set({ status: "queued", updatedAt: new Date() })
     .where(eq(smsLogs.id, smsLogId));
 
-  // Send SMS
   const result = await sendSms(phoneNumber, messageBody);
 
-  // Update SMS log with result
   await db
     .update(smsLogs)
     .set({
@@ -125,13 +115,18 @@ export async function processSmsResend(
 }
 
 async function processNotificationSms(
-  data: SmsNotificationJob
+  data: SmsNotificationJob,
 ): Promise<{ messageId: string }> {
   const phoneNumber = data.phoneNumber;
   const messageBody = data.messageBody;
 
   let smsLogId = data.smsLogId;
-  if (!smsLogId) {
+  if (smsLogId) {
+    await db
+      .update(smsLogs)
+      .set({ status: "queued", updatedAt: new Date() })
+      .where(eq(smsLogs.id, smsLogId));
+  } else {
     const [smsLog] = await db
       .insert(smsLogs)
       .values({
@@ -144,11 +139,6 @@ async function processNotificationSms(
       .returning({ id: smsLogs.id });
 
     smsLogId = smsLog.id;
-  } else {
-    await db
-      .update(smsLogs)
-      .set({ status: "queued", updatedAt: new Date() })
-      .where(eq(smsLogs.id, smsLogId));
   }
 
   const result = await sendSms(phoneNumber, messageBody);
@@ -171,8 +161,12 @@ async function processNotificationSms(
   return { messageId: result.messageId! };
 }
 
-function isNotificationJob(
-  data: SmsJob
-): data is SmsNotificationJob | SmsResendJob {
-  return "messageBody" in data;
+function isResendJob(data: SmsJob): data is SmsResendJob {
+  return (
+    "messageBody" in data && "smsLogId" in data && !("transactionId" in data)
+  );
+}
+
+function isNotificationJob(data: SmsJob): data is SmsNotificationJob {
+  return "messageBody" in data && !isResendJob(data);
 }

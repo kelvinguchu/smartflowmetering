@@ -1,6 +1,6 @@
 export * from "./mpesa.service";
 export * from "./sms.service";
-export * from "./gomelong.service";
+export * from "./meter-providers/gomelong.service";
 export * from "./audit-log.service";
 export * from "./application-onboarding.service";
 export * from "./mother-meter-analytics.service";

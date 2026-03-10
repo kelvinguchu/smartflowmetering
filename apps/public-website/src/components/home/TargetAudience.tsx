@@ -12,12 +12,12 @@ const sectors = [
     title: "Residential Buildings",
     tagline: "Smart living for modern communities",
     description:
-      "Empower tenants and property managers with precise, real-time consumption tracking. Our residential solutions eliminate billing disputes and improve collection efficiency.",
+      "Empower tenants and property managers with prepaid sub meters for precise, real-time consumption tracking. Our residential sub metering solutions eliminate billing disputes and improve collection efficiency.",
     details: [
-      "Individual unit sub-metering",
-      "Mobile app for tenant payments",
+      "Individual unit prepaid sub metering",
+      "M-Pesa token payments for tenants",
       "Automated billing & notifications",
-      "Leak inspection & alerts",
+      "Leak detection & alerts",
     ],
     image: "/assets/residential-building.jpg",
     icon: MdOutlineHome,
@@ -28,9 +28,9 @@ const sectors = [
     title: "Commercial Complexes",
     tagline: "Efficient operations for business hubs",
     description:
-      "Streamline utility management for shopping malls, office complexes, and mixed-use developments. Ensure accurate cost allocation and recover utility expenses seamlessly.",
+      "Streamline utility management for shopping malls, office complexes, and mixed-use developments with prepaid sub meters. Ensure accurate cost allocation and recover utility expenses via token metering.",
     details: [
-      "Multi-tariff management",
+      "Multi-tariff sub meter management",
       "Common area cost allocation",
       "Peak load monitoring",
       "Integration with BMS",
@@ -44,9 +44,9 @@ const sectors = [
     title: "Industrial Facilities",
     tagline: "High-capacity solutions for factories",
     description:
-      "Optimized metering for high-consumption environments. Monitor power quality, manage demand, and reduce operational costs with industrial-grade precision.",
+      "Prepaid 3-phase sub meters optimized for high-consumption environments. Monitor power quality, manage demand, and reduce operational costs with industrial-grade precision.",
     details: [
-      "High-voltage metering",
+      "3-phase sub metering",
       "Power factor monitoring",
       "Demand side management",
       "Shift-based consumption analysis",
@@ -77,13 +77,13 @@ export function TargetAudience() {
               <div
                 className={cn(
                   "grid lg:grid-cols-2 gap-3 h-full",
-                  index % 2 !== 0 && "lg:grid-flow-dense"
+                  index % 2 !== 0 && "lg:grid-flow-dense",
                 )}>
                 {/* Image Section */}
                 <div
                   className={cn(
-                    "relative h-[250px] sm:h-[350px] lg:h-auto w-full overflow-hidden rounded-2xl",
-                    index % 2 !== 0 && "lg:col-start-2"
+                    "relative h-62.5 sm:h-87.5 lg:h-auto w-full overflow-hidden rounded-2xl",
+                    index % 2 !== 0 && "lg:col-start-2",
                   )}>
                   <img
                     src={sector.image}
@@ -96,7 +96,7 @@ export function TargetAudience() {
                 <div
                   className={cn(
                     "flex flex-col justify-center p-5 sm:p-8 lg:p-12 rounded-2xl h-full",
-                    "bg-secondary/80 dark:bg-secondary/20"
+                    "bg-secondary/80 dark:bg-secondary/20",
                   )}>
                   <div className='space-y-6'>
                     <div className='flex items-center gap-3'>
@@ -104,7 +104,7 @@ export function TargetAudience() {
                       <span
                         className={cn(
                           "text-sm font-bold uppercase tracking-wider",
-                          sector.color
+                          sector.color,
                         )}>
                         {sector.title}
                       </span>
@@ -125,7 +125,7 @@ export function TargetAudience() {
                           <MdOutlineCheckCircle
                             className={cn(
                               "mt-1 text-xl shrink-0 opacity-80",
-                              sector.color
+                              sector.color,
                             )}
                           />
                           <span className='font-medium text-foreground/90'>

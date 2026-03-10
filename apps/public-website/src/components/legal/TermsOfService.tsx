@@ -110,9 +110,9 @@ export function TermsOfService() {
               For any questions regarding these Terms of Service, please contact
               us at{" "}
               <a
-                href='mailto:inquiries@smartflowmetering.com'
+                href='mailto:inquiries@smartmetering.africa'
                 className='text-primary hover:underline'>
-                inquiries@smartflowmetering.com
+                inquiries@smartmetering.africa
               </a>{" "}
               or call{" "}
               <a

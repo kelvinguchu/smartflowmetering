@@ -269,7 +269,7 @@ function ProgressBar({ loading }: { loading: boolean }) {
       />
       <div className="flex-1 h-2 bg-[#2D2640] rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-[#7553FF] to-[#B3A1FF] rounded-full transition-all duration-500"
+          className="h-full bg-linear-to-r from-[#7553FF] to-[#B3A1FF] rounded-full transition-all duration-500"
           style={{ width: loading ? '60%' : '100%' }}
         />
       </div>

@@ -19,13 +19,6 @@ async function getSessionFromHeaders(headers: Headers): Promise<SessionResult> {
   return auth.api.getSession({ headers });
 }
 
-export const loadAuthContext = createMiddleware<AppBindings>(async (c, next) => {
-  const session = await getSessionFromHeaders(c.req.raw.headers);
-  c.set("authSession", session?.session ?? null);
-  c.set("authUser", session?.user ?? null);
-  await next();
-});
-
 export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
   const session = await getSessionFromHeaders(c.req.raw.headers);
   const authSession = session?.session ?? null;
@@ -37,7 +30,7 @@ export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
         error: "Unauthorized",
         message: "Unauthorized: Please sign in to access this resource",
       },
-      401
+      401,
     );
   }
 
@@ -47,7 +40,7 @@ export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
         error: "Forbidden",
         message: "Forbidden: Your account has been suspended",
       },
-      403
+      403,
     );
   }
 
@@ -69,7 +62,7 @@ export const requireAdmin = createMiddleware<AppBindings>(async (c, next) => {
         error: "Unauthorized",
         message: "Unauthorized: Please sign in to access this resource",
       },
-      401
+      401,
     );
   }
 
@@ -79,7 +72,7 @@ export const requireAdmin = createMiddleware<AppBindings>(async (c, next) => {
         error: "Forbidden",
         message: "Forbidden: Your account has been suspended",
       },
-      403
+      403,
     );
   }
 
@@ -89,7 +82,7 @@ export const requireAdmin = createMiddleware<AppBindings>(async (c, next) => {
         error: "Forbidden",
         message: "Forbidden: Admin access required",
       },
-      403
+      403,
     );
   }
 
