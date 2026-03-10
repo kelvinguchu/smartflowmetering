@@ -86,19 +86,19 @@ export function Hero() {
         <div className='absolute bottom-[-10%] left-[-10%] w-150 h-150 bg-accent/5 rounded-full blur-[100px]' />
       </div>
 
-      <div className='container relative z-10 w-full px-4 sm:px-8 flex h-full pt-16 items-center justify-center'>
-        <div className='grid gap-8 lg:gap-8 lg:grid-cols-[1fr_auto] items-center'>
+      <div className='relative z-10 w-full max-w-screen-2xl mx-auto px-6 sm:px-10 lg:px-16 xl:px-24 flex h-full pt-20 items-center justify-center'>
+        <div className='grid gap-8 lg:gap-12 xl:gap-20 lg:grid-cols-[1fr_auto] items-center w-full'>
           {/* Left Column: Text Content */}
-          <div className='flex flex-col justify-center space-y-6 lg:space-y-8 max-w-xl order-2 lg:order-1 text-center lg:text-left mx-auto lg:mx-0'>
-            <div className='space-y-3 lg:space-y-4'>
-              <h1 className='text-2xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl/tight'>
-                Smart Utility Management <br />
+          <div className='flex flex-col justify-center space-y-6 lg:space-y-8 max-w-2xl order-2 lg:order-1 text-center lg:text-left mx-auto lg:mx-0'>
+            <div className='space-y-4 lg:space-y-5'>
+              <h1 className='text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl/tight'>
+                Prepaid Sub Meters <br />
                 <span className='text-primary'>For Modern Living</span>
               </h1>
-              <p className='text-muted-foreground text-base sm:text-lg lg:text-xl leading-relaxed max-w-xl mx-auto lg:mx-0'>
-                Take control of electricity, water, and gas with our seamless
-                prepaid metering platform. Automated billing, remote monitoring,
-                and instant tokens.
+              <p className='text-muted-foreground text-base sm:text-lg lg:text-xl leading-relaxed max-w-2xl mx-auto lg:mx-0'>
+                Take control of electricity, water, and gas with prepaid sub
+                meters in Kenya. Buy tokens via M-Pesa, monitor usage remotely,
+                and enjoy instant prepaid token delivery.
               </p>
             </div>
 
@@ -129,8 +129,9 @@ export function Hero() {
             <motion.div
               initial={{ opacity: 0, y: 30, rotateX: 10 }}
               animate={{ opacity: 1, y: 0, rotateX: 0 }}
+              whileHover={{ scale: 1.01 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
-              className='relative w-87.5 md:w-112.5 bg-slate-100 dark:bg-slate-900 rounded-[2rem] lg:rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] border-4 border-slate-200 dark:border-slate-800 p-3 lg:p-5 flex flex-col gap-3 lg:gap-5 transform hover:scale-[1.01] transition-transform duration-500 scale-100 sm:scale-100 lg:scale-95 xl:scale-100 origin-center'
+              className='relative w-87.5 md:w-112.5 bg-slate-100 dark:bg-slate-900 rounded-[2rem] lg:rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] border-4 border-slate-200 dark:border-slate-800 p-3 lg:p-5 flex flex-col gap-3 lg:gap-5 origin-center'
               style={{ perspective: 1000 }}>
               {/* Device Reflection/Gloss */}
               <div className='absolute inset-0 rounded-4xl lg:rounded-[2.5rem] bg-linear-to-tr from-white/40 to-transparent pointer-events-none' />

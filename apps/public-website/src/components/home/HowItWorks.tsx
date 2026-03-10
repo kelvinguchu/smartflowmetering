@@ -9,69 +9,55 @@ import {
 } from "react-icons/md";
 import { cn } from "@/lib/utils";
 
-const tenantSteps = [
+const tenantFeatures = [
   {
-    id: 1,
-    title: "Lipa na M-Pesa",
+    title: "1. Lipa na M-Pesa",
     description:
-      "Go to your M-Pesa menu, select Pay Bill, and enter our Business Number.",
+      "Go to M-Pesa, select Pay Bill, and enter our Business Number.",
     icon: MdPayment,
-    color: "text-green-500",
-    bgColor: "bg-green-50 dark:bg-green-950/30",
-    borderColor: "border-green-200 dark:border-green-900",
+    color: "from-emerald-500/20 to-green-500/10",
+    iconColor: "text-emerald-500",
   },
   {
-    id: 2,
-    title: "Enter Details",
-    description:
-      "Enter your Meter Number as the Account Number, then the amount you wish to top up.",
+    title: "2. Enter Details",
+    description: "Use your Meter Number as Account Number, and top-up amount.",
     icon: MdAppRegistration,
-    color: "text-blue-500",
-    bgColor: "bg-blue-50 dark:bg-blue-950/30",
-    borderColor: "border-blue-200 dark:border-blue-900",
+    color: "from-blue-500/20 to-sky-500/10",
+    iconColor: "text-blue-500",
   },
   {
-    id: 3,
-    title: "Receive Token",
+    title: "3. Receive Token",
     description:
-      "You will receive a 20-digit token via SMS instantly. Enter it into your meter to get power.",
+      "Get a 20-digit token instantly via SMS to enter into your meter.",
     icon: MdBolt,
-    color: "text-orange-500",
-    bgColor: "bg-orange-50 dark:bg-orange-950/30",
-    borderColor: "border-orange-200 dark:border-orange-900",
+    color: "from-orange-500/20 to-amber-500/10",
+    iconColor: "text-orange-500",
   },
 ];
 
-const landlordSteps = [
+const landlordFeatures = [
   {
-    id: 1,
-    title: "Apply Online",
-    description:
-      "Fill out the self-service form with your property and meter details. We'll review and activate your account.",
+    title: "1. Apply Online",
+    description: "Fill the form with property details to get activated.",
     icon: MdHome,
-    color: "text-purple-500",
-    bgColor: "bg-purple-50 dark:bg-purple-950/30",
-    borderColor: "border-purple-200 dark:border-purple-900",
+    color: "from-purple-500/20 to-fuchsia-500/10",
+    iconColor: "text-purple-500",
   },
   {
-    id: 2,
-    title: "Mother Meter Mgmt",
+    title: "2. Mother Meter Management",
     description:
-      "We monitor your main KPLC meter. Alerts are sent for refills or bills are automatically reconciled.",
+      "We monitor your main KPLC meter to alert for refills and reconcile bills automatically.",
     icon: MdPerson,
-    color: "text-indigo-500",
-    bgColor: "bg-indigo-50 dark:bg-indigo-950/30",
-    borderColor: "border-indigo-200 dark:border-indigo-900",
+    color: "from-indigo-500/20 to-violet-500/10",
+    iconColor: "text-indigo-500",
   },
   {
-    id: 3,
-    title: "Track Revenue",
+    title: "3. Track Revenue",
     description:
-      "View real-time consumption and revenue from all your sub-meters through our dashboard.",
+      "View real-time consumption across all your prepaid sub meters on the dashboard and via SMS.",
     icon: MdMonitorHeart,
-    color: "text-teal-500",
-    bgColor: "bg-teal-50 dark:bg-teal-950/30",
-    borderColor: "border-teal-200 dark:border-teal-900",
+    color: "from-teal-500/20 to-emerald-500/10",
+    iconColor: "text-teal-500",
   },
 ];
 
@@ -79,129 +65,98 @@ export function HowItWorks() {
   return (
     <section
       id='how-it-works'
-      className='py-6 md:py-8 relative overflow-hidden'>
-      {/* Background Decor */}
-      <div className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle_at_center,var(--primary-foreground)_0%,transparent_70%)] opacity-50 z-0 pointer-events-none' />
-
-      <div className='container relative z-10 max-w-screen-2xl px-4 sm:px-8 space-y-8'>
-        {/* Main Header */}
-        <div className='flex items-center justify-center gap-4 w-full'>
-          <div className='h-0.5 bg-primary w-12 md:w-24 lg:w-32 rounded-full' />
-          <h2 className='text-3xl md:text-5xl font-bold tracking-tight font-heading text-center whitespace-nowrap'>
+      className='py-24 bg-background relative border-t border-border/40'>
+      <div className='container max-w-7xl mx-auto px-6 lg:px-12'>
+        {/* Header */}
+        <div className='flex items-center justify-center gap-6 mb-20'>
+          <div className='h-px bg-border w-16 md:w-32' />
+          <h2 className='text-3xl md:text-5xl font-extrabold tracking-tight whitespace-nowrap'>
             How It <span className='text-primary'>Works</span>
           </h2>
-          <div className='h-0.5 bg-primary w-12 md:w-24 lg:w-32 rounded-full' />
+          <div className='h-px bg-border w-16 md:w-32' />
         </div>
 
-        {/* Tenant Section */}
-        <div className='relative w-full'>
-          <div className='text-center mb-12 w-full'>
-            <h3 className='text-2xl md:text-3xl font-bold font-heading inline-block relative'>
-              For Tenants
-              <div className='absolute -bottom-2 left-0 right-0 h-1 bg-primary/20 rounded-full' />
-            </h3>
-          </div>
+        <div className='grid lg:grid-cols-2 gap-16 lg:gap-24'>
+          {/* Tenants Column */}
+          <div className='relative'>
+            <div className='mb-10'>
+              <h3 className='text-3xl font-bold'>For Tenants</h3>
+            </div>
 
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-8 relative'>
-            {/* Connector Line (Desktop) */}
-            <div className='hidden md:block absolute top-12 left-[16%] right-[16%] h-0.5 bg-linear-to-r from-border/0 via-border to-border/0 z-0' />
+            <div className='space-y-8 relative'>
+              {/* Connecting vertical line */}
+              <div className='absolute left-8 top-10 bottom-10 w-px bg-border' />
 
-            {tenantSteps.map((step, index) => (
-              <motion.div
-                key={step.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className='relative flex flex-col items-center text-center z-10 group'>
-                {/* Icon Container with pulsing effect */}
-                <div className='relative mb-6'>
+              {tenantFeatures.map((step, i) => (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.15 }}
+                  key={step.title}
+                  className='relative flex gap-6 bg-card hover:bg-accent/30 p-6 rounded-2xl border border-border/50 transition-colors group z-10'>
+                  {/* Icon Area */}
                   <div
                     className={cn(
-                      "absolute inset-0 rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500",
-                      step.bgColor.replace("/30", "")
-                    )}
-                  />
-                  <motion.div
-                    whileHover={{ scale: 1.1, rotate: [0, -5, 5, 0] }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                    className={cn(
-                      "relative w-24 h-24 rounded-3xl flex items-center justify-center shadow-xl border-2 backdrop-blur-sm transition-all duration-300",
-                      step.bgColor,
-                      step.borderColor
+                      "w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center bg-linear-to-br border border-background shadow-sm",
+                      step.color,
                     )}>
-                    <step.icon className={cn("text-4xl", step.color)} />
-                    <div className='absolute -top-3 -right-3 w-8 h-8 rounded-full bg-background border border-border shadow-md flex items-center justify-center font-bold text-sm text-muted-foreground'>
-                      {step.id}
-                    </div>
-                  </motion.div>
-                </div>
+                    <step.icon className={cn("text-2xl", step.iconColor)} />
+                  </div>
 
-                <h3 className='text-xl font-bold font-heading mb-3 group-hover:text-primary transition-colors duration-300'>
-                  {step.title}
-                </h3>
-
-                <p className='text-muted-foreground leading-relaxed text-sm'>
-                  {step.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* Landlord Section */}
-        <div className='relative w-full'>
-          <div className='text-center mb-12 w-full'>
-            <h3 className='text-2xl md:text-3xl font-bold font-heading inline-block relative'>
-              For Landlords
-              <div className='absolute -bottom-2 left-0 right-0 h-1 bg-primary/20 rounded-full' />
-            </h3>
+                  {/* Text */}
+                  <div>
+                    <h4 className='text-lg font-bold mb-2 group-hover:text-primary transition-colors'>
+                      {step.title}
+                    </h4>
+                    <p className='text-muted-foreground leading-relaxed text-sm'>
+                      {step.description}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </div>
 
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-8 relative'>
-            {/* Connector Line (Desktop) */}
-            <div className='hidden md:block absolute top-12 left-[16%] right-[16%] h-0.5 bg-linear-to-r from-border/0 via-border to-border/0 z-0' />
+          {/* Landlords Column */}
+          <div className='relative'>
+            <div className='mb-10'>
+              <h3 className='text-3xl font-bold'>For Landlords</h3>
+            </div>
 
-            {landlordSteps.map((step, index) => (
-              <motion.div
-                key={step.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className='relative flex flex-col items-center text-center z-10 group'>
-                {/* Icon Container with pulsing effect */}
-                <div className='relative mb-6'>
+            <div className='space-y-8 relative'>
+              {/* Connecting vertical line */}
+              <div className='absolute left-8 top-10 bottom-10 w-px bg-border' />
+
+              {landlordFeatures.map((step, i) => (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.15 }}
+                  key={step.title}
+                  className='relative flex gap-6 bg-card hover:bg-accent/30 p-6 rounded-2xl border border-border/50 transition-colors group z-10'>
+                  {/* Icon Area */}
                   <div
                     className={cn(
-                      "absolute inset-0 rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500",
-                      step.bgColor.replace("/30", "")
-                    )}
-                  />
-                  <motion.div
-                    whileHover={{ scale: 1.1, rotate: [0, -5, 5, 0] }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                    className={cn(
-                      "relative w-24 h-24 rounded-3xl flex items-center justify-center shadow-xl border-2 backdrop-blur-sm transition-all duration-300",
-                      step.bgColor,
-                      step.borderColor
+                      "w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center bg-linear-to-br border border-background shadow-sm",
+                      step.color,
                     )}>
-                    <step.icon className={cn("text-4xl", step.color)} />
-                    <div className='absolute -top-3 -right-3 w-8 h-8 rounded-full bg-background border border-border shadow-md flex items-center justify-center font-bold text-sm text-muted-foreground'>
-                      {step.id}
-                    </div>
-                  </motion.div>
-                </div>
+                    <step.icon className={cn("text-2xl", step.iconColor)} />
+                  </div>
 
-                <h3 className='text-xl font-bold font-heading mb-3 group-hover:text-primary transition-colors duration-300'>
-                  {step.title}
-                </h3>
-
-                <p className='text-muted-foreground leading-relaxed text-sm'>
-                  {step.description}
-                </p>
-              </motion.div>
-            ))}
+                  {/* Text */}
+                  <div>
+                    <h4 className='text-lg font-bold mb-2 group-hover:text-primary transition-colors'>
+                      {step.title}
+                    </h4>
+                    <p className='text-muted-foreground leading-relaxed text-sm'>
+                      {step.description}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

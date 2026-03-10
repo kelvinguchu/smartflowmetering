@@ -54,10 +54,7 @@ function createRateLimitMiddleware(options: RateLimitOptions) {
     c.header("X-RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
 
     if (bucket.count > options.max) {
-      const retryAfter = Math.max(
-        1,
-        Math.ceil((bucket.resetAt - now) / 1000)
-      );
+      const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
       c.header("Retry-After", String(retryAfter));
       return c.json(
         {
@@ -65,7 +62,7 @@ function createRateLimitMiddleware(options: RateLimitOptions) {
           message: options.message,
           retryAfter,
         },
-        429
+        429,
       );
     }
 
@@ -88,8 +85,7 @@ export const authRateLimit = createRateLimitMiddleware({
   max: 10,
   durationMs: 60 * 1000,
   prefix: "auth",
-  message:
-    "Too many authentication attempts. Please wait before trying again.",
+  message: "Too many authentication attempts. Please wait before trying again.",
 });
 
 export const mpesaRateLimit = createRateLimitMiddleware({
@@ -112,6 +108,13 @@ export const smsRateLimit = createRateLimitMiddleware({
   durationMs: 60 * 1000,
   prefix: "sms",
   message: "Too many SMS requests. Please wait before trying again.",
+});
+
+export const applicationRateLimit = createRateLimitMiddleware({
+  max: 10,
+  durationMs: 60 * 1000,
+  prefix: "application",
+  message: "Too many application submissions. Please wait before trying again.",
 });
 
 export const rateLimitMiddleware = globalRateLimit;

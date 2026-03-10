@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { after, before, beforeEach, describe, it } from "node:test";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createApp } from "../../src/app";
 import { env } from "../../src/config";
 import { db } from "../../src/db";

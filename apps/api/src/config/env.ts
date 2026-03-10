@@ -200,7 +200,7 @@ function normalizeMpesaEnvironment(
 
 function trimTrailingSlash(value: string | undefined): string {
   if (!value) return "";
-  return value.trim().replace(/\/+$/g, "");
+  return value.trim().replaceAll(/\/+$/g, "");
 }
 
 function normalizeCallbackTokenTransport(

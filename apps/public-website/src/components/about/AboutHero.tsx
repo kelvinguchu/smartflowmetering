@@ -11,8 +11,9 @@ export function AboutHero() {
         </div>
 
         <p className='text-base sm:text-lg text-muted-foreground text-center max-w-3xl mx-auto leading-relaxed'>
-          Founded in 2025, Smart Flow Metering Limited is dedicated to transforming
-          utility management for landlords and tenants across Kenya.
+          Founded in 2025, Smart Flow Metering Limited provides prepaid sub
+          meters for electricity, water, and gas across Kenya. We help landlords
+          and tenants manage utilities with token meters and M-Pesa payments.
         </p>
       </div>
     </section>

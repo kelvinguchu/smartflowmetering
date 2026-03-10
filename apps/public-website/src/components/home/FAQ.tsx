@@ -7,9 +7,9 @@ import {
 
 const faqs = [
   {
-    question: "How do I buy electricity tokens?",
+    question: "How do I buy prepaid electricity tokens?",
     answer:
-      "Open M-Pesa on your phone, select Pay Bill, enter our Business Number, then enter your Meter Number as the Account Number and the amount you wish to pay. You will receive a 20-digit token via SMS instantly.",
+      "Open M-Pesa on your phone, select Pay Bill, enter our Business Number, then enter your Meter Number as the Account Number and the amount you wish to pay. You will receive a 20-digit prepaid token via SMS instantly.",
   },
   {
     question: "What is the minimum token purchase amount?",
@@ -17,9 +17,9 @@ const faqs = [
       "The minimum transaction amount is KES 30. Payments below this threshold will be rejected.",
   },
   {
-    question: "How quickly will I receive my token?",
+    question: "How quickly will I receive my prepaid token?",
     answer:
-      "Tokens are delivered via SMS within 3-8 seconds after your M-Pesa payment is confirmed.",
+      "Prepaid tokens are delivered via SMS within 3-8 seconds after your M-Pesa payment is confirmed.",
   },
   {
     question: "Do I need internet access to buy tokens?",
@@ -29,12 +29,13 @@ const faqs = [
   {
     question: "How do landlords get started with Smart Flow Metering?",
     answer:
-      "Landlords can apply online by filling out a self-service form with property and meter details. Once reviewed and approved, your meters are activated and ready for tenant token purchases.",
+      "Landlords can apply online by filling out a self-service form with property and meter details. Once reviewed and approved, your prepaid sub meters are activated and ready for tenant token purchases.",
   },
   {
-    question: "What types of meters does Smart Flow Metering support?",
+    question:
+      "What types of prepaid sub meters does Smart Flow Metering support?",
     answer:
-      "We support prepaid meters for electricity, water, and gas from brands including Hexing, Stron, and Conlog.",
+      "We support prepaid sub meters for electricity, water, and gas — including integrated meters, split meters, 3-phase meters, and water token meters from brands like Hexing, Stron, and Conlog.",
   },
   {
     question: "How are electricity units calculated?",

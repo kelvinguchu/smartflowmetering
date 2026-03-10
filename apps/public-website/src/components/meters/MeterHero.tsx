@@ -70,7 +70,7 @@ export function MeterHero({ product }: MeterHeroProps) {
                     size='lg'
                     className='bg-primary hover:bg-primary/90 rounded-full'>
                     <a
-                      href='mailto:inquiries@smartflowmetering.com'
+                      href='mailto:inquiries@smartmetering.africa'
                       className='inline-flex items-center gap-1.5'>
                       <MdMail />
                       Email Us

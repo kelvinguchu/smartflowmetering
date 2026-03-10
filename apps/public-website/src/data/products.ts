@@ -20,11 +20,11 @@ export interface Product {
 export const products: Product[] = [
   {
     id: "integrated",
-    name: "Single-Phase Integrated",
+    name: "Prepaid Integrated Sub Meter",
     type: "Electricity",
-    tagline: "The Compact Home Meter",
+    tagline: "Compact Prepaid Sub Meter",
     description:
-      "An all-in-one solution that combines affordability with reliability. Compact unit with keypad and meter in one. Tenants enter tokens directly on the device.",
+      "An affordable prepaid sub meter with keypad and meter in one compact unit. Tenants enter prepaid tokens directly on the device — the most popular token meter for Kenyan landlords.",
     features: [
       "Low cost and affordable",
       "Easy installation",
@@ -47,11 +47,11 @@ export const products: Product[] = [
   },
   {
     id: "split",
-    name: "Single-Phase Split",
+    name: "Prepaid Split Sub Meter",
     type: "Electricity",
-    tagline: "The Secure Split Meter",
+    tagline: "Secure Prepaid Split Sub Meter",
     description:
-      "Maximum security for landlords. The measurement unit stays locked in your electrical cabinet, while the tenant gets a wireless keypad (CIU) for convenience. Prevents bypass fraud effectively.",
+      "Maximum security prepaid split meter for landlords. The measurement unit stays locked in your DB board, while the tenant gets a wireless keypad (CIU). The best tamper-proof sub meter in Kenya.",
     features: [
       "Anti-tamper design (meter locked in DB board)",
       "Separate Customer Interface Unit (CIU)",
@@ -74,11 +74,11 @@ export const products: Product[] = [
   },
   {
     id: "water",
-    name: "Intelligent Water Meter",
+    name: "Prepaid Water Sub Meter",
     type: "Water",
-    tagline: "Smart Aqua",
+    tagline: "Prepaid Water Token Meter",
     description:
-      "Prepaid convenience for water. Smart valve-controlled meter that detects leaks early and stops you from chasing water bills. Auto-shutoff on zero credit protects your property.",
+      "Prepaid water meter with smart valve control and leak detection. Tenants buy water tokens via M-Pesa. Auto-shutoff on zero credit protects your property from water wastage.",
     features: [
       "Automatic valve control",
       "Leak detection alerts",
@@ -101,11 +101,11 @@ export const products: Product[] = [
   },
   {
     id: "three-phase",
-    name: "Three-Phase Meter",
+    name: "Prepaid 3-Phase Sub Meter",
     type: "Electricity",
-    tagline: "The Commercial Powerhouse",
+    tagline: "Commercial 3-Phase Sub Meter",
     description:
-      "Handle high-voltage demands with precision. Heavy-duty metering for commercial and industrial loads. Ensure your commercial tenants pay exactly for what they use.",
+      "Heavy-duty prepaid 3-phase sub meter for commercial and industrial loads. Ensure your commercial tenants pay exactly for what they use with precision token metering.",
     features: [
       "4-wire measurement",
       "Load balancing monitoring",
@@ -128,11 +128,11 @@ export const products: Product[] = [
   },
   {
     id: "gas",
-    name: "Smart Gas Meter",
+    name: "Prepaid Gas Sub Meter",
     type: "Gas",
-    tagline: "Safe and Precise",
+    tagline: "Prepaid Gas Token Meter",
     description:
-      "Safe and precise metering for piped gas estates. Diaphragm residential meter with safety shutoff for peace of mind in your gas-powered property.",
+      "Prepaid gas meter for piped gas estates with safety shutoff valve. Tenants buy gas tokens via M-Pesa for precise, pay-as-you-go gas sub metering.",
     features: [
       "Safety shut-off valve",
       "Precision measurement",

@@ -13,9 +13,9 @@ This guide covers deploying Smart Flow Metering to a VPS using Dokploy - a self-
 
 2. **Domain Setup**
    - Point these DNS records to your VPS IP:
-     - `smartflowmetering.com` â†’ A record â†’ `YOUR_VPS_IP`
-     - `api.smartflowmetering.com` â†’ A record â†’ `YOUR_VPS_IP`
-     - `db.smartflowmetering.com` â†’ A record â†’ `YOUR_VPS_IP` (optional, for Adminer)
+     - `smartmetering.africa` â†’ A record â†’ `YOUR_VPS_IP`
+     - `api.smartmetering.africa` â†’ A record â†’ `YOUR_VPS_IP`
+     - `db.smartmetering.africa` â†’ A record â†’ `YOUR_VPS_IP` (optional, for Adminer)
 
 3. **Dokploy Installed**
    ```bash
@@ -57,12 +57,12 @@ MPESA_CONSUMER_SECRET=your_daraja_consumer_secret
 MPESA_PASSKEY=your_mpesa_passkey
 
 # Required - Domains (for Traefik SSL)
-WEB_DOMAIN=smartflowmetering.com
-API_DOMAIN=api.smartflowmetering.com
-ADMINER_DOMAIN=db.smartflowmetering.com
+WEB_DOMAIN=smartmetering.africa
+API_DOMAIN=api.smartmetering.africa
+ADMINER_DOMAIN=db.smartmetering.africa
 
 # Required - Frontend API URL
-VITE_API_URL=https://api.smartflowmetering.com
+VITE_API_URL=https://api.smartmetering.africa
 
 # Optional - Adminer Basic Auth (generate with: htpasswd -nb admin password)
 ADMINER_AUTH=admin:$$apr1$$xxxxx$$yyyyy
@@ -110,10 +110,10 @@ The `docker-compose.dokploy.yml` already includes Traefik labels. Just ensure yo
 docker ps | grep smartflowmetering
 
 # Check API health
-curl https://api.smartflowmetering.com/api/health
+curl https://api.smartmetering.africa/api/health
 
 # Check web frontend
-curl https://smartflowmetering.com
+curl https://smartmetering.africa
 ```
 
 ### Run Database Migrations
@@ -247,8 +247,8 @@ docker exec smartflowmetering-api nc -zv postgres 5432
 docker logs traefik
 
 # Verify domain DNS
-dig smartflowmetering.com
-dig api.smartflowmetering.com
+dig smartmetering.africa
+dig api.smartmetering.africa
 ```
 
 ### dokploy-network Not Found

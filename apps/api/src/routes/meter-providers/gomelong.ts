@@ -1,12 +1,9 @@
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
-import { requireAdmin, type AppBindings } from "../lib/auth-middleware";
+import { requireAdmin, type AppBindings } from "../../lib/auth-middleware";
 import {
   addUseType,
   deleteUseType,
-  type GomelongMeterType,
-  type GomelongVendingType,
   getChangeDecoderToken,
   getClearCreditToken,
   getClearTamperSignToken,
@@ -21,105 +18,23 @@ import {
   pageWaterVend,
   updateUseType,
   useTypeList,
-} from "../services/gomelong.service";
-
-const meterTypeSchema = z
-  .union([z.literal(1), z.literal(2), z.literal("1"), z.literal("2")])
-  .transform((value): GomelongMeterType => (value === 1 || value === "1" ? 1 : 2));
-const vendingTypeSchema = z
-  .union([z.literal(0), z.literal(1), z.literal("0"), z.literal("1")])
-  .transform((value): GomelongVendingType =>
-    value === 0 || value === "0" ? 0 : 1
-  );
-const meterCodeSchema = z.string().min(1).max(32);
-
-const sgcQuerySchema = z.object({
-  meterType: meterTypeSchema,
-});
-
-const contractInfoQuerySchema = z.object({
-  meterCode: meterCodeSchema,
-  meterType: meterTypeSchema,
-});
-
-const changeDecoderQuerySchema = z.object({
-  meterCode: meterCodeSchema,
-  meterType: meterTypeSchema,
-  sgcId: z.string().min(1),
-});
-
-const clearTokenQuerySchema = z.object({
-  meterCode: meterCodeSchema,
-  meterType: meterTypeSchema,
-});
-
-const maxPowerQuerySchema = z.object({
-  meterCode: meterCodeSchema,
-  power: z.coerce.number().int().positive(),
-});
-
-const vendingQuerySchema = z.object({
-  meterCode: meterCodeSchema,
-  meterType: meterTypeSchema,
-  amountOrQuantity: z.coerce.number().positive(),
-  vendingType: vendingTypeSchema.optional(),
-});
-
-const meterDeleteBodySchema = z.object({
-  meterCode: meterCodeSchema,
-  meterType: meterTypeSchema,
-});
-
-const meterRegisterBodySchema = z.object({
-  useTypeId: z.string().min(1),
-  meterCode: z.string().min(1),
-  meterType: meterTypeSchema,
-  customerName: z.string().min(1),
-  address: z.string().optional(),
-  phoneNumber: z.string().optional(),
-  fax: z.string().optional(),
-  sgcId: z.string().optional(),
-  billingMode: vendingTypeSchema.optional(),
-});
-
-const meterUpdateBodySchema = z.object({
-  meterCode: meterCodeSchema,
-  meterType: meterTypeSchema,
-  customerName: z.string().min(1),
-  address: z.string().optional(),
-  phoneNumber: z.string().optional(),
-  useTypeId: z.string().optional(),
-  sgcId: z.string().optional(),
-  billingMode: vendingTypeSchema.optional(),
-});
-
-const addUseTypeBodySchema = z.object({
-  useTypeId: z.string().min(1),
-  useTypeName: z.string().min(1),
-  meterType: meterTypeSchema,
-  price: z.coerce.number().positive(),
-  vat: z.coerce.number().min(0),
-});
-
-const updateUseTypeBodySchema = z.object({
-  price: z.coerce.number().positive(),
-  vat: z.coerce.number().min(0),
-});
-
-const useTypeParamSchema = z.object({
-  useTypeId: z.string().min(1),
-});
-
-const waterVendPageQuerySchema = z.object({
-  pageNumber: z.coerce.number().int().positive().optional(),
-  pageSize: z.coerce.number().int().positive().optional(),
-});
-
-const waterVendPageBodySchema = z.object({
-  meterCode: meterCodeSchema,
-  startDate: z.iso.date(),
-  endDate: z.iso.date(),
-});
+} from "../../services/meter-providers/gomelong.service";
+import {
+  sgcQuerySchema,
+  changeDecoderQuerySchema,
+  clearTokenQuerySchema,
+  contractInfoQuerySchema,
+  maxPowerQuerySchema,
+  vendingQuerySchema,
+  meterDeleteBodySchema,
+  meterRegisterBodySchema,
+  meterUpdateBodySchema,
+  addUseTypeBodySchema,
+  updateUseTypeBodySchema,
+  useTypeParamSchema,
+  waterVendPageQuerySchema,
+  waterVendPageBodySchema,
+} from "../../validators/gomelong";
 
 export const gomelongRoutes = new Hono<AppBindings>();
 
@@ -128,14 +43,18 @@ gomelongRoutes.use("*", requireAdmin);
 gomelongRoutes.get("/health", (c) =>
   c.json({
     configured: isGomelongConfigured(),
-  })
+  }),
 );
 
-gomelongRoutes.get("/kmf/sgc", zValidator("query", sgcQuerySchema), async (c) => {
-  const query = c.req.valid("query");
-  const result = await listSgcByMeterType(query.meterType);
-  return providerResponse(c, result);
-});
+gomelongRoutes.get(
+  "/kmf/sgc",
+  zValidator("query", sgcQuerySchema),
+  async (c) => {
+    const query = c.req.valid("query");
+    const result = await listSgcByMeterType(query.meterType);
+    return providerResponse(c, result);
+  },
+);
 
 gomelongRoutes.get(
   "/power/change-decoder-token",
@@ -148,7 +67,7 @@ gomelongRoutes.get(
       sgcId: query.sgcId,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.get(
@@ -161,7 +80,7 @@ gomelongRoutes.get(
       meterType: query.meterType,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.get(
@@ -174,7 +93,7 @@ gomelongRoutes.get(
       meterType: query.meterType,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.get(
@@ -187,7 +106,7 @@ gomelongRoutes.get(
       meterType: query.meterType,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.get(
@@ -200,7 +119,7 @@ gomelongRoutes.get(
       power: query.power,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.get(
@@ -215,7 +134,7 @@ gomelongRoutes.get(
       vendingType: query.vendingType ?? undefined,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.post(
@@ -228,7 +147,7 @@ gomelongRoutes.post(
       meterType: body.meterType,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.post(
@@ -248,7 +167,7 @@ gomelongRoutes.post(
       billingMode: body.billingMode ?? undefined,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.post(
@@ -267,7 +186,7 @@ gomelongRoutes.post(
       billingMode: body.billingMode ?? undefined,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.get("/use-types", async (c) => {
@@ -288,7 +207,7 @@ gomelongRoutes.post(
       vat: body.vat,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.patch(
@@ -304,7 +223,7 @@ gomelongRoutes.patch(
       vat: body.vat,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.delete(
@@ -314,7 +233,7 @@ gomelongRoutes.delete(
     const { useTypeId } = c.req.valid("param");
     const result = await deleteUseType(useTypeId);
     return providerResponse(c, result);
-  }
+  },
 );
 
 gomelongRoutes.post(
@@ -332,12 +251,12 @@ gomelongRoutes.post(
       pageSize: query.pageSize,
     });
     return providerResponse(c, result);
-  }
+  },
 );
 
 function providerResponse(
   c: Context<AppBindings>,
-  result: { code: number; message: string | null; data: unknown; raw: unknown }
+  result: { code: number; message: string | null; data: unknown; raw: unknown },
 ) {
   const ok = result.code === 0;
   return c.json(
@@ -345,6 +264,6 @@ function providerResponse(
       success: ok,
       provider: result,
     },
-    ok ? 200 : 502
+    ok ? 200 : 502,
   );
 }

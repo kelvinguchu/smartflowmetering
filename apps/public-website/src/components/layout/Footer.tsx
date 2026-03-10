@@ -94,9 +94,9 @@ export function Footer() {
               <ul className='space-y-2 text-sm text-background/70'>
                 <li>
                   <a
-                    href='mailto:inquiries@smartflowmetering.com'
+                    href='mailto:inquiries@smartmetering.africa'
                     className='hover:text-primary cursor-pointer'>
-                    inquiries@smartflowmetering.com
+                    inquiries@smartmetering.africa
                   </a>
                 </li>
                 <li>

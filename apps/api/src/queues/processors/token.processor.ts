@@ -9,7 +9,7 @@ import {
   isGomelongConfigured,
   vendTokenWithGomelong,
   type GomelongMeterType,
-} from "../../services/gomelong.service";
+} from "../../services/meter-providers/gomelong.service";
 
 type MeterBrand = "hexing" | "stron" | "conlog";
 type MeterUtilityType = "electricity" | "water" | "gas";
@@ -24,7 +24,7 @@ type MeterUtilityType = "electricity" | "water" | "gas";
  * 4. Queues SMS delivery
  */
 export async function processTokenGeneration(
-  job: Job<TokenGenerationJob>
+  job: Job<TokenGenerationJob>,
 ): Promise<{ token: string }> {
   const {
     transactionId,
@@ -105,7 +105,7 @@ export async function processTokenGeneration(
     },
     {
       jobId: `sms-${transactionId}`,
-    }
+    },
   );
 
   return { token };
@@ -129,7 +129,7 @@ interface TokenRequest {
 }
 
 async function generateTokenFromManufacturer(
-  request: TokenRequest
+  request: TokenRequest,
 ): Promise<string> {
   const {
     brand,
@@ -146,7 +146,7 @@ async function generateTokenFromManufacturer(
     const mappedType = mapMeterTypeToGomelong(meterType);
     if (!mappedType) {
       throw new Error(
-        `Gomelong does not support meter type '${meterType}' for meter ${meterNumber}`
+        `Gomelong does not support meter type '${meterType}' for meter ${meterNumber}`,
       );
     }
 
@@ -166,12 +166,12 @@ async function generateTokenFromManufacturer(
 
     if (!isMockTokenFallbackAllowed()) {
       throw new Error(
-        `Gomelong is enabled for brand '${brand}' but credentials are missing`
+        `Gomelong is enabled for brand '${brand}' but credentials are missing`,
       );
     }
 
     console.warn(
-      `[Token] Gomelong enabled for '${brand}' but credentials are missing, falling back`
+      `[Token] Gomelong enabled for '${brand}' but credentials are missing, falling back`,
     );
   }
 
@@ -213,11 +213,14 @@ async function generateTokenFromManufacturer(
 }
 
 function shouldUseGomelongForBrand(brand: MeterBrand): boolean {
-  if (env.GOMELONG_BRANDS.length > 0) return env.GOMELONG_BRANDS.includes(brand);
+  if (env.GOMELONG_BRANDS.length > 0)
+    return env.GOMELONG_BRANDS.includes(brand);
   return isGomelongConfigured();
 }
 
-function mapMeterTypeToGomelong(meterType: MeterUtilityType): GomelongMeterType | null {
+function mapMeterTypeToGomelong(
+  meterType: MeterUtilityType,
+): GomelongMeterType | null {
   if (meterType === "electricity") return 1;
   if (meterType === "water") return 2;
   return null;

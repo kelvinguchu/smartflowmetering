@@ -6,11 +6,7 @@ import { motherMeterEvents, motherMeters } from "../db/schema";
 import {
   motherMeterEventSchema,
   motherMeterIdParamSchema,
-  motherMeterLowBalanceNotifySchema,
-  motherMeterLowBalanceQuerySchema,
   motherMeterListQuerySchema,
-  postpaidReminderNotifySchema,
-  postpaidReminderQuerySchema,
   reconciliationQuerySchema,
 } from "../validators/mother-meters";
 import {
@@ -22,107 +18,12 @@ import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
 import {
   computeMotherMeterBalance,
   computeMotherMeterReconciliation,
-  listMotherMeterLowBalanceAlerts,
-  listPostpaidPaymentReminders,
 } from "../services/mother-meter-analytics.service";
-import {
-  queueLowBalanceNotifications,
-  queuePostpaidReminderNotifications,
-} from "../services/mother-meter-alerts.service";
+import { motherMeterAlertRoutes } from "./mother-meter-alert-routes";
 
 export const motherMeterRoutes = new Hono<AppBindings>();
 
-motherMeterRoutes.get(
-  "/alerts/low-balance",
-  requireAdmin,
-  zValidator("query", motherMeterLowBalanceQuerySchema),
-  async (c) => {
-    const query = c.req.valid("query");
-    const alerts = await listMotherMeterLowBalanceAlerts({
-      limit: query.limit,
-      offset: query.offset,
-      includeAboveThreshold: query.includeAboveThreshold,
-    });
-
-    const belowThreshold = alerts.filter((alert) => alert.isBelowThreshold).length;
-
-    return c.json({
-      data: alerts.map((alert) => ({
-        ...alert,
-        estimatedBalance: alert.estimatedBalance.toFixed(2),
-        lowBalanceThreshold: alert.lowBalanceThreshold.toFixed(2),
-      })),
-      count: alerts.length,
-      summary: {
-        belowThreshold,
-      },
-    });
-  }
-);
-
-motherMeterRoutes.post(
-  "/alerts/low-balance/notify",
-  requireAdmin,
-  zValidator("json", motherMeterLowBalanceNotifySchema),
-  async (c) => {
-    const body = c.req.valid("json");
-    const result = await queueLowBalanceNotifications({
-      maxAlerts: body.maxAlerts,
-    });
-
-    return c.json({
-      message: "Low-balance admin notifications generated",
-      ...result,
-    });
-  }
-);
-
-motherMeterRoutes.get(
-  "/alerts/postpaid-reminders",
-  requireAdmin,
-  zValidator("query", postpaidReminderQuerySchema),
-  async (c) => {
-    const query = c.req.valid("query");
-    const reminders = await listPostpaidPaymentReminders({
-      limit: query.limit,
-      offset: query.offset,
-      daysAfterLastPayment: query.daysAfterLastPayment,
-      includeNotDue: query.includeNotDue,
-    });
-
-    const dueCount = reminders.filter((item) => item.isReminderDue).length;
-
-    return c.json({
-      data: reminders.map((item) => ({
-        ...item,
-        lastBillPaymentAt: item.lastBillPaymentAt?.toISOString() ?? null,
-        reminderDate: item.reminderDate?.toISOString() ?? null,
-      })),
-      count: reminders.length,
-      summary: {
-        dueCount,
-      },
-    });
-  }
-);
-
-motherMeterRoutes.post(
-  "/alerts/postpaid-reminders/notify",
-  requireAdmin,
-  zValidator("json", postpaidReminderNotifySchema),
-  async (c) => {
-    const body = c.req.valid("json");
-    const result = await queuePostpaidReminderNotifications({
-      maxAlerts: body.maxAlerts,
-      daysAfterLastPayment: body.daysAfterLastPayment,
-    });
-
-    return c.json({
-      message: "Postpaid reminder admin notifications generated",
-      ...result,
-    });
-  }
-);
+motherMeterRoutes.route("/alerts", motherMeterAlertRoutes);
 
 motherMeterRoutes.get(
   "/",
@@ -148,7 +49,7 @@ motherMeterRoutes.get(
     });
 
     return c.json({ data: result, count: result.length });
-  }
+  },
 );
 
 motherMeterRoutes.get(
@@ -164,7 +65,7 @@ motherMeterRoutes.get(
     });
 
     return c.json({ data: events, count: events.length });
-  }
+  },
 );
 
 motherMeterRoutes.post(
@@ -194,7 +95,7 @@ motherMeterRoutes.post(
         amount: body.amount.toFixed(2),
         kplcToken: body.kplcToken ?? null,
         kplcReceiptNumber: body.kplcReceiptNumber ?? null,
-        performedBy: user.id.match(/^[0-9a-f-]{36}$/i)
+        performedBy: new RegExp(/^[0-9a-f-]{36}$/i).exec(user.id)
           ? user.id
           : "00000000-0000-0000-0000-000000000000",
       })
@@ -214,7 +115,7 @@ motherMeterRoutes.post(
     });
 
     return c.json({ data: event }, 201);
-  }
+  },
 );
 
 motherMeterRoutes.get(
@@ -242,10 +143,10 @@ motherMeterRoutes.get(
 
     return c.json({
       data: {
-          motherMeterId: motherMeter.id,
-          motherMeterNumber: motherMeter.motherMeterNumber,
-          type: motherMeter.type,
-          totals: {
+        motherMeterId: motherMeter.id,
+        motherMeterNumber: motherMeter.motherMeterNumber,
+        type: motherMeter.type,
+        totals: {
           deposits: balance.deposits.toFixed(2),
           billPayments: balance.billPayments.toFixed(2),
           netSales: balance.netSales.toFixed(2),
@@ -257,7 +158,7 @@ motherMeterRoutes.get(
         },
       },
     });
-  }
+  },
 );
 
 motherMeterRoutes.get(
@@ -300,7 +201,7 @@ motherMeterRoutes.get(
         variance: reconciliation.variance.toFixed(2),
       },
     });
-  }
+  },
 );
 
 function toNumber(value: string | null | undefined): number {

@@ -19,6 +19,7 @@ import { requireAdmin, type AppBindings } from "../lib/auth-middleware";
 import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
 import { smsDeliveryQueue } from "../queues";
 import { formatOnboardingApprovedSms } from "../services/sms.service";
+import { applicationRateLimit } from "../lib/rate-limit";
 
 const applicationIdParamSchema = z.object({
   id: z.uuid(),
@@ -28,6 +29,7 @@ export const applicationRoutes = new Hono<AppBindings>();
 
 applicationRoutes.post(
   "/",
+  applicationRateLimit,
   zValidator("json", createApplicationSchema),
   async (c) => {
     try {
@@ -37,7 +39,7 @@ applicationRoutes.post(
     } catch (error) {
       return handleApplicationError(c, error);
     }
-  }
+  },
 );
 
 applicationRoutes.get(
@@ -48,7 +50,7 @@ applicationRoutes.get(
     const query = c.req.valid("query");
     const result = await listMeterApplications(query);
     return c.json(result);
-  }
+  },
 );
 
 applicationRoutes.get(
@@ -62,7 +64,7 @@ applicationRoutes.get(
       return c.json({ error: "Application not found" }, 404);
     }
     return c.json({ data: application });
-  }
+  },
 );
 
 applicationRoutes.post(
@@ -103,12 +105,12 @@ applicationRoutes.post(
           },
           {
             jobId: `sms-application-approved-${approved.applicationId}`,
-          }
+          },
         );
       } catch (notificationError) {
         console.error(
           "[Applications] Failed to queue approval notification:",
-          notificationError
+          notificationError,
         );
       }
 
@@ -119,7 +121,7 @@ applicationRoutes.post(
     } catch (error) {
       return handleApplicationError(c, error);
     }
-  }
+  },
 );
 
 applicationRoutes.post(
@@ -149,12 +151,15 @@ applicationRoutes.post(
     } catch (error) {
       return handleApplicationError(c, error);
     }
-  }
+  },
 );
 
 function handleApplicationError(c: Context<AppBindings>, error: unknown) {
   if (error instanceof ApplicationError) {
-    return c.json({ error: error.message }, toApplicationStatusCode(error.statusCode));
+    return c.json(
+      { error: error.message },
+      toApplicationStatusCode(error.statusCode),
+    );
   }
 
   console.error("[Applications]", error);

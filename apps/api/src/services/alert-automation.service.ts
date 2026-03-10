@@ -1,9 +1,9 @@
 import { env } from "../config";
 import {
-  queueDailyLandlordUsageSummarySms,
   queueLowBalanceNotifications,
   queuePostpaidReminderNotifications,
 } from "./mother-meter-alerts.service";
+import { queueDailyLandlordUsageSummarySms } from "./daily-usage-sms.service";
 
 let automationTimer: NodeJS.Timeout | null = null;
 let cycleRunning = false;
@@ -15,7 +15,7 @@ export function startAlertAutomation(): void {
 
   const intervalMs = env.ALERT_AUTOMATION_INTERVAL_SECONDS * 1000;
   console.log(
-    `[Alerts Automation] Enabled (interval: ${env.ALERT_AUTOMATION_INTERVAL_SECONDS}s)`
+    `[Alerts Automation] Enabled (interval: ${env.ALERT_AUTOMATION_INTERVAL_SECONDS}s)`,
   );
 
   void runAlertAutomationCycle();
@@ -57,14 +57,11 @@ async function runAlertAutomationCycle(): Promise<void> {
       });
     }
 
-    console.log(
-      "[Alerts Automation] Cycle complete",
-      {
-        lowBalance: lowBalanceResult,
-        postpaidReminders: postpaidReminderResult,
-        dailyUsageSms: dailyUsageResult,
-      }
-    );
+    console.log("[Alerts Automation] Cycle complete", {
+      lowBalance: lowBalanceResult,
+      postpaidReminders: postpaidReminderResult,
+      dailyUsageSms: dailyUsageResult,
+    });
   } catch (error) {
     console.error("[Alerts Automation] Cycle failed:", error);
   } finally {
@@ -72,9 +69,12 @@ async function runAlertAutomationCycle(): Promise<void> {
   }
 }
 
-function shouldRunDailyUsageAtCurrentHour(date: Date, timezone: string): boolean {
+function shouldRunDailyUsageAtCurrentHour(
+  date: Date,
+  timezone: string,
+): boolean {
   const hour = getHourInTimezone(date, timezone);
-  return hour >= env.LANDLORD_DAILY_USAGE_SMS_HOUR;
+  return hour === env.LANDLORD_DAILY_USAGE_SMS_HOUR;
 }
 
 function getHourInTimezone(date: Date, timezone: string): number {
