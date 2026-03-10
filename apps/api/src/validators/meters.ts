@@ -6,8 +6,8 @@ export const createMeterSchema = z.object({
   meterNumber: z.string().min(6).max(20),
   meterType: z.enum(["electricity", "water", "gas"]),
   brand: z.enum(["hexing", "stron", "conlog"]),
-  motherMeterId: z.string().uuid(),
-  tariffId: z.string().uuid(),
+  motherMeterId: z.uuid(),
+  tariffId: z.uuid(),
   supplyGroupCode: z.string().min(1),
   keyRevisionNumber: z.number().int().min(1).max(9).optional(),
   tariffIndex: z.number().int().min(1).max(99).optional(),
@@ -17,7 +17,7 @@ export type CreateMeter = z.infer<typeof createMeterSchema>;
 
 export const updateMeterSchema = z
   .object({
-    tariffId: z.string().uuid().optional(),
+    tariffId: z.uuid().optional(),
     supplyGroupCode: z.string().min(1).optional(),
     keyRevisionNumber: z.number().int().min(1).max(9).optional(),
     tariffIndex: z.number().int().min(1).max(99).optional(),
@@ -30,7 +30,7 @@ export type UpdateMeter = z.infer<typeof updateMeterSchema>;
 export const meterQuerySchema = z.object({
   meterNumber: z.string().optional(),
   status: meterStatusSchema.optional(),
-  motherMeterId: z.string().uuid().optional(),
+  motherMeterId: z.uuid().optional(),
 });
 
 export type MeterQuery = z.infer<typeof meterQuerySchema>;

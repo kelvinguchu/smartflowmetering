@@ -11,6 +11,9 @@ import {
   smsRoutes,
   gomelongRoutes,
   applicationRoutes,
+  motherMeterRoutes,
+  notificationRoutes,
+  failedTransactionRoutes,
 } from "./routes";
 import { auth } from "./lib/auth";
 import { rateLimitMiddleware } from "./lib/rate-limit";
@@ -74,6 +77,9 @@ export function createApp() {
   app.route("/api/sms", smsRoutes);
   app.route("/api/gomelong", gomelongRoutes);
   app.route("/api/applications", applicationRoutes);
+  app.route("/api/mother-meters", motherMeterRoutes);
+  app.route("/api/notifications", notificationRoutes);
+  app.route("/api/failed-transactions", failedTransactionRoutes);
 
   return app;
 }

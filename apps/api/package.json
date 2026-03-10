@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "tsx --test --test-force-exit tests/env-config.test.ts tests/docker-env-wiring.test.ts",
-    "test:e2e": "tsx --test --test-force-exit tests/e2e/mpesa-purchase.e2e.test.ts tests/e2e/api-health-auth.e2e.test.ts tests/e2e/applications-onboarding.e2e.test.ts",
+    "test:e2e": "tsx --test --test-force-exit --test-concurrency=1 tests/e2e/mpesa-purchase.e2e.test.ts tests/e2e/api-health-auth.e2e.test.ts tests/e2e/applications-onboarding.e2e.test.ts tests/e2e/notifications-alerts.e2e.test.ts tests/e2e/gomelong-token.e2e.test.ts tests/e2e/mpesa-signature.e2e.test.ts tests/e2e/reconciliation-recovery.e2e.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "node --import tsx src/index.ts",
     "build": "tsc --noEmit",
@@ -13,7 +13,10 @@
     "db:push": "drizzle-kit push",
     "db:push:force": "drizzle-kit push --force",
     "db:studio": "drizzle-kit studio",
-    "db:drop": "drizzle-kit drop"
+    "db:drop": "drizzle-kit drop",
+    "bench": "tsx benchmarks/run.ts",
+    "bench:quick": "tsx benchmarks/run.ts --quick",
+    "bench:mpesa-offline": "tsx benchmarks/mpesa-offline.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.5.3",

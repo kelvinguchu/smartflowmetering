@@ -10,6 +10,7 @@ import { transactions } from "./transactions";
 import { failedTransactions } from "./failed-transactions";
 import { generatedTokens } from "./generated-tokens";
 import { smsLogs } from "./sms-logs";
+import { adminNotifications } from "./admin-notifications";
 
 export {
   user,
@@ -100,6 +101,14 @@ export {
   type SmsLog,
   type NewSmsLog,
 } from "./sms-logs";
+export {
+  adminNotifications,
+  notificationSeverityEnum,
+  notificationStatusEnum,
+  notificationTypeEnum,
+  type AdminNotification,
+  type NewAdminNotification,
+} from "./admin-notifications";
 
 // Audit Logs
 export { auditLogs, type AuditLog, type NewAuditLog } from "./audit-logs";

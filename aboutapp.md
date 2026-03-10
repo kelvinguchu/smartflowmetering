@@ -144,22 +144,8 @@
 8. Token generated and sent
 9. Customer receives SMS with token
 
-**USSD Model (Future Enhancement)**
-
-**User Journey:**
-
-1. Customer dials USSD code (e.g., *483*66#)
-2. Menu appears: "1. Buy Token 2. Check Balance 3. History"
-3. Customer selects "1. Buy Token"
-4. Enters meter number
-5. Enters amount
-6. Confirms purchase
-7. STK Push sent for payment
-8. Token delivered via SMS
-
 **Modeled After:** KPLC prepaid system
 
-- Similar USSD flow
 - Similar paybill payment flow
 - Similar token delivery mechanism
 
@@ -303,7 +289,7 @@ Fields:
 - rate_used: Decimal (KPLC rate at time of purchase)
 - units_purchased: Decimal (calculated: net_amount / rate_used)
 - status: 'pending', 'completed', 'failed'
-- payment_method: 'paybill', 'stk_push', 'ussd'
+- payment_method: 'paybill', 'stk_push'
 - created_at: Timestamp
 - completed_at: Timestamp
 ```
@@ -703,13 +689,7 @@ Meter: 12345678
 - Mobile app
 - Transaction history
 
-### Phase 3: USSD Integration
-
-- USSD menu system
-- Session management
-- KPLC-style user experience
-
-### Phase 4: Landlord Features
+### Phase 3: Landlord Features
 
 - Dashboard for multiple meters
 - Revenue reporting

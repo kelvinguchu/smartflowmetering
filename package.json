@@ -9,6 +9,9 @@
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
+    "@types/autocannon": "^7.12.7",
+    "api": "workspace:*",
+    "autocannon": "^8.0.0",
     "prettier": "^3.7.4",
     "turbo": "^2.7.0",
     "typescript": "5.9.2"

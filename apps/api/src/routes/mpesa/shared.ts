@@ -1,15 +1,27 @@
 import { Hono, type Context } from "hono";
 import type { AppBindings } from "../../lib/auth-middleware";
 import { env } from "../../config";
-import { getClientIP, isValidMpesaIP } from "../../lib/mpesa-validation";
+import {
+  getClientIP,
+  isValidMpesaIP,
+  validateMpesaSignature,
+} from "../../lib/mpesa-validation";
 
 export type MpesaRouter = Hono<AppBindings>;
 
-export function rejectIfInvalidMpesaSource(
+export async function rejectIfInvalidMpesaSource(
   c: Context<AppBindings>,
   label: string,
   payload: Record<string, string | number>
 ) {
+  const signatureValidation = await validateMpesaSignature(c.req.raw);
+  if (!signatureValidation.valid) {
+    console.warn(
+      `[${label}] Rejected: Invalid signature (${signatureValidation.reason ?? "unknown"})`
+    );
+    return c.json(payload, 403);
+  }
+
   if (!hasValidMpesaCallbackToken(c)) {
     console.warn(`[${label}] Rejected: Invalid callback token`);
     return c.json(payload, 403);

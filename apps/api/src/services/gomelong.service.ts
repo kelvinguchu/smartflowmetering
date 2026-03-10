@@ -39,7 +39,7 @@ export function assertGomelongConfigured() {
 
   if (missing.length > 0) {
     throw new Error(
-      `Gomelong credentials are not configured: ${missing.join(", ")}`
+      `Gomelong credentials are not configured: ${missing.join(", ")}`,
     );
   }
 }
@@ -251,19 +251,19 @@ export async function pageWaterVend(request: {
     {
       PageNumber: request.pageNumber,
       PageSize: request.pageSize,
-    }
+    },
   );
 }
 
 export async function vendTokenWithGomelong(
-  request: GomelongVendingRequest
+  request: GomelongVendingRequest,
 ): Promise<string> {
   assertGomelongConfigured();
   const result = await getVendingToken(request);
   const code = result.code;
   if (code !== 0) {
     throw new Error(
-      `Gomelong vend failed (${code}): ${result.message ?? "unknown error"}`
+      `Gomelong vend failed (${code}): ${result.message ?? "unknown error"}`,
     );
   }
 
@@ -280,7 +280,10 @@ async function gomelongGet(path: string, query: Record<string, QueryValue>) {
   return gomelongRequest(path, { method: "GET", query });
 }
 
-async function gomelongPostForm(path: string, form: Record<string, QueryValue>) {
+async function gomelongPostForm(
+  path: string,
+  form: Record<string, QueryValue>,
+) {
   assertGomelongConfigured();
   const formData = new FormData();
   for (const [key, value] of Object.entries(form)) {
@@ -297,7 +300,7 @@ async function gomelongPostForm(path: string, form: Record<string, QueryValue>) 
 async function gomelongPostJson(
   path: string,
   body: Record<string, unknown>,
-  query?: Record<string, QueryValue>
+  query?: Record<string, QueryValue>,
 ) {
   assertGomelongConfigured();
   return gomelongRequest(path, {
@@ -315,7 +318,7 @@ async function gomelongRequest<T = unknown>(
     query?: Record<string, QueryValue>;
     body?: BodyInit | null;
     headers?: Record<string, string>;
-  }
+  },
 ): Promise<GomelongResult<T>> {
   const endpoint = new URL(path, env.GOMELONG_API_URL);
 
@@ -328,10 +331,7 @@ async function gomelongRequest<T = unknown>(
 
   const response = await fetch(endpoint, {
     method: options.method,
-    headers: {
-      Accept: "application/json, text/plain, */*",
-      ...(options.headers ?? {}),
-    },
+    headers: buildRequestHeaders(options.headers),
     body: options.body,
   });
 
@@ -345,7 +345,7 @@ async function gomelongRequest<T = unknown>(
 
   if (!response.ok) {
     throw new Error(
-      `Gomelong HTTP ${response.status}: ${getMessage(payload) ?? "request failed"}`
+      `Gomelong HTTP ${response.status}: ${getMessage(payload) ?? "request failed"}`,
     );
   }
 
@@ -357,11 +357,26 @@ async function gomelongRequest<T = unknown>(
   };
 }
 
-function safeJsonParse(value: string): unknown | null {
+function buildRequestHeaders(
+  headers?: Record<string, string>,
+): Record<string, string> {
+  if (!headers) {
+    return {
+      Accept: "application/json, text/plain, */*",
+    };
+  }
+
+  return {
+    Accept: "application/json, text/plain, */*",
+    ...headers,
+  };
+}
+
+function safeJsonParse(value: string): unknown {
   try {
     return JSON.parse(value);
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -377,45 +392,19 @@ function getMessage(payload: GomelongRichResult): string | null {
 }
 
 function extractToken(data: unknown): string | null {
-  if (data == null) return null;
-
   if (typeof data === "string") {
     return normalizeToken(data);
   }
 
-  if (typeof data === "object") {
-    const candidateFields = [
-      "token",
-      "Token",
-      "stsToken",
-      "StsToken",
-      "vendingToken",
-      "VendingToken",
-      "tokenNo",
-      "TokenNo",
-    ] as const;
-
-    for (const field of candidateFields) {
-      const value = (data as Record<string, unknown>)[field];
-      if (typeof value === "string") {
-        const normalized = normalizeToken(value);
-        if (normalized) return normalized;
-      }
-    }
-
-    for (const value of Object.values(data as Record<string, unknown>)) {
-      if (typeof value === "string") {
-        const normalized = normalizeToken(value);
-        if (normalized) return normalized;
-      }
-    }
+  if (!isRecord(data)) {
+    return null;
   }
 
-  return null;
+  return extractTokenFromObject(data);
 }
 
 function normalizeToken(value: string): string | null {
-  const direct = value.match(/\d{20}/)?.[0];
+  const direct = new RegExp(/\d{20}/).exec(value)?.[0];
   if (direct) return direct;
 
   const digitsOnly = value.replaceAll(/\D/g, "");
@@ -423,3 +412,37 @@ function normalizeToken(value: string): string | null {
 
   return null;
 }
+
+function extractTokenFromObject(data: Record<string, unknown>): string | null {
+  for (const field of TOKEN_CANDIDATE_FIELDS) {
+    const normalized = normalizePossibleToken(data[field]);
+    if (normalized) return normalized;
+  }
+
+  for (const value of Object.values(data)) {
+    const normalized = normalizePossibleToken(value);
+    if (normalized) return normalized;
+  }
+
+  return null;
+}
+
+function normalizePossibleToken(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return normalizeToken(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object";
+}
+
+const TOKEN_CANDIDATE_FIELDS = [
+  "token",
+  "Token",
+  "stsToken",
+  "StsToken",
+  "vendingToken",
+  "VendingToken",
+  "tokenNo",
+  "TokenNo",
+] as const;

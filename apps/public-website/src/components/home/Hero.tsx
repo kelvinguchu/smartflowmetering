@@ -82,8 +82,8 @@ export function Hero() {
           className='absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full border-[3px] border-secondary border-dashed opacity-20'
         />
         {/* Blur effects */}
-        <div className='absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px]' />
-        <div className='absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-accent/5 rounded-full blur-[100px]' />
+        <div className='absolute top-[-20%] right-[-10%] w-200 h-200 bg-primary/5 rounded-full blur-[120px]' />
+        <div className='absolute bottom-[-10%] left-[-10%] w-150 h-150 bg-accent/5 rounded-full blur-[100px]' />
       </div>
 
       <div className='container relative z-10 w-full px-4 sm:px-8 flex h-full pt-16 items-center justify-center'>
@@ -106,13 +106,13 @@ export function Hero() {
               <Button
                 asChild
                 size='lg'
-                className='w-[200px] sm:w-auto bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25 text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full cursor-pointer transition-transform hover:-translate-y-0.5'>
+                className='w-50 sm:w-auto bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25 text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full cursor-pointer transition-transform hover:-translate-y-0.5'>
                 <Link to='/register'>Get Started</Link>
               </Button>
               <Button
                 size='lg'
                 variant='outline'
-                className='w-[200px] sm:w-auto text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full border-2 hover:bg-secondary/50 cursor-pointer transition-transform hover:-translate-y-0.5'
+                className='w-50 sm:w-auto text-base lg:text-lg px-6 lg:px-8 h-10 lg:h-12 rounded-full border-2 hover:bg-secondary/50 cursor-pointer transition-transform hover:-translate-y-0.5'
                 onClick={() => {
                   document
                     .getElementById("how-it-works")
@@ -130,7 +130,7 @@ export function Hero() {
               initial={{ opacity: 0, y: 30, rotateX: 10 }}
               animate={{ opacity: 1, y: 0, rotateX: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
-              className='relative w-[350px] md:w-[450px] bg-slate-100 dark:bg-slate-900 rounded-[2rem] lg:rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] border-4 border-slate-200 dark:border-slate-800 p-3 lg:p-5 flex flex-col gap-3 lg:gap-5 transform hover:scale-[1.01] transition-transform duration-500 scale-100 sm:scale-100 lg:scale-95 xl:scale-100 origin-center'
+              className='relative w-87.5 md:w-112.5 bg-slate-100 dark:bg-slate-900 rounded-[2rem] lg:rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] border-4 border-slate-200 dark:border-slate-800 p-3 lg:p-5 flex flex-col gap-3 lg:gap-5 transform hover:scale-[1.01] transition-transform duration-500 scale-100 sm:scale-100 lg:scale-95 xl:scale-100 origin-center'
               style={{ perspective: 1000 }}>
               {/* Device Reflection/Gloss */}
               <div className='absolute inset-0 rounded-4xl lg:rounded-[2.5rem] bg-linear-to-tr from-white/40 to-transparent pointer-events-none' />
@@ -182,6 +182,12 @@ export function Hero() {
                   "enter",
                 ].map((key) => {
                   const isAction = key === "del" || key === "enter";
+                  const getKeyDisplay = (k: string): string => {
+                    if (k === "enter") return "↵";
+                    if (k === "del") return "DEL";
+                    return k;
+                  };
+                  const keyDisplay = getKeyDisplay(key);
                   return (
                     <motion.button
                       key={key}
@@ -196,7 +202,7 @@ export function Hero() {
                               ${key === "enter" ? "bg-linear-to-r from-green-500 to-emerald-600 border-green-700" : ""}
                               ${key === "del" ? "bg-linear-to-r from-red-500 to-rose-600 border-red-700 text-sm" : ""}
                            `}>
-                      {key === "enter" ? "â†µ" : key === "del" ? "DEL" : key}
+                      {keyDisplay}
                     </motion.button>
                   );
                 })}

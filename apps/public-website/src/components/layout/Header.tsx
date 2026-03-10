@@ -66,7 +66,7 @@ export function Header() {
 
             {/* Dropdown Menu */}
             <div className='absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200'>
-              <div className='bg-card rounded-xl shadow-xl border border-border/50 py-2 min-w-[220px]'>
+              <div className='bg-card rounded-xl shadow-xl border border-border/50 py-2 min-w-55'>
                 {products.map((product) => (
                   <Link
                     key={product.id}

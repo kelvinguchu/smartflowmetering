@@ -14,7 +14,7 @@ export function MeterHero({ product }: MeterHeroProps) {
         <div className='bg-card rounded-3xl shadow-xl border border-border/50 p-3'>
           <div className='grid lg:grid-cols-2 gap-3 h-full'>
             {/* Image Section */}
-            <div className='relative h-[250px] sm:h-[350px] lg:h-auto w-full overflow-hidden rounded-2xl bg-white'>
+            <div className='relative h-62.5 sm:h-87.5 lg:h-auto w-full overflow-hidden rounded-2xl bg-white'>
               <img
                 src={product.image}
                 alt={product.name}

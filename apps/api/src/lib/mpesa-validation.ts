@@ -1,4 +1,5 @@
 import { env } from "../config";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * Known Safaricom M-Pesa IP ranges
@@ -56,11 +57,74 @@ export function isValidMpesaIP(ip: string | null | undefined): boolean {
   return false;
 }
 
+export interface MpesaSignatureValidationResult {
+  valid: boolean;
+  reason?: string;
+}
+
+export async function validateMpesaSignature(
+  request: Request
+): Promise<MpesaSignatureValidationResult> {
+  const enforceSignature = env.MPESA_REQUIRE_SIGNATURE;
+  const secret = env.MPESA_SIGNATURE_SECRET;
+
+  if (!secret) {
+    if (enforceSignature) {
+      return { valid: false, reason: "Signature secret is not configured" };
+    }
+    return { valid: true };
+  }
+
+  const signatureHeader = request.headers.get(env.MPESA_SIGNATURE_HEADER);
+  if (!signatureHeader) {
+    if (enforceSignature) {
+      return {
+        valid: false,
+        reason: `Missing signature header: ${env.MPESA_SIGNATURE_HEADER}`,
+      };
+    }
+    return { valid: true };
+  }
+
+  const providedSignature = normalizeSignature(signatureHeader);
+  if (!providedSignature) {
+    return { valid: false, reason: "Invalid signature format" };
+  }
+
+  const timestampHeader = request.headers.get(
+    env.MPESA_SIGNATURE_TIMESTAMP_HEADER
+  );
+  if (timestampHeader) {
+    const timestampMs = parseTimestamp(timestampHeader);
+    if (!timestampMs) {
+      return { valid: false, reason: "Invalid signature timestamp" };
+    }
+
+    const ageMs = Math.abs(Date.now() - timestampMs);
+    if (ageMs > env.MPESA_SIGNATURE_MAX_AGE_SECONDS * 1000) {
+      return { valid: false, reason: "Signature timestamp expired" };
+    }
+  }
+
+  const rawBody = await request.clone().text();
+  const payload = timestampHeader ? `${timestampHeader}.${rawBody}` : rawBody;
+  const expectedSignature = createHmac("sha256", secret).update(payload).digest();
+
+  if (
+    providedSignature.length !== expectedSignature.length ||
+    !timingSafeEqual(providedSignature, expectedSignature)
+  ) {
+    return { valid: false, reason: "Signature mismatch" };
+  }
+
+  return { valid: true };
+}
+
 /**
  * Extract client IP from request headers
  * Handles various proxy headers
  */
-export function getClientIP(headers: Headers, server?: unknown): string | null {
+export function getClientIP(headers: Headers): string | null {
   // Check X-Forwarded-For (common proxy header)
   const forwarded = headers.get("x-forwarded-for");
   if (forwarded) {
@@ -82,4 +146,34 @@ export function getClientIP(headers: Headers, server?: unknown): string | null {
 
   // Fallback: requires runtime-specific socket access (not implemented)
   return null;
+}
+
+function normalizeSignature(value: string): Buffer | null {
+  const trimmed = value.trim();
+  const withoutPrefix = trimmed.replace(/^(sha256|v1)=/i, "");
+
+  if (/^[a-f0-9]{64}$/i.test(withoutPrefix)) {
+    return Buffer.from(withoutPrefix, "hex");
+  }
+
+  try {
+    const asBuffer = Buffer.from(withoutPrefix, "base64");
+    if (asBuffer.length === 32) return asBuffer;
+  } catch {
+    // no-op
+  }
+
+  return null;
+}
+
+function parseTimestamp(value: string): number | null {
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const numeric = Number.parseInt(trimmed, 10);
+    if (!Number.isFinite(numeric)) return null;
+    return numeric > 1_000_000_000_000 ? numeric : numeric * 1000;
+  }
+
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
 }

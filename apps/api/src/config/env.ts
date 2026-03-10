@@ -86,6 +86,25 @@ export const env = {
     process.env.MPESA_IDENTIFIER_TYPE ?? "4",
     10
   ),
+  MPESA_SIGNATURE_SECRET: process.env.MPESA_SIGNATURE_SECRET ?? "",
+  MPESA_SIGNATURE_HEADER: (
+    process.env.MPESA_SIGNATURE_HEADER ?? "x-mpesa-signature"
+  )
+    .trim()
+    .toLowerCase(),
+  MPESA_SIGNATURE_TIMESTAMP_HEADER: (
+    process.env.MPESA_SIGNATURE_TIMESTAMP_HEADER ?? "x-mpesa-timestamp"
+  )
+    .trim()
+    .toLowerCase(),
+  MPESA_SIGNATURE_MAX_AGE_SECONDS: parsePositiveInteger(
+    process.env.MPESA_SIGNATURE_MAX_AGE_SECONDS,
+    300
+  ),
+  MPESA_REQUIRE_SIGNATURE: parseBoolean(
+    process.env.MPESA_REQUIRE_SIGNATURE,
+    isProduction && Boolean(process.env.MPESA_SIGNATURE_SECRET)
+  ),
 
   // Legacy/Direct Manufacturer Providers
   HEXING_API_KEY: process.env.HEXING_API_KEY ?? "",
@@ -133,6 +152,35 @@ export const env = {
   // Business Rules
   COMMISSION_RATE: 0.1, // 10% commission
   MIN_TRANSACTION_AMOUNT: 30, // KES 30 minimum
+  ALERT_AUTOMATION_ENABLED: parseBoolean(
+    process.env.ALERT_AUTOMATION_ENABLED,
+    false
+  ),
+  ALERT_AUTOMATION_INTERVAL_SECONDS: parsePositiveInteger(
+    process.env.ALERT_AUTOMATION_INTERVAL_SECONDS,
+    900
+  ),
+  ALERT_TIMEZONE: process.env.ALERT_TIMEZONE?.trim() || "Africa/Nairobi",
+  LOW_BALANCE_ALERT_DEDUPE_HOURS: parsePositiveInteger(
+    process.env.LOW_BALANCE_ALERT_DEDUPE_HOURS,
+    12
+  ),
+  POSTPAID_REMINDER_DEDUPE_HOURS: parsePositiveInteger(
+    process.env.POSTPAID_REMINDER_DEDUPE_HOURS,
+    24
+  ),
+  POSTPAID_REMINDER_DAYS_AFTER_PAYMENT: parsePositiveInteger(
+    process.env.POSTPAID_REMINDER_DAYS_AFTER_PAYMENT,
+    13
+  ),
+  LANDLORD_DAILY_USAGE_SMS_ENABLED: parseBoolean(
+    process.env.LANDLORD_DAILY_USAGE_SMS_ENABLED,
+    isProduction
+  ),
+  LANDLORD_DAILY_USAGE_SMS_HOUR: parseHour(
+    process.env.LANDLORD_DAILY_USAGE_SMS_HOUR,
+    20
+  ),
 
   // Safaricom M-Pesa IP ranges for callback validation
   // Source: Safaricom Developer Documentation
@@ -161,4 +209,31 @@ function normalizeCallbackTokenTransport(
   const candidate = value?.toLowerCase();
   if (candidate === "query" || candidate === "header") return candidate;
   return "query_or_header";
+}
+
+function parsePositiveInteger(
+  value: string | undefined,
+  fallback: number
+): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true" || normalized === "yes") {
+    return true;
+  }
+  if (normalized === "0" || normalized === "false" || normalized === "no") {
+    return false;
+  }
+  return fallback;
+}
+
+function parseHour(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  if (parsed < 0 || parsed > 23) return fallback;
+  return parsed;
 }

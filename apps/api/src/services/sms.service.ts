@@ -15,7 +15,7 @@ export interface SmsResult {
 }
 
 function formatPhoneForSms(phoneNumber: string): string {
-  const cleanedPhoneNumber = phoneNumber.replace(/[^0-9+]/g, "");
+  const cleanedPhoneNumber = phoneNumber.replaceAll(/[^0-9+]/g, "");
 
   if (cleanedPhoneNumber.startsWith("+")) {
     return cleanedPhoneNumber.slice(1);
@@ -162,6 +162,17 @@ Amount: KES ${amount}
 Units: ${units} kWh
 Token: ${formattedToken}
 Enter this token on your meter.`;
+}
+
+export function formatOnboardingApprovedSms(input: {
+  landlordName: string;
+  motherMeterNumber: string;
+  subMeterCount: number;
+}): string {
+  return `Smart Flow Metering: Hello ${input.landlordName}, your meter application has been approved.
+Mother meter: ${input.motherMeterNumber}
+Registered sub-meters: ${input.subMeterCount}
+You can now start vending tokens.`;
 }
 
 /**

@@ -101,7 +101,7 @@ export function registerStkRoutes(router: MpesaRouter) {
     zValidator("json", stkPushCallbackSchema),
     async (c) => {
       const body = c.req.valid("json");
-      const rejection = rejectIfInvalidMpesaSource(c, "STK Callback", {
+      const rejection = await rejectIfInvalidMpesaSource(c, "STK Callback", {
         ResultCode: 1,
         ResultDesc: "Forbidden",
       });

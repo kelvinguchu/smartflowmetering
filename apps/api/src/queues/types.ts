@@ -10,7 +10,7 @@ export interface PaymentProcessingJob {
   amount: string;
   phoneNumber: string;
   mpesaReceiptNumber: string;
-  paymentMethod?: "paybill" | "stk_push" | "ussd";
+  paymentMethod?: "paybill" | "stk_push";
 }
 
 /**
@@ -62,6 +62,13 @@ export interface SmsDeliveryJob {
   amount: string;
 }
 
+export interface SmsNotificationJob {
+  phoneNumber: string;
+  messageBody: string;
+  transactionId?: string | null;
+  smsLogId?: string;
+}
+
 /**
  * SMS Resend Job
  * Triggered manually by admin
@@ -73,3 +80,4 @@ export interface SmsResendJob {
 }
 
 export type PaymentJob = PaymentProcessingJob | MpesaRawCallbackJob;
+export type SmsJob = SmsDeliveryJob | SmsNotificationJob | SmsResendJob;

@@ -7,7 +7,7 @@ import {
 import type {
   PaymentJob,
   TokenGenerationJob,
-  SmsDeliveryJob,
+  SmsJob,
 } from "./types";
 
 // ============================================================
@@ -36,7 +36,7 @@ export const tokenWorker = createWorker<TokenGenerationJob>(
   5 // Process 5 token requests concurrently
 );
 
-export const smsWorker = createWorker<SmsDeliveryJob>(
+export const smsWorker = createWorker<SmsJob>(
   QUEUE_NAMES.SMS_DELIVERY,
   processSmsDelivery,
   10 // Process 10 SMS concurrently

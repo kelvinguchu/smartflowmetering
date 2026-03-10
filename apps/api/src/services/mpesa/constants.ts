@@ -36,5 +36,5 @@ export function getMpesaApiUrls(
 }
 
 function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/g, "");
+  return baseUrl.replaceAll(/\/+$/g, "");
 }

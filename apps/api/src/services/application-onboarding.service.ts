@@ -8,27 +8,25 @@ import {
   motherMeters,
   properties,
   tariffs,
-  type MeterApplication,
 } from "../db/schema";
 import {
   approveApplicationSchema,
   applicationQuerySchema,
   createApplicationSchema,
 } from "../validators/applications";
+import {
+  ApplicationError,
+  buildDefaultPropertyName,
+  formatDecimal,
+  mapUtilityType,
+  normalizeOptionalString,
+  normalizeSubMeterNumbers,
+} from "./application-onboarding.helpers";
+export { ApplicationError } from "./application-onboarding.helpers";
+
 type CreateApplicationInput = z.infer<typeof createApplicationSchema>;
 type ApplicationQueryInput = z.infer<typeof applicationQuerySchema>;
 type ApproveApplicationInput = z.infer<typeof approveApplicationSchema>;
-
-type MeterTypeForApplication = "electricity" | "water";
-
-export class ApplicationError extends Error {
-  constructor(
-    public readonly statusCode: number,
-    message: string
-  ) {
-    super(message);
-  }
-}
 
 export async function createMeterApplication(input: CreateApplicationInput) {
   const subMeterNumbers = normalizeSubMeterNumbers(input.subMeterNumbers);
@@ -210,6 +208,9 @@ export async function approveMeterApplication(
   return {
     applicationId,
     ...created,
+    landlordName: `${application.firstName} ${application.lastName}`.trim(),
+    phoneNumber: application.phoneNumber,
+    motherMeterNumber: application.motherMeterNumber,
   };
 }
 
@@ -238,38 +239,4 @@ async function getRequiredPendingApplication(applicationId: string) {
   }
 
   return application;
-}
-
-function normalizeSubMeterNumbers(raw: unknown): string[] {
-  if (!Array.isArray(raw)) {
-    throw new ApplicationError(400, "subMeterNumbers must be an array");
-  }
-
-  const normalized = raw
-    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-    .filter(Boolean);
-
-  if (normalized.length === 0) {
-    throw new ApplicationError(400, "At least one sub meter number is required");
-  }
-
-  return [...new Set(normalized)];
-}
-
-function mapUtilityType(utilityType: MeterApplication["utilityType"]): MeterTypeForApplication {
-  if (utilityType === "water") return "water";
-  return "electricity";
-}
-
-function formatDecimal(value: number, scale: number): string {
-  return value.toFixed(scale);
-}
-
-function normalizeOptionalString(value: string | undefined): string | null {
-  const normalized = value?.trim();
-  return normalized ? normalized : null;
-}
-
-function buildDefaultPropertyName(application: MeterApplication): string {
-  return `${application.firstName} ${application.lastName} Property`.trim();
 }

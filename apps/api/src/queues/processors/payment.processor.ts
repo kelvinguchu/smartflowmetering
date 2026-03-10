@@ -213,6 +213,8 @@ async function processPaymentInternal(data: PaymentProcessingJob) {
     },
     {
       jobId: `token-${transaction.id}`, // Prevent duplicate token generation
+      attempts: 3,
+      backoff: { type: "exponential", delay: 500 },
     }
   );
 

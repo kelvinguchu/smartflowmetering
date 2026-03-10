@@ -16,7 +16,7 @@ import {
 } from "../lib/auth-middleware";
 
 const idParamSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const meterNumberParamSchema = z.object({

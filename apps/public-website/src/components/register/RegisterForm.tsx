@@ -60,29 +60,34 @@ export function RegisterForm() {
     const formData = new FormData(event.currentTarget);
     const subMeterNumbers = formData
       .getAll("subMeterNumbers")
-      .map((entry) => String(entry).trim())
+      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
       .filter(Boolean);
 
+    const getFormString = (key: string): string => {
+      const value = formData.get(key);
+      return typeof value === "string" ? value.trim() : "";
+    };
+
     const payload = {
-      firstName: String(formData.get("firstName") ?? "").trim(),
-      lastName: String(formData.get("lastName") ?? "").trim(),
-      phoneNumber: String(formData.get("phoneNumber") ?? "").trim(),
-      email: String(formData.get("email") ?? "").trim(),
-      idNumber: String(formData.get("idNumber") ?? "").trim(),
-      kraPin: String(formData.get("kraPin") ?? "").trim(),
-      county: String(formData.get("county") ?? "").trim(),
-      location: String(formData.get("location") ?? "").trim(),
+      firstName: getFormString("firstName"),
+      lastName: getFormString("lastName"),
+      phoneNumber: getFormString("phoneNumber"),
+      email: getFormString("email"),
+      idNumber: getFormString("idNumber"),
+      kraPin: getFormString("kraPin"),
+      county: getFormString("county"),
+      location: getFormString("location"),
       buildingType,
       utilityType,
-      motherMeterNumber: String(formData.get("motherMeterNumber") ?? "").trim(),
+      motherMeterNumber: getFormString("motherMeterNumber"),
       initialReading: Number(formData.get("initialReading") ?? "0"),
       paymentMode,
       subMeterNumbers,
       installationType,
       suppliesOtherHouses,
       billPayer,
-      technicianName: String(formData.get("technicianName") ?? "").trim() || undefined,
-      technicianPhone: String(formData.get("technicianPhone") ?? "").trim() || undefined,
+      technicianName: getFormString("technicianName") || undefined,
+      technicianPhone: getFormString("technicianPhone") || undefined,
       termsAccepted: true,
     };
 
@@ -90,7 +95,7 @@ export function RegisterForm() {
     setStatusMessage(null);
 
     try {
-      const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/g, "");
+      const apiBase = (import.meta.env.VITE_API_URL ?? "").replaceAll(/\/+$/g, "");
       const endpoint = `${apiBase}/api/applications`;
 
       const response = await fetch(endpoint, {

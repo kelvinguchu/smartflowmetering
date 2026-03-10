@@ -10,7 +10,7 @@ export const createApplicationSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   phoneNumber: z.string().min(10).max(20),
-  email: z.string().email(),
+  email: z.email(),
   idNumber: z.string().min(5),
   kraPin: z.string().min(5),
   county: z.string().min(2),
@@ -36,7 +36,7 @@ export const applicationQuerySchema = z.object({
 });
 
 export const approveApplicationSchema = z.object({
-  tariffId: z.string().uuid(),
+  tariffId: z.uuid(),
   propertyName: z.string().min(1).max(120).optional(),
   motherMeterType: z.enum(["prepaid", "postpaid"]).optional(),
   meterBrand: z.enum(["hexing", "stron", "conlog"]).optional(),

@@ -11,6 +11,9 @@ import {
   type GomelongMeterType,
 } from "../../services/gomelong.service";
 
+type MeterBrand = "hexing" | "stron" | "conlog";
+type MeterUtilityType = "electricity" | "water" | "gas";
+
 /**
  * Token Generation Processor
  *
@@ -116,8 +119,8 @@ function formatTokenForDisplay(token: string): string {
 
 // Manufacturer API integration
 interface TokenRequest {
-  brand: "hexing" | "stron" | "conlog";
-  meterType: "electricity" | "water" | "gas";
+  brand: MeterBrand;
+  meterType: MeterUtilityType;
   meterNumber: string;
   units: string;
   supplyGroupCode: string;
@@ -161,7 +164,7 @@ async function generateTokenFromManufacturer(
       });
     }
 
-    if (env.NODE_ENV === "production") {
+    if (!isMockTokenFallbackAllowed()) {
       throw new Error(
         `Gomelong is enabled for brand '${brand}' but credentials are missing`
       );
@@ -176,6 +179,9 @@ async function generateTokenFromManufacturer(
   const apiConfig = getApiConfig(brand);
 
   if (!apiConfig.apiKey || !apiConfig.apiUrl) {
+    if (!isMockTokenFallbackAllowed()) {
+      throw new Error(`${brand} API is not configured`);
+    }
     console.warn(`[Token] ${brand} API not configured, using mock token`);
     return generateMockToken();
   }
@@ -206,20 +212,18 @@ async function generateTokenFromManufacturer(
   return data.token;
 }
 
-function shouldUseGomelongForBrand(brand: "hexing" | "stron" | "conlog"): boolean {
+function shouldUseGomelongForBrand(brand: MeterBrand): boolean {
   if (env.GOMELONG_BRANDS.length > 0) return env.GOMELONG_BRANDS.includes(brand);
   return isGomelongConfigured();
 }
 
-function mapMeterTypeToGomelong(
-  meterType: "electricity" | "water" | "gas"
-): GomelongMeterType | null {
+function mapMeterTypeToGomelong(meterType: MeterUtilityType): GomelongMeterType | null {
   if (meterType === "electricity") return 1;
   if (meterType === "water") return 2;
   return null;
 }
 
-function getApiConfig(brand: "hexing" | "stron" | "conlog"): {
+function getApiConfig(brand: MeterBrand): {
   apiKey: string;
   apiUrl: string;
 } {
@@ -241,4 +245,14 @@ function generateMockToken(): string {
     token += digits.charAt(Math.floor(Math.random() * digits.length));
   }
   return token;
+}
+
+function isMockTokenFallbackAllowed(): boolean {
+  const raw = process.env.ALLOW_MOCK_TOKEN_FALLBACK?.trim().toLowerCase();
+  if (raw) {
+    if (raw === "0" || raw === "false" || raw === "no") return false;
+    if (raw === "1" || raw === "true" || raw === "yes") return true;
+  }
+
+  return env.NODE_ENV !== "production";
 }

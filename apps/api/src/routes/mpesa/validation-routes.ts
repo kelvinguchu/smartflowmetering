@@ -12,18 +12,31 @@ import {
 import { rejectIfInvalidMpesaSource, type MpesaRouter } from "./shared";
 
 export function registerValidationRoutes(router: MpesaRouter) {
+  const guardValidationSource = async (c: any, next: () => Promise<void>) => {
+    const rejection = await rejectIfInvalidMpesaSource(c, "M-Pesa Validation", {
+      ResultCode: "C2B00016",
+      ResultDesc: "Forbidden",
+    });
+    if (rejection) return rejection;
+    await next();
+  };
+
+  const guardCallbackSource = async (c: any, next: () => Promise<void>) => {
+    const rejection = await rejectIfInvalidMpesaSource(c, "M-Pesa Callback", {
+      ResultCode: "1",
+      ResultDesc: "Forbidden",
+    });
+    if (rejection) return rejection;
+    await next();
+  };
+
   router.post(
     "/validation",
     mpesaRateLimit,
+    guardValidationSource,
     zValidator("json", mpesaValidationSchema),
     async (c) => {
       const body = c.req.valid("json");
-      const rejection = rejectIfInvalidMpesaSource(c, "M-Pesa Validation", {
-        ResultCode: "C2B00016",
-        ResultDesc: "Forbidden",
-      });
-      if (rejection) return rejection;
-
       const meterNumber = body.BillRefNumber.trim();
       const amount = Number.parseFloat(String(body.TransAmount));
 
@@ -73,15 +86,10 @@ export function registerValidationRoutes(router: MpesaRouter) {
   router.post(
     "/callback",
     mpesaRateLimit,
+    guardCallbackSource,
     zValidator("json", mpesaC2BCallbackSchema),
     async (c) => {
       const body = c.req.valid("json");
-      const rejection = rejectIfInvalidMpesaSource(c, "M-Pesa Callback", {
-        ResultCode: "1",
-        ResultDesc: "Forbidden",
-      });
-      if (rejection) return rejection;
-
       console.log(`[M-Pesa Callback] Received: ${body.TransID}`);
 
       try {

@@ -2,11 +2,15 @@ import type { Job } from "bullmq";
 import { db } from "../../db";
 import { smsLogs } from "../../db/schema";
 import { eq } from "drizzle-orm";
-import type { SmsDeliveryJob, SmsResendJob } from "../types";
+import type {
+  SmsDeliveryJob,
+  SmsJob,
+  SmsNotificationJob,
+  SmsResendJob,
+} from "../types";
 import {
   sendSms,
   formatTokenSms,
-  type SmsResult,
 } from "../../services/sms.service";
 
 /**
@@ -28,12 +32,13 @@ function parseCost(cost: string | undefined): string | null {
  * 3. Logs the delivery status
  */
 export async function processSmsDelivery(
-  job: Job<SmsDeliveryJob>
+  job: Job<SmsJob>
 ): Promise<{ messageId: string }> {
-  const { transactionId, phoneNumber, meterNumber, token, units, amount } =
-    job.data;
+  if (isNotificationJob(job.data)) {
+    return processNotificationSms(job.data);
+  }
 
-  // Format the message
+  const { transactionId, phoneNumber, meterNumber, token, units, amount } = job.data;
   const message = formatTokenSms(meterNumber, token, units, amount);
 
   console.log(
@@ -119,3 +124,55 @@ export async function processSmsResend(
   return { messageId: result.messageId! };
 }
 
+async function processNotificationSms(
+  data: SmsNotificationJob
+): Promise<{ messageId: string }> {
+  const phoneNumber = data.phoneNumber;
+  const messageBody = data.messageBody;
+
+  let smsLogId = data.smsLogId;
+  if (!smsLogId) {
+    const [smsLog] = await db
+      .insert(smsLogs)
+      .values({
+        transactionId: data.transactionId ?? null,
+        phoneNumber,
+        messageBody,
+        provider: "hostpinnacle",
+        status: "queued",
+      })
+      .returning({ id: smsLogs.id });
+
+    smsLogId = smsLog.id;
+  } else {
+    await db
+      .update(smsLogs)
+      .set({ status: "queued", updatedAt: new Date() })
+      .where(eq(smsLogs.id, smsLogId));
+  }
+
+  const result = await sendSms(phoneNumber, messageBody);
+
+  await db
+    .update(smsLogs)
+    .set({
+      status: result.success ? "sent" : "failed",
+      provider: result.provider ?? "hostpinnacle",
+      providerMessageId: result.messageId ?? null,
+      cost: parseCost(result.cost),
+      updatedAt: new Date(),
+    })
+    .where(eq(smsLogs.id, smsLogId));
+
+  if (!result.success) {
+    throw new Error(`SMS delivery failed: ${result.error}`);
+  }
+
+  return { messageId: result.messageId! };
+}
+
+function isNotificationJob(
+  data: SmsJob
+): data is SmsNotificationJob | SmsResendJob {
+  return "messageBody" in data;
+}

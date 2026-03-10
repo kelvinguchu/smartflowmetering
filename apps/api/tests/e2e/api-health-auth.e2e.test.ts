@@ -51,12 +51,42 @@ describe("E2E: API health and auth guards", () => {
       { method: "GET", path: "/api/tariffs" },
       { method: "GET", path: "/api/transactions" },
       { method: "GET", path: "/api/sms" },
+      { method: "GET", path: "/api/notifications" },
+      { method: "GET", path: "/api/failed-transactions" },
       { method: "GET", path: "/api/gomelong/health" },
       { method: "GET", path: "/api/applications" },
+      { method: "GET", path: "/api/mother-meters" },
+      { method: "GET", path: "/api/mother-meters/alerts/low-balance" },
+      { method: "GET", path: "/api/mother-meters/alerts/postpaid-reminders" },
       {
         method: "POST",
         path: "/api/applications/00000000-0000-0000-0000-000000000000/approve",
         payload: { tariffId: "00000000-0000-0000-0000-000000000000" },
+      },
+      {
+        method: "POST",
+        path: "/api/mother-meters/alerts/low-balance/notify",
+        payload: {},
+      },
+      {
+        method: "POST",
+        path: "/api/mother-meters/alerts/postpaid-reminders/notify",
+        payload: {},
+      },
+      {
+        method: "POST",
+        path: "/api/notifications/run-alert-checks",
+        payload: {},
+      },
+      {
+        method: "POST",
+        path: "/api/notifications/run-daily-usage-sms",
+        payload: {},
+      },
+      {
+        method: "POST",
+        path: "/api/mother-meters/00000000-0000-0000-0000-000000000000/events",
+        payload: { eventType: "refill", amount: 1000 },
       },
       {
         method: "POST",

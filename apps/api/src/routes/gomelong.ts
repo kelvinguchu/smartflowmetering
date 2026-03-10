@@ -5,6 +5,8 @@ import { requireAdmin, type AppBindings } from "../lib/auth-middleware";
 import {
   addUseType,
   deleteUseType,
+  type GomelongMeterType,
+  type GomelongVendingType,
   getChangeDecoderToken,
   getClearCreditToken,
   getClearTamperSignToken,
@@ -21,8 +23,14 @@ import {
   useTypeList,
 } from "../services/gomelong.service";
 
-const meterTypeSchema = z.coerce.number().int().refine((value) => value === 1 || value === 2);
-const vendingTypeSchema = z.coerce.number().int().refine((value) => value === 0 || value === 1);
+const meterTypeSchema = z
+  .union([z.literal(1), z.literal(2), z.literal("1"), z.literal("2")])
+  .transform((value): GomelongMeterType => (value === 1 || value === "1" ? 1 : 2));
+const vendingTypeSchema = z
+  .union([z.literal(0), z.literal(1), z.literal("0"), z.literal("1")])
+  .transform((value): GomelongVendingType =>
+    value === 0 || value === "0" ? 0 : 1
+  );
 const meterCodeSchema = z.string().min(1).max(32);
 
 const sgcQuerySchema = z.object({
@@ -109,8 +117,8 @@ const waterVendPageQuerySchema = z.object({
 
 const waterVendPageBodySchema = z.object({
   meterCode: meterCodeSchema,
-  startDate: z.string().date(),
-  endDate: z.string().date(),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
 });
 
 export const gomelongRoutes = new Hono<AppBindings>();
@@ -125,7 +133,7 @@ gomelongRoutes.get("/health", (c) =>
 
 gomelongRoutes.get("/kmf/sgc", zValidator("query", sgcQuerySchema), async (c) => {
   const query = c.req.valid("query");
-  const result = await listSgcByMeterType(query.meterType as 1 | 2);
+  const result = await listSgcByMeterType(query.meterType);
   return providerResponse(c, result);
 });
 
@@ -136,7 +144,7 @@ gomelongRoutes.get(
     const query = c.req.valid("query");
     const result = await getChangeDecoderToken({
       meterCode: query.meterCode,
-      meterType: query.meterType as 1 | 2,
+      meterType: query.meterType,
       sgcId: query.sgcId,
     });
     return providerResponse(c, result);
@@ -150,7 +158,7 @@ gomelongRoutes.get(
     const query = c.req.valid("query");
     const result = await getClearCreditToken({
       meterCode: query.meterCode,
-      meterType: query.meterType as 1 | 2,
+      meterType: query.meterType,
     });
     return providerResponse(c, result);
   }
@@ -163,7 +171,7 @@ gomelongRoutes.get(
     const query = c.req.valid("query");
     const result = await getClearTamperSignToken({
       meterCode: query.meterCode,
-      meterType: query.meterType as 1 | 2,
+      meterType: query.meterType,
     });
     return providerResponse(c, result);
   }
@@ -176,7 +184,7 @@ gomelongRoutes.get(
     const query = c.req.valid("query");
     const result = await getContractInfo({
       meterCode: query.meterCode,
-      meterType: query.meterType as 1 | 2,
+      meterType: query.meterType,
     });
     return providerResponse(c, result);
   }
@@ -202,9 +210,9 @@ gomelongRoutes.get(
     const query = c.req.valid("query");
     const result = await getVendingToken({
       meterCode: query.meterCode,
-      meterType: query.meterType as 1 | 2,
+      meterType: query.meterType,
       amountOrQuantity: query.amountOrQuantity,
-      vendingType: (query.vendingType as 0 | 1 | undefined) ?? undefined,
+      vendingType: query.vendingType ?? undefined,
     });
     return providerResponse(c, result);
   }
@@ -217,7 +225,7 @@ gomelongRoutes.post(
     const body = c.req.valid("json");
     const result = await meterDelete({
       meterCode: body.meterCode,
-      meterType: body.meterType as 1 | 2,
+      meterType: body.meterType,
     });
     return providerResponse(c, result);
   }
@@ -231,13 +239,13 @@ gomelongRoutes.post(
     const result = await meterRegister({
       useTypeId: body.useTypeId,
       meterCode: body.meterCode,
-      meterType: body.meterType as 1 | 2,
+      meterType: body.meterType,
       customerName: body.customerName,
       address: body.address,
       phoneNumber: body.phoneNumber,
       fax: body.fax,
       sgcId: body.sgcId,
-      billingMode: (body.billingMode as 0 | 1 | undefined) ?? undefined,
+      billingMode: body.billingMode ?? undefined,
     });
     return providerResponse(c, result);
   }
@@ -250,13 +258,13 @@ gomelongRoutes.post(
     const body = c.req.valid("json");
     const result = await meterUpdate({
       meterCode: body.meterCode,
-      meterType: body.meterType as 1 | 2,
+      meterType: body.meterType,
       customerName: body.customerName,
       address: body.address,
       phoneNumber: body.phoneNumber,
       useTypeId: body.useTypeId,
       sgcId: body.sgcId,
-      billingMode: (body.billingMode as 0 | 1 | undefined) ?? undefined,
+      billingMode: body.billingMode ?? undefined,
     });
     return providerResponse(c, result);
   }
@@ -275,7 +283,7 @@ gomelongRoutes.post(
     const result = await addUseType({
       useTypeId: body.useTypeId,
       useTypeName: body.useTypeName,
-      meterType: body.meterType as 1 | 2,
+      meterType: body.meterType,
       price: body.price,
       vat: body.vat,
     });

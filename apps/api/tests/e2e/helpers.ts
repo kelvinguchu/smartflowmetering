@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { eq, sql } from "drizzle-orm";
+import type { App } from "../../src/app";
 import { closeDbConnection, db } from "../../src/db";
 import {
   customers,
@@ -7,6 +8,7 @@ import {
   motherMeters,
   properties,
   tariffs,
+  user,
   type NewMeter,
   type NewMotherMeter,
   type NewProperty,
@@ -23,6 +25,7 @@ import {
 const TRUNCATE_SQL = `
 TRUNCATE TABLE
   sms_logs,
+  admin_notifications,
   audit_logs,
   meter_applications,
   generated_tokens,
@@ -35,8 +38,11 @@ TRUNCATE TABLE
   properties,
   customers,
   tariffs,
-  meter_applications,
-  audit_logs
+  session,
+  account,
+  two_factor,
+  verification,
+  "user"
 CASCADE;
 `;
 
@@ -203,4 +209,72 @@ export async function waitFor(
   }
 
   assert.fail(`Condition not met within ${timeoutMs}ms`);
+}
+
+export async function createAuthenticatedSession(
+  app: App,
+  role: "admin" | "user" = "admin"
+) {
+  const email = `e2e-${role}-${Date.now()}-${Math.floor(Math.random() * 10_000)}@example.com`;
+  const password = "Passw0rd!";
+
+  const signUpResponse = await app.request("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: `E2E ${role}`,
+      email,
+      password,
+    }),
+  });
+  assert.equal(
+    signUpResponse.status,
+    200,
+    `Expected sign-up to succeed, got ${signUpResponse.status}`
+  );
+
+  if (role === "admin") {
+    const created = await db.query.user.findFirst({
+      where: eq(user.email, email),
+      columns: { id: true },
+    });
+    assert.ok(created, "Expected signed up user to exist");
+    await db.update(user).set({ role: "admin" }).where(eq(user.id, created.id));
+  }
+
+  const signInResponse = await app.request("/api/auth/sign-in/email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
+  assert.equal(
+    signInResponse.status,
+    200,
+    `Expected sign-in to succeed, got ${signInResponse.status}`
+  );
+
+  const setCookie = signInResponse.headers.get("set-cookie");
+  assert.ok(setCookie, "Expected sign-in response to set a session cookie");
+
+  const sessionTokenCookie =
+    setCookie.match(/better-auth\.session_token=[^;]+/)?.[0] ?? "";
+  const sessionDataCookie =
+    setCookie.match(/better-auth\.session_data=[^;]+/)?.[0] ?? "";
+  const cookie = [sessionTokenCookie, sessionDataCookie]
+    .filter(Boolean)
+    .join("; ");
+
+  assert.ok(cookie, "Expected valid auth cookie to be extracted");
+
+  return {
+    email,
+    password,
+    headers: {
+      cookie,
+      "Content-Type": "application/json",
+    },
+  };
 }
