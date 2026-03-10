@@ -63,6 +63,7 @@ export interface SmsDeliveryJob {
 }
 
 export interface SmsNotificationJob {
+  kind: "notification";
   phoneNumber: string;
   messageBody: string;
   transactionId?: string | null;
@@ -74,6 +75,7 @@ export interface SmsNotificationJob {
  * Triggered manually by admin
  */
 export interface SmsResendJob {
+  kind: "resend";
   smsLogId: string;
   phoneNumber: string;
   messageBody: string;

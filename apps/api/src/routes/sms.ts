@@ -48,7 +48,7 @@ smsRoutes.get(
         count: logs.length,
       },
     });
-  }
+  },
 );
 
 smsRoutes.get(
@@ -57,14 +57,18 @@ smsRoutes.get(
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
-    const log = await db.select().from(smsLogs).where(eq(smsLogs.id, id)).limit(1);
+    const log = await db
+      .select()
+      .from(smsLogs)
+      .where(eq(smsLogs.id, id))
+      .limit(1);
 
     if (!log.length) {
       return c.json({ error: "SMS log not found" }, 404);
     }
 
     return c.json({ data: log[0] });
-  }
+  },
 );
 
 smsRoutes.post(
@@ -73,7 +77,11 @@ smsRoutes.post(
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
-    const [log] = await db.select().from(smsLogs).where(eq(smsLogs.id, id)).limit(1);
+    const [log] = await db
+      .select()
+      .from(smsLogs)
+      .where(eq(smsLogs.id, id))
+      .limit(1);
 
     if (!log) {
       return c.json({ error: "SMS log not found" }, 404);
@@ -82,6 +90,7 @@ smsRoutes.post(
     const job = await smsDeliveryQueue.add(
       "sms-resend",
       {
+        kind: "resend" as const,
         smsLogId: log.id,
         phoneNumber: log.phoneNumber,
         messageBody: log.messageBody,
@@ -89,7 +98,7 @@ smsRoutes.post(
       {
         attempts: 3,
         backoff: { type: "exponential", delay: 5000 },
-      }
+      },
     );
 
     return c.json({
@@ -97,7 +106,7 @@ smsRoutes.post(
       jobId: job.id,
       smsLogId: log.id,
     });
-  }
+  },
 );
 
 smsRoutes.post(
@@ -117,5 +126,5 @@ smsRoutes.post(
       provider: result.provider,
       error: result.error,
     });
-  }
+  },
 );

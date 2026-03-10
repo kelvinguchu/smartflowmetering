@@ -96,6 +96,7 @@ applicationRoutes.post(
         await smsDeliveryQueue.add(
           "send-notification-sms",
           {
+            kind: "notification" as const,
             phoneNumber: approved.phoneNumber,
             messageBody: formatOnboardingApprovedSms({
               landlordName: approved.landlordName,

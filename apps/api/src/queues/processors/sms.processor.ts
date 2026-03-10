@@ -162,11 +162,9 @@ async function processNotificationSms(
 }
 
 function isResendJob(data: SmsJob): data is SmsResendJob {
-  return (
-    "messageBody" in data && "smsLogId" in data && !("transactionId" in data)
-  );
+  return "kind" in data && data.kind === "resend";
 }
 
 function isNotificationJob(data: SmsJob): data is SmsNotificationJob {
-  return "messageBody" in data && !isResendJob(data);
+  return "kind" in data && data.kind === "notification";
 }
