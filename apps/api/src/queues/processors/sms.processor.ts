@@ -3,6 +3,7 @@ import { db } from "../../db";
 import { smsLogs } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import type { SmsJob, SmsNotificationJob, SmsResendJob } from "../types";
+import { isResendJob, isNotificationJob } from "../sms-guards";
 import { sendSms, formatTokenSms } from "../../services/sms.service";
 
 /**
@@ -159,12 +160,4 @@ async function processNotificationSms(
   }
 
   return { messageId: result.messageId! };
-}
-
-function isResendJob(data: SmsJob): data is SmsResendJob {
-  return "kind" in data && data.kind === "resend";
-}
-
-function isNotificationJob(data: SmsJob): data is SmsNotificationJob {
-  return "kind" in data && data.kind === "notification";
 }
