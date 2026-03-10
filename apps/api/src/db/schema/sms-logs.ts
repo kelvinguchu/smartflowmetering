@@ -11,7 +11,6 @@ import { transactions } from "./transactions";
 
 // SMS provider enum
 export const smsProviderEnum = pgEnum("sms_provider", [
-  "africastalking",
   "hostpinnacle",
 ]);
 

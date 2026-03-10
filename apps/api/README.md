@@ -1,1 +1,1 @@
-## Ohm Kenya backend
+## Smart Flow Metering backend

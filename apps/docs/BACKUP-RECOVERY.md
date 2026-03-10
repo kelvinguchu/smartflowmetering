@@ -1,14 +1,14 @@
-# OHMKenya Backup & Recovery Guide
+# Smart Flow Metering Backup & Recovery Guide
 
 ## Overview
 
-OHMKenya uses automated PostgreSQL backups to ensure data safety for all financial transactions, meter data, and customer records.
+Smart Flow Metering uses automated PostgreSQL backups to ensure data safety for all financial transactions, meter data, and customer records.
 
 ## Backup Strategy
 
 ### Automated Backups
 
-Backups are created automatically by the `ohmkenya-backup` container using `prodrigestivill/postgres-backup-local`.
+Backups are created automatically by the `smartflowmetering-backup` container using `prodrigestivill/postgres-backup-local`.
 
 | Frequency   | Retention           | Location             |
 | ----------- | ------------------- | -------------------- |
@@ -60,7 +60,7 @@ docker compose logs backup
 ./scripts/restore-backup.sh
 
 # Restore a specific backup
-./scripts/restore-backup.sh ohmkenya_20260103_120000.sql.gz
+./scripts/restore-backup.sh smartflowmetering_20260103_120000.sql.gz
 ```
 
 ### Manual Restore
@@ -70,8 +70,8 @@ docker compose logs backup
 docker compose stop api
 
 # 2. Restore the backup
-gunzip -c ./backups/hourly/ohmkenya_20260103_120000.sql.gz | \
-  docker compose exec -T postgres psql -U postgres -d ohmkenya
+gunzip -c ./backups/hourly/smartflowmetering_20260103_120000.sql.gz | \
+  docker compose exec -T postgres psql -U postgres -d smartflowmetering
 
 # 3. Restart the API
 docker compose start api
@@ -84,7 +84,7 @@ docker compose start api
 Add to your `.env`:
 
 ```env
-R2_BUCKET=ohmkenya-backups
+R2_BUCKET=smartflowmetering-backups
 R2_ENDPOINT=https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com
 AWS_ACCESS_KEY_ID=your_r2_access_key
 AWS_SECRET_ACCESS_KEY=your_r2_secret_key
@@ -103,7 +103,7 @@ aws s3 sync ./backups s3://${R2_BUCKET}/backups \
 Add to your `.env`:
 
 ```env
-S3_BUCKET=ohmkenya-backups
+S3_BUCKET=smartflowmetering-backups
 AWS_ACCESS_KEY_ID=your_aws_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret
 AWS_DEFAULT_REGION=eu-west-1
@@ -118,7 +118,7 @@ aws s3 sync ./backups s3://${S3_BUCKET}/backups
 ### Option 3: Rsync to Remote Server
 
 ```bash
-rsync -avz --delete ./backups/ user@backup-server:/backups/ohmkenya/
+rsync -avz --delete ./backups/ user@backup-server:/backups/smartflowmetering/
 ```
 
 ## Monitoring Backups
@@ -172,11 +172,11 @@ This will ping the health check URL after each successful backup.
 
    ```bash
    # Download from remote storage if needed
-   aws s3 cp s3://ohmkenya-backups/backups/daily/latest.sql.gz ./backups/
+   aws s3 cp s3://smartflowmetering-backups/backups/daily/latest.sql.gz ./backups/
 
    # Restore
    gunzip -c ./backups/latest.sql.gz | \
-     docker compose exec -T postgres psql -U postgres -d ohmkenya
+     docker compose exec -T postgres psql -U postgres -d smartflowmetering
    ```
 
 6. **Start remaining services**
@@ -192,7 +192,7 @@ This will ping the health check URL after each successful backup.
    curl http://localhost:3000/api/health
 
    # Check database
-   docker compose exec postgres psql -U postgres -d ohmkenya -c "SELECT COUNT(*) FROM transactions;"
+   docker compose exec postgres psql -U postgres -d smartflowmetering -c "SELECT COUNT(*) FROM transactions;"
    ```
 
 ## Best Practices

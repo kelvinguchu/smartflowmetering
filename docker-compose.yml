@@ -8,14 +8,17 @@ services:
       dockerfile: Dockerfile
       args:
         # Defaults to localhost for local testing
-        # Override in Dokploy to: https://api.ohmkenya.com
+        # Override in production to: https://api.smartmetering.africa
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
-    container_name: ohmkenya-admin-dashboard
+    container_name: smartflowmetering-admin-dashboard
     restart: unless-stopped
     ports:
       - "80:3000"
     networks:
       - backend
+    depends_on:
+      api:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
@@ -23,13 +26,13 @@ services:
       retries: 3
 
   # ==========================================
-  # API (OHMKenya Backend)
+  # API (Smart Flow Metering Backend)
   # ==========================================
   api:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
-    container_name: ohmkenya-api
+    container_name: smartflowmetering-api
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -40,18 +43,54 @@ services:
       PORT: 3000
 
       # Internal Network Connection
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/ohmkenya
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-smartflowmetering}}
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379}
 
       # External Logic (Fill these in your .env or Dokploy)
       MPESA_SHORTCODE: ${MPESA_SHORTCODE}
       MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY}
       MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET}
       MPESA_PASSKEY: ${MPESA_PASSKEY}
+      MPESA_ENVIRONMENT: ${MPESA_ENVIRONMENT}
+      MPESA_ENV: ${MPESA_ENV}
+      MPESA_BASE_URL: ${MPESA_BASE_URL}
+      MPESA_CALLBACK_URL: ${MPESA_CALLBACK_URL}
+      MPESA_CALLBACK_BASE_URL: ${MPESA_CALLBACK_BASE_URL}
+      MPESA_REGISTER_TOKEN: ${MPESA_REGISTER_TOKEN}
+      MPESA_CALLBACK_TOKEN: ${MPESA_CALLBACK_TOKEN}
+      MPESA_CALLBACK_TOKEN_TRANSPORT: ${MPESA_CALLBACK_TOKEN_TRANSPORT}
+      MPESA_SIGNATURE_SECRET: ${MPESA_SIGNATURE_SECRET}
+      MPESA_SIGNATURE_HEADER: ${MPESA_SIGNATURE_HEADER}
+      MPESA_SIGNATURE_TIMESTAMP_HEADER: ${MPESA_SIGNATURE_TIMESTAMP_HEADER}
+      MPESA_SIGNATURE_MAX_AGE_SECONDS: ${MPESA_SIGNATURE_MAX_AGE_SECONDS}
+      MPESA_REQUIRE_SIGNATURE: ${MPESA_REQUIRE_SIGNATURE}
+      MPESA_C2B_COMMAND_ID: ${MPESA_C2B_COMMAND_ID}
+      MPESA_TRANSACTION_STATUS_COMMAND_ID: ${MPESA_TRANSACTION_STATUS_COMMAND_ID}
+      MPESA_IDENTIFIER_TYPE: ${MPESA_IDENTIFIER_TYPE}
+      MPESA_ALLOWED_IPS: ${MPESA_ALLOWED_IPS}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      HOSTPINNACLE_API_URL: ${HOSTPINNACLE_API_URL}
+      HOSTPINNACLE_USER_ID: ${HOSTPINNACLE_USER_ID}
+      HOSTPINNACLE_PASSWORD: ${HOSTPINNACLE_PASSWORD}
+      HOSTPINNACLE_API_KEY: ${HOSTPINNACLE_API_KEY}
+      HOSTPINNACLE_SENDER_ID: ${HOSTPINNACLE_SENDER_ID}
+      GOMELONG_API_URL: ${GOMELONG_API_URL}
+      GOMELONG_USER_ID: ${GOMELONG_USER_ID}
+      GOMELONG_PASSWORD: ${GOMELONG_PASSWORD}
+      GOMELONG_BRANDS: ${GOMELONG_BRANDS}
+      GOMELONG_VENDING_TYPE: ${GOMELONG_VENDING_TYPE}
+      ALERT_AUTOMATION_ENABLED: ${ALERT_AUTOMATION_ENABLED}
+      ALERT_AUTOMATION_INTERVAL_SECONDS: ${ALERT_AUTOMATION_INTERVAL_SECONDS}
+      ALERT_TIMEZONE: ${ALERT_TIMEZONE}
+      LOW_BALANCE_ALERT_DEDUPE_HOURS: ${LOW_BALANCE_ALERT_DEDUPE_HOURS}
+      POSTPAID_REMINDER_DEDUPE_HOURS: ${POSTPAID_REMINDER_DEDUPE_HOURS}
+      POSTPAID_REMINDER_DAYS_AFTER_PAYMENT: ${POSTPAID_REMINDER_DAYS_AFTER_PAYMENT}
+      LANDLORD_DAILY_USAGE_SMS_ENABLED: ${LANDLORD_DAILY_USAGE_SMS_ENABLED}
+      LANDLORD_DAILY_USAGE_SMS_HOUR: ${LANDLORD_DAILY_USAGE_SMS_HOUR}
 
       # Allow CORS from localhost and prod
-      CORS_ORIGINS: "http://localhost:3000,https://ohmkenya.com"
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,https://smartmetering.africa,https://www.smartmetering.africa"
     networks:
       - backend
     depends_on:
@@ -61,24 +100,22 @@ services:
         condition: service_healthy
 
   # ==========================================
-  # Database (PostgreSQL 17)
+  # Database (PostgreSQL 18)
   # ==========================================
   postgres:
-    image: postgres:17-alpine
-    container_name: ohmkenya-postgres
+    image: postgres:18.3-alpine3.22
+    container_name: smartflowmetering-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-ohmkenya}
-      POSTGRES_USER: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-smartflowmetering}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-ohmkenya}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-smartflowmetering}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -87,9 +124,10 @@ services:
   # Database Admin (Adminer)
   # ==========================================
   adminer:
-    image: adminer:latest
-    container_name: ohmkenya-adminer
+    image: adminer:5.4.2-standalone
+    container_name: smartflowmetering-adminer
     restart: unless-stopped
+    profiles: ["ops"]
     ports:
       - "127.0.0.1:8080:8080"
     networks:
@@ -104,18 +142,16 @@ services:
   # Queue (Redis)
   # ==========================================
   redis:
-    image: redis:7.4-alpine
-    container_name: ohmkenya-redis
+    image: redis:8.4.0-alpine3.22
+    container_name: smartflowmetering-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     networks:
       - backend
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -129,8 +165,8 @@ services:
   # - Weekly backups kept for 6 months
   # ==========================================
   backup:
-    image: prodrigestivill/postgres-backup-local:17-alpine
-    container_name: ohmkenya-backup
+    image: prodrigestivill/postgres-backup-local:18
+    container_name: smartflowmetering-backup
     restart: unless-stopped
     volumes:
       - ./backups:/backups
@@ -143,8 +179,8 @@ services:
       # Database connection
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-ohmkenya}
-      POSTGRES_USER: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-smartflowmetering}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       
       # Backup schedule (cron format)

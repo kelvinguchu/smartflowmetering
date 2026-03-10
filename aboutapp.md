@@ -1,8 +1,8 @@
-# Technical Project Overview: OHMKenya (December 2025)
+# Technical Project Overview: Smart Flow Metering (December 2025)
 
 ## Project Identity
 
-**Name:** OHMKenya
+**Name:** Smart Flow Metering
 **Type:** Prepaid utility metering platform (electricity, water, gas)
 **Architecture:** Monorepo with separate backend API and frontend web application
 **Business Model:** 10% commission on all token purchases
@@ -76,13 +76,13 @@
 **User Journey:**
 
 1. Customer goes to M-Pesa on their phone
-2. Selects Lipa na M-Pesa → Pay Bill
-3. Enters OHMKenya's paybill number
+2. Selects Lipa na M-Pesa â†’ Pay Bill
+3. Enters Smart Flow Metering's paybill number
 4. Enters their meter number as the account number
 5. Enters amount they want to purchase
 6. Confirms transaction with PIN
 7. M-Pesa processes payment
-8. OHMKenya API receives M-Pesa callback notification
+8. Smart Flow Metering API receives M-Pesa callback notification
 9. System validates meter number exists
 10. System calculates units based on KPLC rate for that meter
 11. System calls manufacturer API to generate token
@@ -113,7 +113,7 @@
 - Validate meter number exists in database
 - Retrieve meter's KPLC rate
 - Calculate units: amount divided by rate per kWh
-- Apply OHMKenya's 10% commission
+- Apply Smart Flow Metering's 10% commission
 - Call manufacturer API with calculated units
 - Receive 20-digit token from manufacturer
 - Queue SMS delivery job
@@ -134,7 +134,7 @@
 
 **User Journey:**
 
-1. Customer opens OHMKenya web/mobile app
+1. Customer opens Smart Flow Metering web/mobile app
 2. Enters meter number and amount
 3. System shows calculated units
 4. Customer clicks "Pay"
@@ -144,22 +144,8 @@
 8. Token generated and sent
 9. Customer receives SMS with token
 
-**USSD Model (Future Enhancement)**
-
-**User Journey:**
-
-1. Customer dials USSD code (e.g., *483*66#)
-2. Menu appears: "1. Buy Token 2. Check Balance 3. History"
-3. Customer selects "1. Buy Token"
-4. Enters meter number
-5. Enters amount
-6. Confirms purchase
-7. STK Push sent for payment
-8. Token delivered via SMS
-
 **Modeled After:** KPLC prepaid system
 
-- Similar USSD flow
 - Similar paybill payment flow
 - Similar token delivery mechanism
 
@@ -285,7 +271,7 @@ Fields:
 
 - **Setup:** No deposit required.
 - **Usage Tracking:** System tracks total kWh usage via sub-meters during the billing period.
-- **Payment:** At the end of the billing period, OHMKenya pays KPLC the exact amount accumulated from the 90% net sales.
+- **Payment:** At the end of the billing period, Smart Flow Metering pays KPLC the exact amount accumulated from the 90% net sales.
 - **Reconciliation:** Compare `Sum of Sub-meter Net Sales` vs `KPLC Bill Amount`.
 
 **transactions**
@@ -303,7 +289,7 @@ Fields:
 - rate_used: Decimal (KPLC rate at time of purchase)
 - units_purchased: Decimal (calculated: net_amount / rate_used)
 - status: 'pending', 'completed', 'failed'
-- payment_method: 'paybill', 'stk_push', 'ussd'
+- payment_method: 'paybill', 'stk_push'
 - created_at: Timestamp
 - completed_at: Timestamp
 ```
@@ -372,7 +358,7 @@ Fields:
 - transaction_id: Foreign key to transactions (Nullable)
 - phone_number: Text
 - message_body: Text
-- provider: 'africastalking', 'hostpinnacle'
+- provider: 'hostpinnacle'
 - status: 'queued', 'sent', 'delivered', 'failed'
 - provider_message_id: Text (External ID)
 - cost: Decimal (Provider cost)
@@ -396,7 +382,7 @@ Fields:
 
 ## Access Control (RBAC) - Internal Admin Portal
 
-**Context:** The web frontend is strictly for OHMKenya staff. It is **NOT** a portal for landlords or tenants.
+**Context:** The web frontend is strictly for Smart Flow Metering staff. It is **NOT** a portal for landlords or tenants.
 
 ### Roles & Permissions
 
@@ -472,24 +458,24 @@ Fields:
 **Step 1: Apply Commission**
 
 ```
-Net Amount = Amount Paid × 0.90
-Commission = Amount Paid × 0.10
+Net Amount = Amount Paid Ã— 0.90
+Commission = Amount Paid Ã— 0.10
 ```
 
 **Step 2: Calculate Units**
 
 ```
-Units = Net Amount ÷ KPLC Rate per kWh
+Units = Net Amount Ã· KPLC Rate per kWh
 ```
 
 **Example Transaction:**
 
 ```
 Customer pays: KES 1,000
-OHMKenya commission (10%): KES 100
+Smart Flow Metering commission (10%): KES 100
 Net amount for electricity: KES 900
 Meter's KPLC rate: KES 20/kWh
-Units purchased: 900 ÷ 20 = 45 kWh
+Units purchased: 900 Ã· 20 = 45 kWh
 
 Token generated for: 45 kWh
 ```
@@ -498,10 +484,10 @@ Token generated for: 45 kWh
 
 ```
 Customer pays: KES 1,000
-OHMKenya commission (10%): KES 100
+Smart Flow Metering commission (10%): KES 100
 Net amount: KES 900
 Meter's KPLC rate: KES 24/kWh (commercial rate)
-Units purchased: 900 ÷ 24 = 37.5 kWh
+Units purchased: 900 Ã· 24 = 37.5 kWh
 
 Token generated for: 37.5 kWh
 ```
@@ -559,7 +545,7 @@ Token generated for: 37.5 kWh
 
 **User Journey:**
 
-1. Landlord visits OHMKenya website "Apply Now".
+1. Landlord visits Smart Flow Metering website "Apply Now".
 2. Fills out the **Meter Registration Form** (Personal details, Property details, Meter list, Technician info).
 3. Accepts Terms & Conditions.
 4. Submits form -> Data saved to `meter_applications` table with status 'pending'.
@@ -616,7 +602,7 @@ Token generated for: 37.5 kWh
 **Token Purchase Confirmation:**
 
 ```
-OHMKenya: Token for meter 12345678
+Smart Flow Metering: Token for meter 12345678
 Amount: KES 1,000
 Units: 45.0 kWh
 Token: 1234-5678-9012-3456-7890
@@ -626,7 +612,7 @@ Valid until [date]
 **Alternative Format:**
 
 ```
-Your OHMKenya token:
+Your Smart Flow Metering token:
 1234-5678-9012-3456-7890
 Meter: 12345678
 45.0 kWh purchased
@@ -634,8 +620,7 @@ Meter: 12345678
 
 ### Delivery System
 
-- Primary: Africa's Talking
-- Fallback: Hostpinnacle
+- Provider: Hostpinnacle
 - Queue-based with retry logic
 - Delivery tracking in database
 
@@ -660,8 +645,7 @@ Meter: 12345678
 
 ### SMS Providers
 
-- Africa's Talking (primary)
-- Hostpinnacle (fallback)
+- Hostpinnacle
 - Delivery time: 2-4 seconds
 
 ---
@@ -705,13 +689,7 @@ Meter: 12345678
 - Mobile app
 - Transaction history
 
-### Phase 3: USSD Integration
-
-- USSD menu system
-- Session management
-- KPLC-style user experience
-
-### Phase 4: Landlord Features
+### Phase 3: Landlord Features
 
 - Dashboard for multiple meters
 - Revenue reporting
@@ -750,4 +728,4 @@ Meter: 12345678
 - SMS delivery failure: Multiple provider fallback
 - All failures tracked in database
 
-This specification provides a complete technical overview of OHMKenya's prepaid metering platform with the current paybill implementation model and clear roadmap for future enhancements.
+This specification provides a complete technical overview of Smart Flow Metering's prepaid metering platform with the current paybill implementation model and clear roadmap for future enhancements.

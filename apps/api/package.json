@@ -1,29 +1,40 @@
 {
   "name": "api",
   "version": "1.0.50",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts",
+    "test": "tsx --test --test-force-exit tests/env-config.test.ts tests/docker-env-wiring.test.ts",
+    "test:e2e": "tsx --test --test-force-exit --test-concurrency=1 tests/e2e/mpesa-purchase.e2e.test.ts tests/e2e/api-health-auth.e2e.test.ts tests/e2e/applications-onboarding.e2e.test.ts tests/e2e/notifications-alerts.e2e.test.ts tests/e2e/gomelong-token.e2e.test.ts tests/e2e/mpesa-signature.e2e.test.ts tests/e2e/reconciliation-recovery.e2e.test.ts",
+    "dev": "tsx watch src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "build": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
+    "db:push:force": "drizzle-kit push --force",
     "db:studio": "drizzle-kit studio",
-    "db:drop": "drizzle-kit drop"
+    "db:drop": "drizzle-kit drop",
+    "bench": "tsx benchmarks/run.ts",
+    "bench:quick": "tsx benchmarks/run.ts --quick",
+    "bench:mpesa-offline": "tsx benchmarks/mpesa-offline.ts"
   },
   "dependencies": {
-    "@elysiajs/cors": "^1.4.0",
-    "@elysiajs/openapi": "^1.4.12",
+    "@better-auth/drizzle-adapter": "^1.5.3",
+    "@hono/node-server": "^1.19.11",
+    "@hono/zod-validator": "^0.7.6",
     "better-auth": "^1.4.8",
     "bullmq": "^5.66.2",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
-    "elysia": "latest",
-    "elysia-rate-limit": "^4.1.0",
+    "hono": "^4.12.5",
     "postgres": "^3.4.7"
   },
   "devDependencies": {
-    "bun-types": "latest",
-    "drizzle-kit": "^0.31.8"
+    "@types/node": "^25.3.3",
+    "drizzle-kit": "^0.31.8",
+    "typescript": "^5.9.2",
+    "tsx": "^4.21.0",
+    "zod": "^4.3.6"
   },
   "module": "src/index.js"
 }

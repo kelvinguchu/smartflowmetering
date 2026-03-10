@@ -1,7 +1,7 @@
 // Utility functions for generating unique IDs
 
 /**
- * Generate OHMKenya transaction ID
+ * Generate Smart Flow Metering transaction ID
  * Format: OHM-YYYYMMDD-XXXXX (e.g., OHM-20251220-A3K9F)
  */
 export function generateTransactionId(): string {

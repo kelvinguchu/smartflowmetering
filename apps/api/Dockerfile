@@ -1,41 +1,20 @@
-# use the official Bun image
-# see all versions at https://hub.docker.com/r/oven/bun/tags
-FROM oven/bun:1 AS base
+ARG NODE_IMAGE=node:22.22.1-alpine3.22
+
+FROM oven/bun:1.3.4-alpine AS deps
 WORKDIR /usr/src/app
+COPY package.json ./
+RUN bun install
 
-# install dependencies into temp directory
-# this will cache them and speed up future builds
-FROM base AS install
-RUN mkdir -p /temp/dev
-COPY package.json /temp/dev/
-RUN cd /temp/dev && bun install
-
-# install with --production (exclude devDependencies)
-RUN mkdir -p /temp/prod
-COPY package.json /temp/prod/
-RUN cd /temp/prod && bun install --production
-
-# copy node_modules from temp directory
-# then copy all (non-ignored) project files into the image
-FROM base AS prerelease
-COPY --from=install /temp/dev/node_modules node_modules
-COPY . .
-
-# [optional] tests & build
+FROM ${NODE_IMAGE} AS release
+WORKDIR /usr/src/app
 ENV NODE_ENV=production
-# RUN bun test
-# RUN bun run build
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+COPY src ./src
+COPY package.json ./
+COPY tsconfig.json ./
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+    && chown -R node:node /usr/src/app
 
-# copy production dependencies and source code into final image
-FROM base AS release
-COPY --from=install /temp/prod/node_modules node_modules
-COPY --from=prerelease /usr/src/app/src src
-COPY --from=prerelease /usr/src/app/package.json .
-COPY --from=prerelease /usr/src/app/drizzle.config.ts .
-# Copy migrations if they exist
-# COPY --from=prerelease /usr/src/app/drizzle drizzle
-
-# run the app
-USER bun
-EXPOSE 3000/tcp
-ENTRYPOINT [ "bun", "run", "src/index.ts" ]
+USER node
+EXPOSE 3000
+ENTRYPOINT ["node", "--import", "tsx", "src/index.ts"]

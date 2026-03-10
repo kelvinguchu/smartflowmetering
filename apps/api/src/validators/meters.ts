@@ -1,55 +1,36 @@
-import { t } from "elysia";
+import { z } from "zod";
 
-// Create meter schema
-export const createMeterSchema = t.Object({
-  meterNumber: t.String({ minLength: 6, maxLength: 20 }),
-  meterType: t.Union([
-    t.Literal("electricity"),
-    t.Literal("water"),
-    t.Literal("gas"),
-  ]),
-  brand: t.Union([
-    t.Literal("hexing"),
-    t.Literal("stron"),
-    t.Literal("conlog"),
-  ]),
-  motherMeterId: t.String({ format: "uuid" }),
-  tariffId: t.String({ format: "uuid" }),
-  supplyGroupCode: t.String({ minLength: 1 }), // SGC - Critical for STS tokens
-  keyRevisionNumber: t.Optional(t.Number({ minimum: 1, maximum: 9 })),
-  tariffIndex: t.Optional(t.Number({ minimum: 1, maximum: 99 })),
+const meterStatusSchema = z.enum(["active", "inactive", "suspended"]);
+
+export const createMeterSchema = z.object({
+  meterNumber: z.string().min(6).max(20),
+  meterType: z.enum(["electricity", "water", "gas"]),
+  brand: z.enum(["hexing", "stron", "conlog"]),
+  motherMeterId: z.uuid(),
+  tariffId: z.uuid(),
+  supplyGroupCode: z.string().min(1),
+  keyRevisionNumber: z.number().int().min(1).max(9).optional(),
+  tariffIndex: z.number().int().min(1).max(99).optional(),
 });
 
-export type CreateMeter = typeof createMeterSchema.static;
+export type CreateMeter = z.infer<typeof createMeterSchema>;
 
-// Update meter schema
-export const updateMeterSchema = t.Partial(
-  t.Object({
-    tariffId: t.String({ format: "uuid" }),
-    supplyGroupCode: t.String({ minLength: 1 }),
-    keyRevisionNumber: t.Number({ minimum: 1, maximum: 9 }),
-    tariffIndex: t.Number({ minimum: 1, maximum: 99 }),
-    status: t.Union([
-      t.Literal("active"),
-      t.Literal("inactive"),
-      t.Literal("suspended"),
-    ]),
+export const updateMeterSchema = z
+  .object({
+    tariffId: z.uuid().optional(),
+    supplyGroupCode: z.string().min(1).optional(),
+    keyRevisionNumber: z.number().int().min(1).max(9).optional(),
+    tariffIndex: z.number().int().min(1).max(99).optional(),
+    status: meterStatusSchema.optional(),
   })
-);
+  .strict();
 
-export type UpdateMeter = typeof updateMeterSchema.static;
+export type UpdateMeter = z.infer<typeof updateMeterSchema>;
 
-// Query params for meter lookup
-export const meterQuerySchema = t.Object({
-  meterNumber: t.Optional(t.String()),
-  status: t.Optional(
-    t.Union([
-      t.Literal("active"),
-      t.Literal("inactive"),
-      t.Literal("suspended"),
-    ])
-  ),
-  motherMeterId: t.Optional(t.String({ format: "uuid" })),
+export const meterQuerySchema = z.object({
+  meterNumber: z.string().optional(),
+  status: meterStatusSchema.optional(),
+  motherMeterId: z.uuid().optional(),
 });
 
-export type MeterQuery = typeof meterQuerySchema.static;
+export type MeterQuery = z.infer<typeof meterQuerySchema>;

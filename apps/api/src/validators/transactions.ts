@@ -1,30 +1,21 @@
-import { t } from "elysia";
+import { z } from "zod";
 
-// Transaction query params
-export const transactionQuerySchema = t.Object({
-  meterId: t.Optional(t.String({ format: "uuid" })),
-  meterNumber: t.Optional(t.String()),
-  phoneNumber: t.Optional(t.String()),
-  status: t.Optional(
-    t.Union([
-      t.Literal("pending"),
-      t.Literal("processing"),
-      t.Literal("completed"),
-      t.Literal("failed"),
-    ])
-  ),
-  startDate: t.Optional(t.String({ format: "date-time" })),
-  endDate: t.Optional(t.String({ format: "date-time" })),
-  limit: t.Optional(t.Number({ minimum: 1, maximum: 100, default: 20 })),
-  offset: t.Optional(t.Number({ minimum: 0, default: 0 })),
+export const transactionQuerySchema = z.object({
+  meterId: z.uuid().optional(),
+  meterNumber: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  status: z.enum(["pending", "processing", "completed", "failed"]).optional(),
+  startDate: z.iso.datetime().optional(),
+  endDate: z.iso.datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
 });
 
-export type TransactionQuery = typeof transactionQuerySchema.static;
+export type TransactionQuery = z.infer<typeof transactionQuerySchema>;
 
-// Resend token request
-export const resendTokenSchema = t.Object({
-  transactionId: t.String({ format: "uuid" }),
-  phoneNumber: t.Optional(t.String()), // Override phone if needed
+export const resendTokenSchema = z.object({
+  transactionId: z.uuid(),
+  phoneNumber: z.string().optional(),
 });
 
-export type ResendToken = typeof resendTokenSchema.static;
+export type ResendToken = z.infer<typeof resendTokenSchema>;

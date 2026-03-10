@@ -1,167 +1,126 @@
-/**
- * Rate Limiting Configuration for OHMKenya API
- *
- * This provides protection against:
- * - DDoS attacks
- * - Brute force attacks on authentication
- * - API abuse
- * - Resource exhaustion
- *
- * Different limits for different endpoint types:
- * - M-Pesa callbacks: Higher limits (Safaricom servers)
- * - Public endpoints: Standard limits
- * - Auth endpoints: Stricter limits (prevent brute force)
- * - Admin endpoints: Moderate limits (authenticated users)
- */
+import { createMiddleware } from "hono/factory";
+import type { AppBindings } from "./auth-middleware";
 
-import { rateLimit } from "elysia-rate-limit";
-import { Elysia } from "elysia";
+type RateLimitBucket = {
+  count: number;
+  resetAt: number;
+};
 
-// ============================================
-// Rate Limit Configurations
-// ============================================
+type RateLimitOptions = {
+  max: number;
+  durationMs: number;
+  prefix: string;
+  message: string;
+};
 
-/**
- * Global rate limit - applies to all endpoints
- * 100 requests per minute per IP (generous for normal use)
- */
-export const globalRateLimit = rateLimit({
-  max: 100,
-  duration: 60 * 1000, // 1 minute
-  generator: (req: Request) => {
-    // Use X-Forwarded-For for proxied requests, fallback to connection IP
-    const forwarded = req.headers.get("x-forwarded-for");
-    const realIp = req.headers.get("x-real-ip");
-    return forwarded?.split(",")[0]?.trim() || realIp || "unknown";
-  },
-  errorResponse: new Response(
-    JSON.stringify({
-      error: "Too Many Requests",
-      message: "Rate limit exceeded. Please try again later.",
-      retryAfter: 60,
-    }),
-    {
-      status: 429,
-      headers: { "Content-Type": "application/json" },
+const rateLimitStore = new Map<string, RateLimitBucket>();
+
+function clientIpFromHeaders(headers: Headers): string {
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+
+  const realIp = headers.get("x-real-ip");
+  if (realIp) {
+    return realIp.trim();
+  }
+
+  const cfIp = headers.get("cf-connecting-ip");
+  if (cfIp) {
+    return cfIp.trim();
+  }
+
+  return "unknown";
+}
+
+function createRateLimitMiddleware(options: RateLimitOptions) {
+  return createMiddleware<AppBindings>(async (c, next) => {
+    const now = Date.now();
+    const key = `${options.prefix}:${clientIpFromHeaders(c.req.raw.headers)}`;
+
+    const existing = rateLimitStore.get(key);
+    const bucket =
+      existing && existing.resetAt > now
+        ? existing
+        : { count: 0, resetAt: now + options.durationMs };
+
+    bucket.count += 1;
+    rateLimitStore.set(key, bucket);
+
+    const remaining = Math.max(options.max - bucket.count, 0);
+    c.header("X-RateLimit-Limit", String(options.max));
+    c.header("X-RateLimit-Remaining", String(remaining));
+    c.header("X-RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
+
+    if (bucket.count > options.max) {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((bucket.resetAt - now) / 1000)
+      );
+      c.header("Retry-After", String(retryAfter));
+      return c.json(
+        {
+          error: "Too Many Requests",
+          message: options.message,
+          retryAfter,
+        },
+        429
+      );
     }
-  ),
-});
 
-/**
- * Auth rate limit - stricter for login/registration
- * 10 attempts per minute per IP (prevents brute force)
- */
-export const authRateLimit = rateLimit({
-  max: 10,
-  duration: 60 * 1000, // 1 minute
-  generator: (req: Request) => {
-    const forwarded = req.headers.get("x-forwarded-for");
-    const realIp = req.headers.get("x-real-ip");
-    return `auth:${forwarded?.split(",")[0]?.trim() || realIp || "unknown"}`;
-  },
-  errorResponse: new Response(
-    JSON.stringify({
-      error: "Too Many Requests",
-      message:
-        "Too many authentication attempts. Please wait before trying again.",
-      retryAfter: 60,
-    }),
-    {
-      status: 429,
-      headers: { "Content-Type": "application/json" },
+    if (remaining < 10) {
+      console.warn(`[Rate Limit Warning] IP approaching limit: ${c.req.url}`);
     }
-  ),
-});
 
-/**
- * M-Pesa callback rate limit - high limits for Safaricom servers
- * 1000 requests per minute (handles burst traffic)
- */
-export const mpesaRateLimit = rateLimit({
-  max: 1000,
-  duration: 60 * 1000, // 1 minute
-  generator: (req: Request) => {
-    // M-Pesa callbacks come from Safaricom IPs
-    const forwarded = req.headers.get("x-forwarded-for");
-    const realIp = req.headers.get("x-real-ip");
-    return `mpesa:${forwarded?.split(",")[0]?.trim() || realIp || "unknown"}`;
-  },
-  errorResponse: new Response(
-    JSON.stringify({
-      error: "Too Many Requests",
-      message: "Rate limit exceeded for M-Pesa callbacks.",
-    }),
-    {
-      status: 429,
-      headers: { "Content-Type": "application/json" },
-    }
-  ),
-});
-
-/**
- * STK Push rate limit - moderate limits per user
- * 5 STK push requests per minute per IP (prevents spam)
- */
-export const stkPushRateLimit = rateLimit({
-  max: 5,
-  duration: 60 * 1000, // 1 minute
-  generator: (req: Request) => {
-    const forwarded = req.headers.get("x-forwarded-for");
-    const realIp = req.headers.get("x-real-ip");
-    return `stk:${forwarded?.split(",")[0]?.trim() || realIp || "unknown"}`;
-  },
-  errorResponse: new Response(
-    JSON.stringify({
-      error: "Too Many Requests",
-      message:
-        "Too many payment requests. Please wait before initiating another payment.",
-      retryAfter: 60,
-    }),
-    {
-      status: 429,
-      headers: { "Content-Type": "application/json" },
-    }
-  ),
-});
-
-/**
- * SMS rate limit - prevents SMS bombing
- * 10 SMS requests per minute per IP
- */
-export const smsRateLimit = rateLimit({
-  max: 10,
-  duration: 60 * 1000, // 1 minute
-  generator: (req: Request) => {
-    const forwarded = req.headers.get("x-forwarded-for");
-    const realIp = req.headers.get("x-real-ip");
-    return `sms:${forwarded?.split(",")[0]?.trim() || realIp || "unknown"}`;
-  },
-  errorResponse: new Response(
-    JSON.stringify({
-      error: "Too Many Requests",
-      message: "Too many SMS requests. Please wait before trying again.",
-      retryAfter: 60,
-    }),
-    {
-      status: 429,
-      headers: { "Content-Type": "application/json" },
-    }
-  ),
-});
-
-// ============================================
-// Rate Limit Middleware Plugin
-// ============================================
-
-/**
- * Apply this to the main Elysia app for global rate limiting
- */
-export const rateLimitMiddleware = new Elysia({ name: "rate-limit" })
-  .use(globalRateLimit)
-  .onBeforeHandle(({ request, set }) => {
-    // Log rate-limited requests for monitoring
-    const remaining = set.headers?.["X-RateLimit-Remaining"];
-    if (remaining !== undefined && parseInt(remaining as string) < 10) {
-      console.warn(`[Rate Limit Warning] IP approaching limit: ${request.url}`);
-    }
+    await next();
   });
+}
+
+export const globalRateLimit = createRateLimitMiddleware({
+  max: 100,
+  durationMs: 60 * 1000,
+  prefix: "global",
+  message: "Rate limit exceeded. Please try again later.",
+});
+
+export const authRateLimit = createRateLimitMiddleware({
+  max: 10,
+  durationMs: 60 * 1000,
+  prefix: "auth",
+  message:
+    "Too many authentication attempts. Please wait before trying again.",
+});
+
+export const mpesaRateLimit = createRateLimitMiddleware({
+  max: 1000,
+  durationMs: 60 * 1000,
+  prefix: "mpesa",
+  message: "Rate limit exceeded for M-Pesa callbacks.",
+});
+
+export const stkPushRateLimit = createRateLimitMiddleware({
+  max: 5,
+  durationMs: 60 * 1000,
+  prefix: "stk",
+  message:
+    "Too many payment requests. Please wait before initiating another payment.",
+});
+
+export const smsRateLimit = createRateLimitMiddleware({
+  max: 10,
+  durationMs: 60 * 1000,
+  prefix: "sms",
+  message: "Too many SMS requests. Please wait before trying again.",
+});
+
+export const rateLimitMiddleware = globalRateLimit;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateLimitStore.entries()) {
+    if (bucket.resetAt <= now) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, 60 * 1000).unref?.();

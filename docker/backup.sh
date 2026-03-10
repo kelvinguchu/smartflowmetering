@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================
-# OHMKenya PostgreSQL Backup Script
+# Smart Flow Metering PostgreSQL Backup Script
 # ==============================================
 # This script creates timestamped backups and manages retention
 #
@@ -18,14 +18,14 @@ set -e  # Exit on any error
 BACKUP_DIR="/backups"
 RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="ohmkenya_${TIMESTAMP}.sql.gz"
+BACKUP_FILE="smartflowmetering_${TIMESTAMP}.sql.gz"
 
 # Database connection (from environment)
 PGHOST=${POSTGRES_HOST:-postgres}
 PGPORT=${POSTGRES_PORT:-5432}
 PGUSER=${POSTGRES_USER:-postgres}
 PGPASSWORD=${POSTGRES_PASSWORD:-postgres}
-PGDATABASE=${POSTGRES_DB:-ohmkenya}
+PGDATABASE=${POSTGRES_DB:-smartflowmetering}
 
 export PGPASSWORD
 
@@ -86,12 +86,12 @@ fi
 # Cleanup old backups
 # ==============================================
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleaning up backups older than ${RETENTION_DAYS} days"
-find ${BACKUP_DIR} -name "ohmkenya_*.sql.gz" -type f -mtime +${RETENTION_DAYS} -delete 2>/dev/null || true
+find ${BACKUP_DIR} -name "smartflowmetering_*.sql.gz" -type f -mtime +${RETENTION_DAYS} -delete 2>/dev/null || true
 
 # List current backups
 echo ""
 echo "Current backups:"
-ls -lh ${BACKUP_DIR}/ohmkenya_*.sql.gz 2>/dev/null || echo "  No backups found"
+ls -lh ${BACKUP_DIR}/smartflowmetering_*.sql.gz 2>/dev/null || echo "  No backups found"
 
 # Calculate total backup size
 TOTAL_SIZE=$(du -sh ${BACKUP_DIR} 2>/dev/null | cut -f1)

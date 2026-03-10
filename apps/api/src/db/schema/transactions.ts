@@ -22,7 +22,6 @@ export const transactionStatusEnum = pgEnum("transaction_status", [
 export const paymentMethodEnum = pgEnum("payment_method", [
   "paybill",
   "stk_push",
-  "ussd",
 ]);
 
 export const transactions = pgTable("transactions", {

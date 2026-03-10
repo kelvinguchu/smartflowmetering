@@ -27,12 +27,12 @@ const faqs = [
       "No. The system works entirely via M-Pesa Paybill, which only requires basic M-Pesa access. No app or internet connection is needed.",
   },
   {
-    question: "How do landlords get started with Ohm Kenya?",
+    question: "How do landlords get started with Smart Flow Metering?",
     answer:
       "Landlords can apply online by filling out a self-service form with property and meter details. Once reviewed and approved, your meters are activated and ready for tenant token purchases.",
   },
   {
-    question: "What types of meters does Ohm Kenya support?",
+    question: "What types of meters does Smart Flow Metering support?",
     answer:
       "We support prepaid meters for electricity, water, and gas from brands including Hexing, Stron, and Conlog.",
   },

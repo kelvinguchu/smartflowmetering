@@ -113,9 +113,9 @@ export function PrivacyPolicy() {
               For privacy-related questions or to exercise your rights, contact
               us at{" "}
               <a
-                href='mailto:inquiries@ohmkenya.com'
+                href='mailto:inquiries@smartflowmetering.com'
                 className='text-primary hover:underline'>
-                inquiries@ohmkenya.com
+                inquiries@smartflowmetering.com
               </a>{" "}
               or call{" "}
               <a

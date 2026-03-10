@@ -1,75 +1,101 @@
-import { Elysia } from "elysia";
+import { createMiddleware } from "hono/factory";
 import { auth } from "./auth";
 
-/**
- * Auth Middleware Plugin for Elysia
- *
- * Provides authentication and authorization via derive/macro pattern:
- * - All routes derive `authSession` and `authUser` from the request
- * - Routes can add `{ auth: true }` or `{ adminOnly: true }` options
- *
- * Usage:
- * ```ts
- * app.use(authMiddleware)
- *    .get("/protected", ({ user }) => user, { auth: true })
- *    .post("/admin", ({ user }) => user, { adminOnly: true })
- * ```
- */
-export const authMiddleware = new Elysia({ name: "auth-middleware" })
-  // Derive session and user for all requests
-  .derive(async ({ request }) => {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    return {
-      authSession: session?.session ?? null,
-      authUser: session?.user ?? null,
-    };
-  })
-  // Define macros for route-level auth requirements
-  .macro({
-    // Require any authenticated user
-    auth: {
-      async resolve({ authSession, authUser }) {
-        if (!authSession || !authUser) {
-          throw new Error("Unauthorized: Please sign in to access this resource");
-        }
-
-        // Check if user is banned
-        if (authUser.banned) {
-          throw new Error("Forbidden: Your account has been suspended");
-        }
-
-        return { session: authSession, user: authUser };
-      },
-    },
-
-    // Require admin role
-    adminOnly: {
-      async resolve({ authSession, authUser }) {
-        if (!authSession || !authUser) {
-          throw new Error("Unauthorized: Please sign in to access this resource");
-        }
-
-        // Check if user is banned
-        if (authUser.banned) {
-          throw new Error("Forbidden: Your account has been suspended");
-        }
-
-        // Check admin role
-        if (authUser.role !== "admin") {
-          throw new Error("Forbidden: Admin access required");
-        }
-
-        return { session: authSession, user: authUser };
-      },
-    },
-  });
-
-// Get the session result type
 type SessionResult = Awaited<ReturnType<typeof auth.api.getSession>>;
 
-// Export session and user types for routes
 export type AuthSession = NonNullable<SessionResult>["session"];
 export type AuthUser = NonNullable<SessionResult>["user"];
+
+export type AppBindings = {
+  Variables: {
+    authSession: AuthSession | null;
+    authUser: AuthUser | null;
+    session: AuthSession;
+    user: AuthUser;
+  };
+};
+
+async function getSessionFromHeaders(headers: Headers): Promise<SessionResult> {
+  return auth.api.getSession({ headers });
+}
+
+export const loadAuthContext = createMiddleware<AppBindings>(async (c, next) => {
+  const session = await getSessionFromHeaders(c.req.raw.headers);
+  c.set("authSession", session?.session ?? null);
+  c.set("authUser", session?.user ?? null);
+  await next();
+});
+
+export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
+  const session = await getSessionFromHeaders(c.req.raw.headers);
+  const authSession = session?.session ?? null;
+  const authUser = session?.user ?? null;
+
+  if (!authSession || !authUser) {
+    return c.json(
+      {
+        error: "Unauthorized",
+        message: "Unauthorized: Please sign in to access this resource",
+      },
+      401
+    );
+  }
+
+  if (authUser.banned) {
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "Forbidden: Your account has been suspended",
+      },
+      403
+    );
+  }
+
+  c.set("authSession", authSession);
+  c.set("authUser", authUser);
+  c.set("session", authSession);
+  c.set("user", authUser);
+  await next();
+});
+
+export const requireAdmin = createMiddleware<AppBindings>(async (c, next) => {
+  const session = await getSessionFromHeaders(c.req.raw.headers);
+  const authSession = session?.session ?? null;
+  const authUser = session?.user ?? null;
+
+  if (!authSession || !authUser) {
+    return c.json(
+      {
+        error: "Unauthorized",
+        message: "Unauthorized: Please sign in to access this resource",
+      },
+      401
+    );
+  }
+
+  if (authUser.banned) {
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "Forbidden: Your account has been suspended",
+      },
+      403
+    );
+  }
+
+  if (authUser.role !== "admin") {
+    return c.json(
+      {
+        error: "Forbidden",
+        message: "Forbidden: Admin access required",
+      },
+      403
+    );
+  }
+
+  c.set("authSession", authSession);
+  c.set("authUser", authUser);
+  c.set("session", authSession);
+  c.set("user", authUser);
+  await next();
+});

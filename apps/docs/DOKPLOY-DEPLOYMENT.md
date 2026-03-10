@@ -1,8 +1,8 @@
-# OHMKenya Dokploy Deployment Guide
+# Smart Flow Metering Dokploy Deployment Guide
 
 ## Overview
 
-This guide covers deploying OHMKenya to a VPS using Dokploy - a self-hosted PaaS for Docker deployments.
+This guide covers deploying Smart Flow Metering to a VPS using Dokploy - a self-hosted PaaS for Docker deployments.
 
 ## Prerequisites
 
@@ -13,9 +13,9 @@ This guide covers deploying OHMKenya to a VPS using Dokploy - a self-hosted PaaS
 
 2. **Domain Setup**
    - Point these DNS records to your VPS IP:
-     - `ohmkenya.com` → A record → `YOUR_VPS_IP`
-     - `api.ohmkenya.com` → A record → `YOUR_VPS_IP`
-     - `db.ohmkenya.com` → A record → `YOUR_VPS_IP` (optional, for Adminer)
+     - `smartflowmetering.com` â†’ A record â†’ `YOUR_VPS_IP`
+     - `api.smartflowmetering.com` â†’ A record â†’ `YOUR_VPS_IP`
+     - `db.smartflowmetering.com` â†’ A record â†’ `YOUR_VPS_IP` (optional, for Adminer)
 
 3. **Dokploy Installed**
    ```bash
@@ -28,13 +28,13 @@ This guide covers deploying OHMKenya to a VPS using Dokploy - a self-hosted PaaS
 
 1. Open Dokploy dashboard (default: `https://YOUR_VPS_IP:3000`)
 2. Click **"Create Project"**
-3. Name it: `OHMKenya`
+3. Name it: `Smart Flow Metering`
 
 ### Step 2: Add Docker Compose Service
 
-1. In your project, click **"Add Service"** → **"Docker Compose"**
+1. In your project, click **"Add Service"** â†’ **"Docker Compose"**
 2. **Source**: Choose "Git Repository"
-3. **Repository URL**: `https://github.com/your-org/ohmkenya.git`
+3. **Repository URL**: `https://github.com/your-org/smartflowmetering.git`
 4. **Branch**: `main`
 5. **Compose File Path**: `docker-compose.dokploy.yml`
 
@@ -45,7 +45,7 @@ In Dokploy's Environment Variables section, add:
 ```env
 # Required - Database
 POSTGRES_PASSWORD=your_super_secure_password_here
-POSTGRES_DB=ohmkenya
+POSTGRES_DB=smartflowmetering
 
 # Required - Authentication
 BETTER_AUTH_SECRET=generate_a_64_char_random_string
@@ -57,12 +57,12 @@ MPESA_CONSUMER_SECRET=your_daraja_consumer_secret
 MPESA_PASSKEY=your_mpesa_passkey
 
 # Required - Domains (for Traefik SSL)
-WEB_DOMAIN=ohmkenya.com
-API_DOMAIN=api.ohmkenya.com
-ADMINER_DOMAIN=db.ohmkenya.com
+WEB_DOMAIN=smartflowmetering.com
+API_DOMAIN=api.smartflowmetering.com
+ADMINER_DOMAIN=db.smartflowmetering.com
 
 # Required - Frontend API URL
-VITE_API_URL=https://api.ohmkenya.com
+VITE_API_URL=https://api.smartflowmetering.com
 
 # Optional - Adminer Basic Auth (generate with: htpasswd -nb admin password)
 ADMINER_AUTH=admin:$$apr1$$xxxxx$$yyyyy
@@ -107,36 +107,36 @@ The `docker-compose.dokploy.yml` already includes Traefik labels. Just ensure yo
 
 ```bash
 # Check all containers are running
-docker ps | grep ohmkenya
+docker ps | grep smartflowmetering
 
 # Check API health
-curl https://api.ohmkenya.com/api/health
+curl https://api.smartflowmetering.com/api/health
 
 # Check web frontend
-curl https://ohmkenya.com
+curl https://smartflowmetering.com
 ```
 
 ### Run Database Migrations
 
 ```bash
 # SSH into VPS, then:
-docker exec ohmkenya-api bun run db:push
+docker exec smartflowmetering-api bun run db:push
 ```
 
 ### Trigger Initial Backup
 
 ```bash
-docker exec ohmkenya-backup /backup.sh
+docker exec smartflowmetering-backup /backup.sh
 ```
 
 ### Verify Backups
 
 ```bash
 # List backups
-docker exec ohmkenya-backup ls -la /backups/
+docker exec smartflowmetering-backup ls -la /backups/
 
 # Check backup logs
-docker logs ohmkenya-backup
+docker logs smartflowmetering-backup
 ```
 
 ## Monitoring & Logs
@@ -151,10 +151,10 @@ docker logs ohmkenya-backup
 
 ```bash
 # API logs
-docker logs -f ohmkenya-api
+docker logs -f smartflowmetering-api
 
 # Postgres logs
-docker logs -f ohmkenya-postgres
+docker logs -f smartflowmetering-postgres
 
 # All services
 docker compose -f docker-compose.dokploy.yml logs -f
@@ -164,33 +164,33 @@ docker compose -f docker-compose.dokploy.yml logs -f
 
 ### Access Backups
 
-Backups are stored in the `ohmkenya_backup_data` Docker volume.
+Backups are stored in the `smartflowmetering_backup_data` Docker volume.
 
 ```bash
 # List backups
-docker run --rm -v ohmkenya_backup_data:/backups alpine ls -la /backups/
+docker run --rm -v smartflowmetering_backup_data:/backups alpine ls -la /backups/
 
 # Copy backup to host
-docker cp ohmkenya-backup:/backups/hourly/latest.sql.gz ./
+docker cp smartflowmetering-backup:/backups/hourly/latest.sql.gz ./
 
 # Copy to external storage (example: S3)
-aws s3 cp ./latest.sql.gz s3://your-bucket/ohmkenya-backups/
+aws s3 cp ./latest.sql.gz s3://your-bucket/smartflowmetering-backups/
 ```
 
 ### Restore from Backup
 
 ```bash
 # 1. Stop API
-docker stop ohmkenya-api
+docker stop smartflowmetering-api
 
 # 2. Copy backup from volume
-docker cp ohmkenya-backup:/backups/hourly/latest.sql.gz ./
+docker cp smartflowmetering-backup:/backups/hourly/latest.sql.gz ./
 
 # 3. Restore
-gunzip -c latest.sql.gz | docker exec -i ohmkenya-postgres psql -U postgres -d ohmkenya
+gunzip -c latest.sql.gz | docker exec -i smartflowmetering-postgres psql -U postgres -d smartflowmetering
 
 # 4. Restart API
-docker start ohmkenya-api
+docker start smartflowmetering-api
 ```
 
 ## Updating the Application
@@ -203,7 +203,7 @@ docker start ohmkenya-api
 
 ### Via Webhook (Auto-Deploy)
 
-1. In Dokploy, go to your service → **"Deployments"**
+1. In Dokploy, go to your service â†’ **"Deployments"**
 2. Copy the **Webhook URL**
 3. Add it to your GitHub/GitLab repository settings
 
@@ -224,20 +224,20 @@ docker start ohmkenya-api
 
 ```bash
 # Check container logs
-docker logs ohmkenya-api
+docker logs smartflowmetering-api
 
 # Check health status
-docker inspect ohmkenya-api | grep -A 10 "Health"
+docker inspect smartflowmetering-api | grep -A 10 "Health"
 ```
 
 ### Database Connection Issues
 
 ```bash
 # Verify postgres is healthy
-docker exec ohmkenya-postgres pg_isready -U postgres
+docker exec smartflowmetering-postgres pg_isready -U postgres
 
 # Test connection from API container
-docker exec ohmkenya-api nc -zv postgres 5432
+docker exec smartflowmetering-api nc -zv postgres 5432
 ```
 
 ### SSL Certificate Issues
@@ -247,8 +247,8 @@ docker exec ohmkenya-api nc -zv postgres 5432
 docker logs traefik
 
 # Verify domain DNS
-dig ohmkenya.com
-dig api.ohmkenya.com
+dig smartflowmetering.com
+dig api.smartflowmetering.com
 ```
 
 ### dokploy-network Not Found
