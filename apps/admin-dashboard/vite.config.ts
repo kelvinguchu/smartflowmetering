@@ -15,8 +15,7 @@ const config = defineConfig({
     }),
     tailwindcss(),
     tanstackStart(),
-    // Nitro for production deployment with Bun preset
-    nitro({ preset: 'bun' }),
+    nitro(),
     viteReact(),
   ],
 })

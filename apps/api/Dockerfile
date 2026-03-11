@@ -1,9 +1,9 @@
 ARG NODE_IMAGE=node:22.22.1-alpine3.22
 
-FROM oven/bun:1.3.4-alpine AS deps
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /usr/src/app
 COPY package.json ./
-RUN bun install
+RUN npm install
 
 FROM ${NODE_IMAGE} AS release
 WORKDIR /usr/src/app
@@ -12,8 +12,7 @@ COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY src ./src
 COPY package.json ./
 COPY tsconfig.json ./
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
-    && chown -R node:node /usr/src/app
+RUN chown -R node:node /usr/src/app
 
 USER node
 EXPOSE 3000

@@ -52,7 +52,10 @@ function parseHostpinnacleResponse(rawBody: string): Record<string, unknown> {
   }
 }
 
-function getResponseValue(response: Record<string, unknown>, keys: string[]): string {
+function getResponseValue(
+  response: Record<string, unknown>,
+  keys: string[],
+): string {
   for (const key of keys) {
     const value = response[key];
     if (typeof value === "string" && value.trim()) {
@@ -67,7 +70,7 @@ function getResponseValue(response: Record<string, unknown>, keys: string[]): st
  */
 export async function sendViaHostpinnacle(
   phoneNumber: string,
-  message: string
+  message: string,
 ): Promise<SmsResult> {
   const missingEnv = getMissingHostpinnacleEnvVars();
   if (missingEnv.length > 0) {
@@ -106,13 +109,17 @@ export async function sendViaHostpinnacle(
     const rawBody = await response.text();
     const body = parseHostpinnacleResponse(rawBody);
 
-    const status = getResponseValue(body, ["status", "responseCode"]).toLowerCase();
+    const status = getResponseValue(body, [
+      "status",
+      "responseCode",
+    ]).toLowerCase();
     const messageId = getResponseValue(body, ["msgid", "messageId", "id"]);
     const errorMessage =
       getResponseValue(body, ["message", "error", "responseDescription"]) ||
       (rawBody.trim() ? rawBody : `HTTP ${response.status}`);
 
-    const successStatus = status === "success" || status === "ok" || status === "queued";
+    const successStatus =
+      status === "success" || status === "ok" || status === "queued";
     if ((response.ok && !status) || successStatus) {
       return {
         success: true,
@@ -141,27 +148,77 @@ export async function sendViaHostpinnacle(
  */
 export async function sendSms(
   phoneNumber: string,
-  message: string
+  message: string,
 ): Promise<SmsResult> {
   return sendViaHostpinnacle(phoneNumber, message);
+}
+
+interface TokenSmsInput {
+  meterNumber: string;
+  token: string;
+  transactionDate: Date;
+  units: string;
+  amountPaid: string;
+  tokenAmount: string;
+  otherCharges: string;
+}
+
+function formatTokenGroups(token: string): string {
+  const digitsOnly = token.replaceAll(/\D/g, "");
+  const source = digitsOnly || token;
+  const grouped = source.replaceAll(/(.{4})/g, "$1-");
+  return grouped.endsWith("-") ? grouped.slice(0, -1) : grouped;
+}
+
+function formatSmsDateTime(date: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "0000";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "00";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+
+  return `${year}${month}${day} ${hour}:${minute}`;
+}
+
+function formatUnits(units: string): string {
+  const parsedUnits = Number.parseFloat(units);
+  if (!Number.isFinite(parsedUnits)) return units;
+  return parsedUnits.toString();
+}
+
+function formatMoney(amount: string): string {
+  const parsedAmount = Number.parseFloat(amount);
+  if (!Number.isFinite(parsedAmount)) return amount;
+  return parsedAmount.toFixed(2);
 }
 
 /**
  * Format token SMS message.
  */
-export function formatTokenSms(
-  meterNumber: string,
-  token: string,
-  units: string,
-  amount: string
-): string {
-  const formattedToken = token.replace(/(.{4})/g, "$1-").slice(0, -1);
+export function formatTokenSms(input: TokenSmsInput): string {
+  const formattedToken = formatTokenGroups(input.token);
+  const formattedDate = formatSmsDateTime(
+    input.transactionDate,
+    env.ALERT_TIMEZONE,
+  );
 
-  return `Smart Flow Metering: Token for meter ${meterNumber}
-Amount: KES ${amount}
-Units: ${units} kWh
-Token: ${formattedToken}
-Enter this token on your meter.`;
+  return `Mtr:${input.meterNumber}
+Token:${formattedToken}
+Date:${formattedDate}
+Units:${formatUnits(input.units)}
+Amt:${formatMoney(input.amountPaid)}
+TknAmt:${formatMoney(input.tokenAmount)}
+OtherCharges:${formatMoney(input.otherCharges)}`;
 }
 
 export function formatOnboardingApprovedSms(input: {

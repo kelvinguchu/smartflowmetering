@@ -1,6 +1,6 @@
 import type { Job } from "bullmq";
 import { db } from "../../db";
-import { smsLogs } from "../../db/schema";
+import { smsLogs, transactions } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import type { SmsJob, SmsNotificationJob, SmsResendJob } from "../types";
 import { isResendJob, isNotificationJob } from "../sms-guards";
@@ -37,7 +37,30 @@ export async function processSmsDelivery(
 
   const { transactionId, phoneNumber, meterNumber, token, units, amount } =
     job.data;
-  const message = formatTokenSms(meterNumber, token, units, amount);
+  const transaction = await db.query.transactions.findFirst({
+    where: eq(transactions.id, transactionId),
+    columns: {
+      amountPaid: true,
+      netAmount: true,
+      commissionAmount: true,
+      createdAt: true,
+      completedAt: true,
+    },
+  });
+
+  if (!transaction) {
+    throw new Error(`Transaction ${transactionId} not found for SMS delivery`);
+  }
+
+  const message = formatTokenSms({
+    meterNumber,
+    token,
+    transactionDate: transaction.completedAt ?? transaction.createdAt,
+    units,
+    amountPaid: transaction.amountPaid ?? amount,
+    tokenAmount: transaction.netAmount,
+    otherCharges: transaction.commissionAmount,
+  });
 
   console.log(
     `[SMS] Sending to ${phoneNumber}: ${message.substring(0, 50)}...`,
