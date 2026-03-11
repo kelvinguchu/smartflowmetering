@@ -2,6 +2,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { db } from "../db";
 import { adminNotifications } from "../db/schema";
 
+
 type NotificationType =
   | "mother_meter_low_balance"
   | "postpaid_payment_reminder"
