@@ -1,4 +1,7 @@
 import { env } from "../config";
+import { formatTokenSms as formatTokenSmsRaw } from "../lib/sms-formatters";
+
+export { formatOnboardingApprovedSms } from "../lib/sms-formatters";
 
 /**
  * SMS Service
@@ -52,7 +55,10 @@ function parseHostpinnacleResponse(rawBody: string): Record<string, unknown> {
   }
 }
 
-function getResponseValue(response: Record<string, unknown>, keys: string[]): string {
+function getResponseValue(
+  response: Record<string, unknown>,
+  keys: string[],
+): string {
   for (const key of keys) {
     const value = response[key];
     if (typeof value === "string" && value.trim()) {
@@ -67,7 +73,7 @@ function getResponseValue(response: Record<string, unknown>, keys: string[]): st
  */
 export async function sendViaHostpinnacle(
   phoneNumber: string,
-  message: string
+  message: string,
 ): Promise<SmsResult> {
   const missingEnv = getMissingHostpinnacleEnvVars();
   if (missingEnv.length > 0) {
@@ -106,13 +112,17 @@ export async function sendViaHostpinnacle(
     const rawBody = await response.text();
     const body = parseHostpinnacleResponse(rawBody);
 
-    const status = getResponseValue(body, ["status", "responseCode"]).toLowerCase();
+    const status = getResponseValue(body, [
+      "status",
+      "responseCode",
+    ]).toLowerCase();
     const messageId = getResponseValue(body, ["msgid", "messageId", "id"]);
     const errorMessage =
       getResponseValue(body, ["message", "error", "responseDescription"]) ||
       (rawBody.trim() ? rawBody : `HTTP ${response.status}`);
 
-    const successStatus = status === "success" || status === "ok" || status === "queued";
+    const successStatus =
+      status === "success" || status === "ok" || status === "queued";
     if ((response.ok && !status) || successStatus) {
       return {
         success: true,
@@ -141,38 +151,26 @@ export async function sendViaHostpinnacle(
  */
 export async function sendSms(
   phoneNumber: string,
-  message: string
+  message: string,
 ): Promise<SmsResult> {
   return sendViaHostpinnacle(phoneNumber, message);
 }
 
-/**
- * Format token SMS message.
- */
-export function formatTokenSms(
-  meterNumber: string,
-  token: string,
-  units: string,
-  amount: string
-): string {
-  const formattedToken = token.replace(/(.{4})/g, "$1-").slice(0, -1);
-
-  return `Smart Flow Metering: Token for meter ${meterNumber}
-Amount: KES ${amount}
-Units: ${units} kWh
-Token: ${formattedToken}
-Enter this token on your meter.`;
+interface TokenSmsServiceInput {
+  meterNumber: string;
+  token: string;
+  transactionDate: Date;
+  units: string;
+  amountPaid: string;
+  tokenAmount: string;
+  otherCharges: string;
 }
 
-export function formatOnboardingApprovedSms(input: {
-  landlordName: string;
-  motherMeterNumber: string;
-  subMeterCount: number;
-}): string {
-  return `Smart Flow Metering: Hello ${input.landlordName}, your meter application has been approved.
-Mother meter: ${input.motherMeterNumber}
-Registered sub-meters: ${input.subMeterCount}
-You can now start vending tokens.`;
+/**
+ * Format token SMS message using the configured alert timezone.
+ */
+export function formatTokenSms(input: TokenSmsServiceInput): string {
+  return formatTokenSmsRaw({ ...input, timezone: env.ALERT_TIMEZONE });
 }
 
 /**

@@ -9,7 +9,6 @@ import {
 } from "../db/schema";
 import { smsDeliveryQueue } from "../queues";
 import {
-  formatDateInTimezone,
   getDateBoundsInTimezone,
   getPreviousDateInTimezone,
 } from "../lib/timezone-dates";

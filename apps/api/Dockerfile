@@ -1,9 +1,9 @@
 ARG NODE_IMAGE=node:22.22.1-alpine3.22
 
-FROM oven/bun:1.3.4-alpine AS deps
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /usr/src/app
-COPY package.json ./
-RUN bun install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 FROM ${NODE_IMAGE} AS release
 WORKDIR /usr/src/app

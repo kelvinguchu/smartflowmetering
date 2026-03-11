@@ -120,7 +120,7 @@ curl https://smartmetering.africa
 
 ```bash
 # SSH into VPS, then:
-docker exec smartflowmetering-api bun run db:push
+docker exec smartflowmetering-api npm run db:push
 ```
 
 ### Trigger Initial Backup
