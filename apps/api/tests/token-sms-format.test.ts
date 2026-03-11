@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatTokenSms } from "../src/services/sms.service";
+import { formatTokenSms } from "../src/lib/sms-formatters";
 
 describe("formatTokenSms", () => {
   it("formats the token SMS exactly as the vending slip layout", () => {
@@ -8,6 +8,7 @@ describe("formatTokenSms", () => {
       meterNumber: "37208250748",
       token: "51364478789055955459",
       transactionDate: new Date("2025-10-20T15:40:00.000Z"),
+      timezone: "Africa/Nairobi",
       units: "14.3000",
       amountPaid: "300",
       tokenAmount: "173.13",
