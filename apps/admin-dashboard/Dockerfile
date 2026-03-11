@@ -7,10 +7,10 @@ FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 
 # Copy package files
-COPY package.json ./
+COPY package.json package-lock.json ./
 
 # Install ALL dependencies (including dev for build)
-RUN npm install
+RUN npm ci
 
 # Copy source
 COPY . .
