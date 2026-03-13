@@ -1,19 +1,19 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
+import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
-import { transactions, meters, generatedTokens, smsLogs } from "../db/schema";
-import {
-  transactionQuerySchema,
-  resendTokenSchema,
-} from "../validators/transactions";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { generatedTokens, meters, smsLogs, transactions } from "../db/schema";
+import { requirePermission } from "../lib/auth-middleware";
+import type { AppBindings } from "../lib/auth-middleware";
+import { revealToken } from "../lib/token-protection";
+import { maskToken, redactTokensInText } from "../lib/token-redaction";
 import { smsDeliveryQueue } from "../queues";
+import { formatTokenSms } from "../services/sms.service";
 import {
-  requireAuth,
-  requireAdmin,
-  type AppBindings,
-} from "../lib/auth-middleware";
+  resendTokenSchema,
+  transactionQuerySchema,
+} from "../validators/transactions";
 
 const idParamSchema = z.object({
   id: z.uuid(),
@@ -27,7 +27,7 @@ export const transactionRoutes = new Hono<AppBindings>();
 
 transactionRoutes.get(
   "/",
-  requireAuth,
+  requirePermission("transactions:read"),
   zValidator("query", transactionQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
@@ -77,13 +77,22 @@ transactionRoutes.get(
       offset: query.offset ?? 0,
     });
 
-    return c.json({ data: result, count: result.length });
+    return c.json({
+      data: result.map((transaction) => ({
+        ...transaction,
+        generatedTokens: transaction.generatedTokens.map((token) => ({
+          ...token,
+          token: maskToken(revealToken(token.token)),
+        })),
+      })),
+      count: result.length,
+    });
   }
 );
 
 transactionRoutes.get(
   "/:id",
-  requireAuth,
+  requirePermission("transactions:read"),
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
@@ -107,13 +116,25 @@ transactionRoutes.get(
       return c.json({ error: "Transaction not found" }, 404);
     }
 
-    return c.json({ data: transaction });
+    return c.json({
+      data: {
+        ...transaction,
+        generatedTokens: transaction.generatedTokens.map((token) => ({
+          ...token,
+          token: maskToken(revealToken(token.token)),
+        })),
+        smsLogs: transaction.smsLogs.map((smsLog) => ({
+          ...smsLog,
+          messageBody: redactTokensInText(smsLog.messageBody),
+        })),
+      },
+    });
   }
 );
 
 transactionRoutes.get(
   "/reference/:transactionId",
-  requireAuth,
+  requirePermission("transactions:read"),
   zValidator("param", transactionIdParamSchema),
   async (c) => {
     const { transactionId } = c.req.valid("param");
@@ -133,13 +154,21 @@ transactionRoutes.get(
       return c.json({ error: "Transaction not found" }, 404);
     }
 
-    return c.json({ data: transaction });
+    return c.json({
+      data: {
+        ...transaction,
+        generatedTokens: transaction.generatedTokens.map((token) => ({
+          ...token,
+          token: maskToken(revealToken(token.token)),
+        })),
+      },
+    });
   }
 );
 
 transactionRoutes.post(
   "/resend-token",
-  requireAuth,
+  requirePermission("transactions:resend_token"),
   zValidator("json", resendTokenSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -160,7 +189,7 @@ transactionRoutes.post(
       return c.json({ error: "Transaction not completed" }, 400);
     }
 
-    const [token] = await db
+    const tokenRows = await db
       .select({
         token: generatedTokens.token,
         value: generatedTokens.value,
@@ -175,9 +204,10 @@ transactionRoutes.post(
       .orderBy(desc(generatedTokens.createdAt))
       .limit(1);
 
-    if (!token) {
+    if (tokenRows.length === 0) {
       return c.json({ error: "No token found for this transaction" }, 400);
     }
+    const token = tokenRows[0];
     const phoneNumber = body.phoneNumber ?? transaction.phoneNumber;
 
     await smsDeliveryQueue.add(
@@ -186,7 +216,7 @@ transactionRoutes.post(
         transactionId: transaction.id,
         phoneNumber,
         meterNumber: transaction.meter.meterNumber,
-        token: token.token,
+        token: revealToken(token.token),
         units: token.value ?? "0",
         amount: transaction.amountPaid,
       },
@@ -200,7 +230,17 @@ transactionRoutes.post(
       .values({
         transactionId: transaction.id,
         phoneNumber,
-        messageBody: `Token resend for meter ${transaction.meter.meterNumber}: ${token.token}`,
+        messageBody: redactTokensInText(
+          formatTokenSms({
+            meterNumber: transaction.meter.meterNumber,
+            token: revealToken(token.token),
+            transactionDate: transaction.completedAt ?? transaction.createdAt,
+            units: token.value ?? "0",
+            amountPaid: transaction.amountPaid,
+            tokenAmount: transaction.netAmount,
+            otherCharges: transaction.commissionAmount,
+          })
+        ),
         provider: "hostpinnacle",
         status: "queued",
       })
@@ -214,38 +254,30 @@ transactionRoutes.post(
   }
 );
 
-transactionRoutes.get("/stats/summary", requireAdmin, async (c) => {
-  const allTransactions = await db.query.transactions.findMany({
-    columns: { status: true, amountPaid: true, commissionAmount: true },
-  });
+transactionRoutes.get(
+  "/stats/summary",
+  requirePermission("transactions:summary"),
+  async (c) => {
+    const [stats] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        pending:
+          sql<number>`count(*) filter (where ${transactions.status} = 'pending')::int`,
+        processing:
+          sql<number>`count(*) filter (where ${transactions.status} = 'processing')::int`,
+        completed:
+          sql<number>`count(*) filter (where ${transactions.status} = 'completed')::int`,
+        failed:
+          sql<number>`count(*) filter (where ${transactions.status} = 'failed')::int`,
+        totalAmount:
+          sql<string>`coalesce(sum(case when ${transactions.status} = 'completed' then ${transactions.amountPaid}::numeric else 0 end), 0)::text`,
+        totalCommission:
+          sql<string>`coalesce(sum(case when ${transactions.status} = 'completed' then ${transactions.commissionAmount}::numeric else 0 end), 0)::text`,
+      })
+      .from(transactions);
 
-  const stats = {
-    total: allTransactions.length,
-    pending: 0,
-    processing: 0,
-    completed: 0,
-    failed: 0,
-    totalAmount: 0,
-    totalCommission: 0,
-  };
-
-  for (const tx of allTransactions) {
-    if (tx.status === "pending") stats.pending += 1;
-    if (tx.status === "processing") stats.processing += 1;
-    if (tx.status === "completed") stats.completed += 1;
-    if (tx.status === "failed") stats.failed += 1;
-
-    if (tx.status === "completed") {
-      stats.totalAmount += Number.parseFloat(tx.amountPaid);
-      stats.totalCommission += Number.parseFloat(tx.commissionAmount);
-    }
-  }
-
-  return c.json({
-    data: {
-      ...stats,
-      totalAmount: stats.totalAmount.toFixed(2),
-      totalCommission: stats.totalCommission.toFixed(2),
-    },
-  });
-});
+    return c.json({
+      data: stats,
+    });
+  },
+);

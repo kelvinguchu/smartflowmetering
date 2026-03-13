@@ -1,12 +1,13 @@
-import { Hono, type Context } from "hono";
-import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import { Hono } from "hono";
+import type { Context } from "hono";
+import { z } from "zod";
+import type { AppBindings } from "../lib/auth-middleware";
 import {
-  approveApplicationSchema,
-  applicationQuerySchema,
-  createApplicationSchema,
-  rejectApplicationSchema,
-} from "../validators/applications";
+  requirePermission,
+} from "../lib/auth-middleware";
+import { applicationRateLimit } from "../lib/rate-limit";
+import { smsDeliveryQueue } from "../queues";
 import {
   ApplicationError,
   approveMeterApplication,
@@ -15,11 +16,14 @@ import {
   listMeterApplications,
   rejectMeterApplication,
 } from "../services/application-onboarding.service";
-import { requireAdmin, type AppBindings } from "../lib/auth-middleware";
 import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
-import { smsDeliveryQueue } from "../queues";
 import { formatOnboardingApprovedSms } from "../services/sms.service";
-import { applicationRateLimit } from "../lib/rate-limit";
+import {
+  approveApplicationSchema,
+  applicationQuerySchema,
+  createApplicationSchema,
+  rejectApplicationSchema,
+} from "../validators/applications";
 
 const applicationIdParamSchema = z.object({
   id: z.uuid(),
@@ -37,14 +41,19 @@ applicationRoutes.post(
       const application = await createMeterApplication(body);
       return c.json({ data: application }, 201);
     } catch (error) {
-      return handleApplicationError(c, error);
+      return handleApplicationError(
+        c,
+        error instanceof Error || error instanceof ApplicationError
+          ? error
+          : undefined,
+      );
     }
   },
 );
 
 applicationRoutes.get(
   "/",
-  requireAdmin,
+  requirePermission("applications:read"),
   zValidator("query", applicationQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
@@ -55,7 +64,7 @@ applicationRoutes.get(
 
 applicationRoutes.get(
   "/:id",
-  requireAdmin,
+  requirePermission("applications:read"),
   zValidator("param", applicationIdParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
@@ -69,7 +78,7 @@ applicationRoutes.get(
 
 applicationRoutes.post(
   "/:id/approve",
-  requireAdmin,
+  requirePermission("applications:decide"),
   zValidator("param", applicationIdParamSchema),
   zValidator("json", approveApplicationSchema),
   async (c) => {
@@ -120,14 +129,19 @@ applicationRoutes.post(
         data: approved,
       });
     } catch (error) {
-      return handleApplicationError(c, error);
+      return handleApplicationError(
+        c,
+        error instanceof Error || error instanceof ApplicationError
+          ? error
+          : undefined,
+      );
     }
   },
 );
 
 applicationRoutes.post(
   "/:id/reject",
-  requireAdmin,
+  requirePermission("applications:decide"),
   zValidator("param", applicationIdParamSchema),
   zValidator("json", rejectApplicationSchema),
   async (c) => {
@@ -150,12 +164,22 @@ applicationRoutes.post(
         reason,
       });
     } catch (error) {
-      return handleApplicationError(c, error);
+      return handleApplicationError(
+        c,
+        error instanceof Error || error instanceof ApplicationError
+          ? error
+          : undefined,
+      );
     }
   },
 );
 
-function handleApplicationError(c: Context<AppBindings>, error: unknown) {
+type ApplicationRouteError = ApplicationError | Error | null | undefined;
+
+function handleApplicationError(
+  c: Context<AppBindings>,
+  error: ApplicationRouteError,
+) {
   if (error instanceof ApplicationError) {
     return c.json(
       { error: error.message },
@@ -168,7 +192,12 @@ function handleApplicationError(c: Context<AppBindings>, error: unknown) {
 }
 
 function toApplicationStatusCode(statusCode: number): 400 | 404 | 409 {
-  if (statusCode === 404) return 404;
-  if (statusCode === 409) return 409;
+  if (statusCode === 404) {
+    return 404;
+  }
+  if (statusCode === 409) {
+    return 409;
+  }
+
   return 400;
 }

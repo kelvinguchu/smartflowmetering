@@ -2,6 +2,9 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { db } from "../db";
 import { adminNotifications } from "../db/schema";
 
+type JsonScalar = string | number | boolean | null;
+type JsonValue = JsonScalar | JsonValue[] | { [key: string]: JsonValue };
+type AdminNotificationRecord = typeof adminNotifications.$inferSelect;
 
 type NotificationType =
   | "mother_meter_low_balance"
@@ -16,7 +19,7 @@ export interface CreateAdminNotificationInput {
   message: string;
   entityType?: string;
   entityId?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, JsonValue>;
 }
 
 export interface ListAdminNotificationsOptions {
@@ -66,8 +69,10 @@ export async function listAdminNotifications(
   };
 }
 
-export async function markAdminNotificationRead(id: string) {
-  const [updated] = await db
+export async function markAdminNotificationRead(
+  id: string
+): Promise<AdminNotificationRecord | null> {
+  const updatedRows = await db
     .update(adminNotifications)
     .set({
       status: "read",
@@ -75,7 +80,7 @@ export async function markAdminNotificationRead(id: string) {
     })
     .where(eq(adminNotifications.id, id))
     .returning();
-  return updated ?? null;
+  return updatedRows[0] ?? null;
 }
 
 export async function markAllAdminNotificationsRead() {

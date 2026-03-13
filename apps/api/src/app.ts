@@ -2,22 +2,32 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { env } from "./config";
+import { auth } from "./lib/auth";
+import type { AppBindings } from "./lib/auth-middleware";
+import { sanitizeUrlForLog } from "./lib/log-redaction";
+import { authRateLimit, rateLimitMiddleware } from "./lib/rate-limit";
 import {
   mpesaRoutes,
   meterRoutes,
   tariffRoutes,
   transactionRoutes,
   healthRoutes,
+  smsRecoveryRoutes,
   smsRoutes,
+  smsWebhookRoutes,
   gomelongRoutes,
   applicationRoutes,
+  appNotificationRoutes,
   motherMeterRoutes,
   notificationRoutes,
   failedTransactionRoutes,
+  adminTokenRoutes,
+  auditLogRoutes,
+  authSecurityRoutes,
+  customerPromptRoutes,
+  supportRecoveryRoutes,
+  userManagementRoutes,
 } from "./routes";
-import { auth } from "./lib/auth";
-import { rateLimitMiddleware } from "./lib/rate-limit";
-import type { AppBindings } from "./lib/auth-middleware";
 
 export function createApp() {
   const app = new Hono<AppBindings>();
@@ -42,7 +52,9 @@ export function createApp() {
 
   app.use("*", async (c, next) => {
     if (env.NODE_ENV === "development") {
-      console.log(`[${new Date().toISOString()}] ${c.req.method} ${c.req.url}`);
+      console.log(
+        `[${new Date().toISOString()}] ${c.req.method} ${sanitizeUrlForLog(c.req.url)}`,
+      );
     }
     await next();
   });
@@ -58,6 +70,7 @@ export function createApp() {
   );
 
   app.use("*", rateLimitMiddleware);
+  app.use("/api/auth/*", authRateLimit);
 
   app.all("/api/auth/*", async (c) => auth.handler(c.req.raw));
 
@@ -74,12 +87,21 @@ export function createApp() {
   app.route("/api/meters", meterRoutes);
   app.route("/api/tariffs", tariffRoutes);
   app.route("/api/transactions", transactionRoutes);
+  app.route("/api/sms/webhooks", smsWebhookRoutes);
+  app.route("/api/sms/recovery", smsRecoveryRoutes);
   app.route("/api/sms", smsRoutes);
   app.route("/api/gomelong", gomelongRoutes);
   app.route("/api/applications", applicationRoutes);
+  app.route("/api/app-notifications", appNotificationRoutes);
   app.route("/api/mother-meters", motherMeterRoutes);
   app.route("/api/notifications", notificationRoutes);
   app.route("/api/failed-transactions", failedTransactionRoutes);
+  app.route("/api/admin-tokens", adminTokenRoutes);
+  app.route("/api/audit-logs", auditLogRoutes);
+  app.route("/api/auth-security", authSecurityRoutes);
+  app.route("/api/customer-prompts", customerPromptRoutes);
+  app.route("/api/support-recovery", supportRecoveryRoutes);
+  app.route("/api/users", userManagementRoutes);
 
   return app;
 }

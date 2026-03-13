@@ -5,6 +5,11 @@ import { eq } from "drizzle-orm";
 import { env } from "../../config";
 import { generateTransactionId } from "../../lib/utils";
 import { calculateTransaction, meetsMinimumAmount } from "../../lib/money";
+import { sanitizeMpesaPayload } from "../../lib/mpesa-payload-sanitizer";
+import {
+  maskMeterNumberForLog,
+  maskReferenceForLog,
+} from "../../lib/log-redaction";
 import { tokenGenerationQueue } from "../index";
 import type { PaymentJob, PaymentProcessingJob, MpesaRawCallbackJob } from "../types";
 
@@ -36,7 +41,9 @@ export async function processPayment(
  * 2. Proceed to processing
  */
 async function handleRawCallback(body: MpesaRawCallbackJob) {
-  console.log(`[Payment Worker] Handling Raw Callback: ${body.TransID}`);
+  console.log(
+    `[Payment Worker] Handling Raw Callback: ${maskReferenceForLog(body.TransID)}`,
+  );
 
   // 1. Store raw callback (Idempotency via unique trans_id)
   const [mpesaTx] = await db
@@ -57,7 +64,8 @@ async function handleRawCallback(body: MpesaRawCallbackJob) {
       firstName: body.FirstName ?? null,
       middleName: body.MiddleName ?? null,
       lastName: body.LastName ?? null,
-      rawCallbackPayload: body as unknown as Record<string, unknown>,
+      rawCallbackPayload:
+        sanitizeMpesaPayload(body) as Record<string, unknown>,
     })
     .onConflictDoNothing({ target: mpesaTransactions.transId })
     .returning({ id: mpesaTransactions.id });
@@ -76,7 +84,9 @@ async function handleRawCallback(body: MpesaRawCallbackJob) {
     // In this "dumb pipe" model, we just re-run the logic. 
     // Ideally, we check if a 'transactions' record exists for this mpesaTxId.
     txId = existing?.id;
-    console.log(`[Payment Worker] Duplicate Callback: ${body.TransID} (ID: ${txId})`);
+    console.log(
+      `[Payment Worker] Duplicate Callback: ${maskReferenceForLog(body.TransID)} (ID: ${txId})`,
+    );
   }
 
   if (!txId) throw new Error("Failed to resolve M-Pesa Transaction ID");
@@ -87,7 +97,9 @@ async function handleRawCallback(body: MpesaRawCallbackJob) {
   });
 
   if (existingTx) {
-    console.log(`[Payment Worker] Transaction already processed: ${existingTx.transactionId}`);
+    console.log(
+      `[Payment Worker] Transaction already processed: ${maskReferenceForLog(existingTx.transactionId)}`,
+    );
     return { transactionId: existingTx.transactionId };
   }
 
@@ -115,7 +127,7 @@ async function processPaymentInternal(data: PaymentProcessingJob) {
   } = data;
 
   console.log(
-    `[Payment] Processing: ${mpesaReceiptNumber} for meter ${meterNumber}`
+    `[Payment] Processing: ${maskReferenceForLog(mpesaReceiptNumber)} for meter ${maskMeterNumberForLog(meterNumber)}`
   );
 
   // Step 1: Check minimum amount
@@ -149,7 +161,9 @@ async function processPaymentInternal(data: PaymentProcessingJob) {
       amount,
       phoneNumber,
     });
-    console.warn(`[Payment] Failed: Meter not found (${meterNumber})`);
+    console.warn(
+      `[Payment] Failed: Meter not found (${maskMeterNumberForLog(meterNumber)})`,
+    );
     return;
   }
 
@@ -161,7 +175,9 @@ async function processPaymentInternal(data: PaymentProcessingJob) {
       amount,
       phoneNumber,
     });
-    console.warn(`[Payment] Failed: Meter inactive (${meterNumber})`);
+    console.warn(
+      `[Payment] Failed: Meter inactive (${maskMeterNumberForLog(meterNumber)})`,
+    );
     return;
   }
 
@@ -194,7 +210,7 @@ async function processPaymentInternal(data: PaymentProcessingJob) {
     .returning();
 
   console.log(
-    `[Payment] Created transaction: ${transactionId}, Units: ${calculation.unitsPurchased}`
+    `[Payment] Created transaction: ${maskReferenceForLog(transactionId)}, Units: ${calculation.unitsPurchased}`
   );
 
   // Step 5: Queue token generation

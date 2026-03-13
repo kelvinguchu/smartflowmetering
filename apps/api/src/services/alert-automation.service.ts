@@ -1,9 +1,10 @@
 import { env } from "../config";
+import { queueCustomerPrompts } from "./customer-prompts.service";
+import { queueDailyLandlordUsageSummarySms } from "./daily-usage-sms.service";
 import {
   queueLowBalanceNotifications,
   queuePostpaidReminderNotifications,
 } from "./mother-meter-alerts.service";
-import { queueDailyLandlordUsageSummarySms } from "./daily-usage-sms.service";
 
 let automationTimer: NodeJS.Timeout | null = null;
 let cycleRunning = false;
@@ -25,13 +26,17 @@ export function startAlertAutomation(): void {
 }
 
 export function stopAlertAutomation(): void {
-  if (!automationTimer) return;
+  if (!automationTimer) {
+    return;
+  }
   clearInterval(automationTimer);
   automationTimer = null;
 }
 
 async function runAlertAutomationCycle(): Promise<void> {
-  if (cycleRunning) return;
+  if (cycleRunning) {
+    return;
+  }
   cycleRunning = true;
 
   try {
@@ -57,7 +62,19 @@ async function runAlertAutomationCycle(): Promise<void> {
       });
     }
 
+    let customerPromptResult: Awaited<
+      ReturnType<typeof queueCustomerPrompts>
+    > | null = null;
+    if (env.CUSTOMER_PROMPTS_ENABLED) {
+      customerPromptResult = await queueCustomerPrompts({
+        limit: env.CUSTOMER_PROMPTS_MAX_PER_RUN,
+        maxPrompts: env.CUSTOMER_PROMPTS_MAX_PER_RUN,
+        type: "all",
+      });
+    }
+
     console.log("[Alerts Automation] Cycle complete", {
+      customerPrompts: customerPromptResult,
       lowBalance: lowBalanceResult,
       postpaidReminders: postpaidReminderResult,
       dailyUsageSms: dailyUsageResult,
@@ -85,6 +102,8 @@ function getHourInTimezone(date: Date, timezone: string): number {
   }).format(date);
 
   const parsed = Number.parseInt(hour, 10);
-  if (!Number.isFinite(parsed)) return 0;
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
   return parsed;
 }

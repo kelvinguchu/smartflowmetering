@@ -11,12 +11,26 @@ function readRepoFile(relativePath: string) {
   return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
 
+function readRootEnvFile() {
+  const envPath = path.join(repoRoot, ".env");
+  const fallbackPath = path.join(repoRoot, ".env.example");
+
+  if (fs.existsSync(envPath)) {
+    return fs.readFileSync(envPath, "utf8");
+  }
+
+  return fs.readFileSync(fallbackPath, "utf8");
+}
+
 describe("docker env wiring behavior", () => {
   it("uses DATABASE_URL and REDIS_URL from .env for the api service", () => {
     const compose = readRepoFile("docker-compose.yml");
 
     assert.match(compose, /DATABASE_URL:\s*\$\{DATABASE_URL(?::-[^}]*)?\}/);
     assert.match(compose, /REDIS_URL:\s*\$\{REDIS_URL(?::-[^}]*)?\}/);
+    assert.match(compose, /SFM_PROCESS_ROLE:\s*api/);
+    assert.match(compose, /\n\s+worker:\n/);
+    assert.match(compose, /SFM_PROCESS_ROLE:\s*worker/);
   });
 
   it("keeps postgres and redis service auth in env-driven mode", () => {
@@ -32,6 +46,9 @@ describe("docker env wiring behavior", () => {
 
     assert.match(dokployCompose, /DATABASE_URL:\s*\$\{DATABASE_URL(?::-[^}]*)?\}/);
     assert.match(dokployCompose, /REDIS_URL:\s*\$\{REDIS_URL(?::-[^}]*)?\}/);
+    assert.match(dokployCompose, /SFM_PROCESS_ROLE:\s*api/);
+    assert.match(dokployCompose, /\n\s+worker:\n/);
+    assert.match(dokployCompose, /SFM_PROCESS_ROLE:\s*worker/);
     assert.match(
       dokployCompose,
       /redis-server --appendonly yes --requirepass \$\{REDIS_PASSWORD\}/
@@ -39,7 +56,7 @@ describe("docker env wiring behavior", () => {
   });
 
   it("defines docker-reachable DB and Redis URLs in root .env", () => {
-    const rootEnv = readRepoFile(".env");
+    const rootEnv = readRootEnvFile();
 
     assert.match(
       rootEnv,

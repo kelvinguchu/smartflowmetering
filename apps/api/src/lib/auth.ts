@@ -1,8 +1,14 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, twoFactor } from "better-auth/plugins";
-import { db } from "../db";
 import { env } from "../config";
+import { db } from "../db";
+import { sendSms } from "../services/sms.service";
+import { shouldDisablePublicSignUp } from "./auth-config";
+import {
+  isAllowedKenyanPhoneNumber,
+  normalizeKenyanPhoneNumber,
+} from "./staff-contact";
 
 /**
  * Better-Auth configuration for Smart Flow Metering
@@ -15,6 +21,31 @@ import { env } from "../config";
  */
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
+
+  user: {
+    additionalFields: {
+      phoneNumber: {
+        type: "string",
+        required: true,
+        unique: true,
+      },
+      phoneNumberVerified: {
+        type: "boolean",
+        required: true,
+        defaultValue: true,
+      },
+      preferredTwoFactorMethod: {
+        type: "string",
+        required: true,
+        defaultValue: "sms",
+      },
+      totpEnrollmentPromptPending: {
+        type: "boolean",
+        required: true,
+        defaultValue: true,
+      },
+    },
+  },
 
   // Base URL for callbacks
   baseURL: env.BETTER_AUTH_URL,
@@ -29,6 +60,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    disableSignUp: shouldDisablePublicSignUp(env.NODE_ENV),
   },
 
   // Disable public sign-up
@@ -50,9 +82,30 @@ export const auth = betterAuth({
       adminRoles: ["admin"],
     }),
 
-    // Two-factor authentication (TOTP)
+    // Two-factor authentication via SMS OTP and TOTP
     twoFactor({
       issuer: "Smart Flow Metering",
+      otpOptions: {
+        allowedAttempts: 5,
+        digits: 6,
+        period: 3,
+        sendOTP: async ({ otp, user }) => {
+          const phoneNumber = getTwoFactorUserPhoneNumber(user);
+
+          if (!phoneNumber || !isAllowedKenyanPhoneNumber(phoneNumber)) {
+            throw new Error("A verified Kenyan phone number is required for SMS 2FA");
+          }
+
+          const normalizedPhoneNumber = normalizeKenyanPhoneNumber(phoneNumber);
+          await sendSms(
+            normalizedPhoneNumber,
+            `Smart Flow Metering login code: ${otp}. It expires in 3 minutes.`,
+          );
+        },
+      },
+      totpOptions: {
+        digits: 6,
+      },
     }),
   ],
 
@@ -64,3 +117,14 @@ export const auth = betterAuth({
 export type Auth = typeof auth;
 export type Session = typeof auth.$Infer.Session;
 export type User = typeof auth.$Infer.Session["user"];
+
+interface TwoFactorUserWithPhoneNumber {
+  id: string;
+  phoneNumber?: string | null;
+}
+
+function getTwoFactorUserPhoneNumber(
+  user: TwoFactorUserWithPhoneNumber,
+): string | null {
+  return typeof user.phoneNumber === "string" ? user.phoneNumber : null;
+}

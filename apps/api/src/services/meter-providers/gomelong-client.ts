@@ -1,4 +1,5 @@
 import { env } from "../../config";
+import { fetchSensitiveWithTimeout } from "../../lib/fetch-sensitive-with-timeout";
 
 export type GomelongMeterType = 1 | 2;
 export type GomelongVendingType = 0 | 1;
@@ -20,6 +21,7 @@ export interface GomelongResult<T = unknown> {
 }
 
 type QueryValue = string | number | boolean | null | undefined;
+const GOMELONG_REQUEST_TIMEOUT_MS = 15_000;
 
 export function isGomelongConfigured(): boolean {
   return Boolean(env.GOMELONG_USER_ID && env.GOMELONG_PASSWORD);
@@ -94,8 +96,9 @@ async function gomelongRequest<T = unknown>(
     }
   }
 
-  const response = await fetch(endpoint, {
+  const response = await fetchSensitiveWithTimeout(endpoint, {
     method: options.method,
+    timeoutMs: GOMELONG_REQUEST_TIMEOUT_MS,
     headers: buildRequestHeaders(options.headers),
     body: options.body,
   });

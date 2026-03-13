@@ -6,6 +6,7 @@ import { createApp } from "../../src/app";
 import { env } from "../../src/config";
 import { db } from "../../src/db";
 import { generatedTokens, transactions } from "../../src/db/schema";
+import { isProtectedToken, revealToken } from "../../src/lib/token-protection";
 import {
   ensureInfraReady,
   ensureTestMeterFixture,
@@ -21,10 +22,7 @@ type MutableEnv = {
   GOMELONG_API_URL: string;
   GOMELONG_USER_ID: string;
   GOMELONG_PASSWORD: string;
-  GOMELONG_BRANDS: string[];
   GOMELONG_VENDING_TYPE: 0 | 1;
-  HEXING_API_URL: string;
-  HEXING_API_KEY: string;
 };
 
 function postCallback(payload: Record<string, unknown>) {
@@ -58,15 +56,11 @@ async function withMockGomelongServer(
 }
 
 describe("E2E: Gomelong vending integration", () => {
-  const originalAllowMockFallback = process.env.ALLOW_MOCK_TOKEN_FALLBACK;
   const originalEnv = {
     GOMELONG_API_URL: env.GOMELONG_API_URL,
     GOMELONG_USER_ID: env.GOMELONG_USER_ID,
     GOMELONG_PASSWORD: env.GOMELONG_PASSWORD,
-    GOMELONG_BRANDS: [...env.GOMELONG_BRANDS],
     GOMELONG_VENDING_TYPE: env.GOMELONG_VENDING_TYPE,
-    HEXING_API_URL: env.HEXING_API_URL,
-    HEXING_API_KEY: env.HEXING_API_KEY,
   } satisfies MutableEnv;
 
   before(async () => {
@@ -76,7 +70,6 @@ describe("E2E: Gomelong vending integration", () => {
   beforeEach(async () => {
     await resetE2EState();
     await ensureTestMeterFixture("TEST-METER-GOMELONG");
-    process.env.ALLOW_MOCK_TOKEN_FALLBACK = "false";
   });
 
   after(async () => {
@@ -84,11 +77,6 @@ describe("E2E: Gomelong vending integration", () => {
     process.env.GOMELONG_API_URL = originalEnv.GOMELONG_API_URL;
     process.env.GOMELONG_USER_ID = originalEnv.GOMELONG_USER_ID;
     process.env.GOMELONG_PASSWORD = originalEnv.GOMELONG_PASSWORD;
-    if (originalAllowMockFallback == null) {
-      delete process.env.ALLOW_MOCK_TOKEN_FALLBACK;
-    } else {
-      process.env.ALLOW_MOCK_TOKEN_FALLBACK = originalAllowMockFallback;
-    }
     await teardownE2E();
   });
 
@@ -116,10 +104,7 @@ describe("E2E: Gomelong vending integration", () => {
       GOMELONG_API_URL: server.url,
       GOMELONG_USER_ID: "gomelong-user",
       GOMELONG_PASSWORD: "gomelong-pass",
-      GOMELONG_BRANDS: [],
       GOMELONG_VENDING_TYPE: 1,
-      HEXING_API_URL: "http://127.0.0.1:1",
-      HEXING_API_KEY: "force-live-provider",
     });
     process.env.GOMELONG_API_URL = server.url;
     process.env.GOMELONG_USER_ID = "gomelong-user";
@@ -156,7 +141,8 @@ describe("E2E: Gomelong vending integration", () => {
       .limit(1);
 
     assert.ok(tokenRow);
-    assert.match(tokenRow.token, /^\d{20}$/);
+    assert.equal(isProtectedToken(tokenRow.token), true);
+    assert.match(revealToken(tokenRow.token), /^\d{20}$/);
 
     await server.close();
   });
@@ -183,10 +169,7 @@ describe("E2E: Gomelong vending integration", () => {
       GOMELONG_API_URL: server.url,
       GOMELONG_USER_ID: "gomelong-user",
       GOMELONG_PASSWORD: "gomelong-pass",
-      GOMELONG_BRANDS: [],
       GOMELONG_VENDING_TYPE: 1,
-      HEXING_API_URL: "http://127.0.0.1:1",
-      HEXING_API_KEY: "force-live-provider",
     });
     process.env.GOMELONG_API_URL = server.url;
     process.env.GOMELONG_USER_ID = "gomelong-user";
@@ -266,10 +249,7 @@ describe("E2E: Gomelong vending integration", () => {
       GOMELONG_API_URL: server.url,
       GOMELONG_USER_ID: "gomelong-user",
       GOMELONG_PASSWORD: "gomelong-pass",
-      GOMELONG_BRANDS: [],
       GOMELONG_VENDING_TYPE: 1,
-      HEXING_API_URL: "http://127.0.0.1:1",
-      HEXING_API_KEY: "force-live-provider",
     });
     process.env.GOMELONG_API_URL = server.url;
     process.env.GOMELONG_USER_ID = "gomelong-user";
@@ -308,7 +288,8 @@ describe("E2E: Gomelong vending integration", () => {
       .limit(1);
 
     assert.ok(tokenRow);
-    assert.match(tokenRow.token, /^\d{20}$/);
+    assert.equal(isProtectedToken(tokenRow.token), true);
+    assert.match(revealToken(tokenRow.token), /^\d{20}$/);
 
     await server.close();
   });

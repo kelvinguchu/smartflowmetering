@@ -1,30 +1,38 @@
-import assert from "node:assert/strict";
+import { hashPassword } from "better-auth/crypto";
 import { eq, sql } from "drizzle-orm";
+import assert from "node:assert/strict";
 import type { App } from "../../src/app";
 import { closeDbConnection, db } from "../../src/db";
 import {
+  account,
   customers,
   meters,
   motherMeters,
   properties,
   tariffs,
   user,
-  type NewMeter,
-  type NewMotherMeter,
-  type NewProperty,
-  type NewTariff,
-  type NewCustomer,
+} from "../../src/db/schema";
+import type {
+  NewCustomer,
+  NewMeter,
+  NewMotherMeter,
+  NewProperty,
+  NewTariff,
 } from "../../src/db/schema";
 import {
+  appNotificationDeliveryQueue,
   closeAllQueues,
   paymentProcessingQueue,
   smsDeliveryQueue,
+  startQueueWorkers,
   tokenGenerationQueue,
 } from "../../src/queues";
 
 const TRUNCATE_SQL = `
 TRUNCATE TABLE
   sms_logs,
+  customer_app_notifications,
+  customer_device_tokens,
   admin_notifications,
   audit_logs,
   meter_applications,
@@ -48,6 +56,7 @@ CASCADE;
 
 export async function ensureInfraReady() {
   try {
+    startQueueWorkers();
     await db.execute(sql`SELECT 1`);
     await paymentProcessingQueue.getJobCounts("waiting");
   } catch (error) {
@@ -59,14 +68,9 @@ export async function ensureInfraReady() {
   }
 }
 
-async function clearQueue(queue: {
-  drain: () => Promise<unknown>;
-  clean: (
-    grace: number,
-    limit: number,
-    status?: "completed" | "failed" | "delayed" | "wait" | "active" | "paused"
-  ) => Promise<unknown>;
-}) {
+type CleanupQueue = Pick<typeof paymentProcessingQueue, "clean" | "drain">;
+
+async function clearQueue(queue: CleanupQueue) {
   await queue.drain();
   await queue.clean(0, 10_000, "completed");
   await queue.clean(0, 10_000, "failed");
@@ -77,6 +81,7 @@ async function clearQueue(queue: {
 }
 
 export async function resetE2EState() {
+  await clearQueue(appNotificationDeliveryQueue);
   await clearQueue(paymentProcessingQueue);
   await clearQueue(tokenGenerationQueue);
   await clearQueue(smsDeliveryQueue);
@@ -88,14 +93,14 @@ export async function teardownE2E() {
   await closeDbConnection();
 }
 
-type TestMeterFixture = {
+interface TestMeterFixture {
   tariffId: string;
   customerId: string;
   propertyId: string;
   motherMeterId: string;
   meterId: string;
   meterNumber: string;
-};
+}
 
 export async function ensureTestMeterFixture(
   meterNumber = "TEST-METER-001"
@@ -194,6 +199,11 @@ export function uniqueRef(prefix: string) {
   return `${prefix}${Date.now()}${Math.floor(Math.random() * 10_000)}`;
 }
 
+export function uniqueKenyanPhoneNumber(): string {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
+  return `2547${suffix.slice(-8)}`;
+}
+
 export async function waitFor(
   check: () => Promise<boolean>,
   timeoutMs = 15_000,
@@ -215,32 +225,29 @@ export async function createAuthenticatedSession(
   app: App,
   role: "admin" | "user" = "admin"
 ) {
-  const email = `e2e-${role}-${Date.now()}-${Math.floor(Math.random() * 10_000)}@example.com`;
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
+  const email = `e2e-${role}-${suffix}@gmail.com`;
   const password = "Passw0rd!";
+  const userId = crypto.randomUUID();
+  const passwordHash = await hashPassword(password);
 
-  const signUpResponse = await app.request("/api/auth/sign-up/email", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: `E2E ${role}`,
-      email,
-      password,
-    }),
+  await db.insert(user).values({
+    id: userId,
+    name: `E2E ${role}`,
+    email,
+    emailVerified: true,
+    phoneNumber: `2547${suffix.slice(-8)}`,
+    phoneNumberVerified: true,
+    role,
   });
-  assert.equal(
-    signUpResponse.status,
-    200,
-    `Expected sign-up to succeed, got ${signUpResponse.status}`
-  );
 
-  if (role === "admin") {
-    const created = await db.query.user.findFirst({
-      where: eq(user.email, email),
-      columns: { id: true },
-    });
-    assert.ok(created, "Expected signed up user to exist");
-    await db.update(user).set({ role: "admin" }).where(eq(user.id, created.id));
-  }
+  await db.insert(account).values({
+    id: crypto.randomUUID(),
+    accountId: userId,
+    providerId: "credential",
+    userId,
+    password: passwordHash,
+  });
 
   const signInResponse = await app.request("/api/auth/sign-in/email", {
     method: "POST",
@@ -260,9 +267,9 @@ export async function createAuthenticatedSession(
   assert.ok(setCookie, "Expected sign-in response to set a session cookie");
 
   const sessionTokenCookie =
-    setCookie.match(/better-auth\.session_token=[^;]+/)?.[0] ?? "";
+    /better-auth\.session_token=[^;]+/.exec(setCookie)?.[0] ?? "";
   const sessionDataCookie =
-    setCookie.match(/better-auth\.session_data=[^;]+/)?.[0] ?? "";
+    /better-auth\.session_data=[^;]+/.exec(setCookie)?.[0] ?? "";
   const cookie = [sessionTokenCookie, sessionDataCookie]
     .filter(Boolean)
     .join("; ");

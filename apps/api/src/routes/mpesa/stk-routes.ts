@@ -4,6 +4,7 @@ import { env } from "../../config";
 import { db } from "../../db";
 import { mpesaTransactions } from "../../db/schema";
 import { requireAuth } from "../../lib/auth-middleware";
+import { sanitizeMpesaPayload } from "../../lib/mpesa-payload-sanitizer";
 import { formatPhoneNumber } from "../../lib/utils";
 import { mpesaRateLimit, stkPushRateLimit } from "../../lib/rate-limit";
 import { paymentProcessingQueue } from "../../queues";
@@ -96,7 +97,7 @@ export function registerStkRoutes(router: MpesaRouter) {
           middleName: "",
           lastName: "Push",
           thirdPartyTransId: "",
-          rawPayload: result,
+          rawPayload: sanitizeMpesaPayload(result) as Record<string, unknown>,
           status: "pending",
         });
 
@@ -125,10 +126,14 @@ export function registerStkRoutes(router: MpesaRouter) {
     async (c) => {
       const body = c.req.valid("json");
 
-      console.log("[STK Callback] Received:", JSON.stringify(body, null, 2));
-
       try {
         const parsed = parseStkCallback(body);
+        console.log("[STK Callback] Received:", {
+          checkoutRequestId: parsed.checkoutRequestId,
+          resultCode: parsed.resultCode,
+          resultDesc: parsed.resultDesc,
+          mpesaReceiptNumber: parsed.mpesaReceiptNumber ?? null,
+        });
         const [existingTx] = await db
           .select()
           .from(mpesaTransactions)
@@ -151,7 +156,10 @@ export function registerStkRoutes(router: MpesaRouter) {
             .set({
               transId: parsed.mpesaReceiptNumber,
               status: "received",
-              rawPayload: { ...existingPayload, callback: body },
+              rawPayload: {
+                ...existingPayload,
+                callback: sanitizeMpesaPayload(body),
+              },
             })
             .where(eq(mpesaTransactions.id, existingTx.id));
 
@@ -179,7 +187,7 @@ export function registerStkRoutes(router: MpesaRouter) {
               status: "failed",
               rawPayload: {
                 ...existingPayload,
-                callback: body,
+                callback: sanitizeMpesaPayload(body),
                 failureReason: parsed.resultDesc,
               },
             })

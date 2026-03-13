@@ -1,12 +1,14 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { desc, eq } from "drizzle-orm";
+import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
 import { smsLogs } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
-import { smsDeliveryQueue } from "../queues";
+import { requirePermission } from "../lib/auth-middleware";
+import type { AppBindings } from "../lib/auth-middleware";
+import { redactTokensInText } from "../lib/token-redaction";
+import { queueSmsRetryById } from "../services/sms-recovery.service";
 import { sendSms } from "../services/sms.service";
-import { requireAdmin, type AppBindings } from "../lib/auth-middleware";
 
 const smsListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -26,7 +28,7 @@ export const smsRoutes = new Hono<AppBindings>();
 
 smsRoutes.get(
   "/",
-  requireAdmin,
+  requirePermission("sms:read"),
   zValidator("query", smsListQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
@@ -41,7 +43,10 @@ smsRoutes.get(
       .offset(offset);
 
     return c.json({
-      data: logs,
+      data: logs.map((log) => ({
+        ...log,
+        messageBody: redactTokensInText(log.messageBody),
+      })),
       pagination: {
         limit,
         offset,
@@ -53,7 +58,7 @@ smsRoutes.get(
 
 smsRoutes.get(
   "/:id",
-  requireAdmin,
+  requirePermission("sms:read"),
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
@@ -67,51 +72,34 @@ smsRoutes.get(
       return c.json({ error: "SMS log not found" }, 404);
     }
 
-    return c.json({ data: log[0] });
+    return c.json({
+      data: {
+        ...log[0],
+        messageBody: redactTokensInText(log[0].messageBody),
+      },
+    });
   },
 );
 
 smsRoutes.post(
   "/resend/:id",
-  requireAdmin,
+  requirePermission("sms:resend"),
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
-    const [log] = await db
-      .select()
-      .from(smsLogs)
-      .where(eq(smsLogs.id, id))
-      .limit(1);
-
-    if (!log) {
-      return c.json({ error: "SMS log not found" }, 404);
-    }
-
-    const job = await smsDeliveryQueue.add(
-      "sms-resend",
-      {
-        kind: "resend" as const,
-        smsLogId: log.id,
-        phoneNumber: log.phoneNumber,
-        messageBody: log.messageBody,
-      },
-      {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 5000 },
-      },
-    );
+    const result = await queueSmsRetryById(id);
 
     return c.json({
       message: "SMS resend queued",
-      jobId: job.id,
-      smsLogId: log.id,
+      jobId: result.jobId,
+      smsLogId: result.smsLogId,
     });
   },
 );
 
 smsRoutes.post(
   "/test",
-  requireAdmin,
+  requirePermission("sms:test"),
   zValidator("json", testSmsSchema),
   async (c) => {
     const { phoneNumber, message } = c.req.valid("json");

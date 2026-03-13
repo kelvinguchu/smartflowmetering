@@ -1,19 +1,20 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq } from "drizzle-orm";
+import { Hono } from "hono";
 import { db } from "../db";
 import { failedTransactions } from "../db/schema";
-import { requireAdmin, type AppBindings } from "../lib/auth-middleware";
+import type { AppBindings } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
+import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
 import {
   failedTransactionIdParamSchema,
   failedTransactionListQuerySchema,
   failedTransactionUpdateSchema,
 } from "../validators/failed-transactions";
-import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
 
 export const failedTransactionRoutes = new Hono<AppBindings>();
 
-failedTransactionRoutes.use("*", requireAdmin);
+failedTransactionRoutes.use("*", requirePermission("failed_transactions:manage"));
 
 failedTransactionRoutes.get(
   "/",

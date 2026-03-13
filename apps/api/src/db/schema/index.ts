@@ -1,15 +1,15 @@
 import { relations } from "drizzle-orm";
-import { tariffs } from "./tariffs";
 import { customers } from "./customers";
-import { properties } from "./properties";
-import { motherMeters } from "./mother-meters";
-import { motherMeterEvents } from "./mother-meter-events";
-import { meters } from "./meters";
-import { mpesaTransactions } from "./mpesa-transactions";
-import { transactions } from "./transactions";
 import { failedTransactions } from "./failed-transactions";
 import { generatedTokens } from "./generated-tokens";
+import { meters } from "./meters";
+import { motherMeterEvents } from "./mother-meter-events";
+import { motherMeters } from "./mother-meters";
+import { mpesaTransactions } from "./mpesa-transactions";
+import { properties } from "./properties";
 import { smsLogs } from "./sms-logs";
+import { tariffs } from "./tariffs";
+import { transactions } from "./transactions";
 
 export {
   user,
@@ -31,6 +31,20 @@ export {
   type Customer,
   type NewCustomer,
 } from "./customers";
+export {
+  customerDeviceTokens,
+  customerDevicePlatformEnum,
+  customerDeviceTokenStatusEnum,
+  type CustomerDeviceToken,
+  type NewCustomerDeviceToken,
+} from "./customer-device-tokens";
+export {
+  customerAppNotifications,
+  customerAppNotificationStatusEnum,
+  customerAppNotificationTypeEnum,
+  type CustomerAppNotification,
+  type NewCustomerAppNotification,
+} from "./customer-app-notifications";
 
 export { properties, type Property, type NewProperty } from "./properties";
 

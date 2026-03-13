@@ -36,6 +36,48 @@
       "when": 1772735301665,
       "tag": "0004_cooing_forgotten_one",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773410570806,
+      "tag": "0005_volatile_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773414714383,
+      "tag": "0006_far_invaders",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773427849348,
+      "tag": "0007_demonic_the_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773432231439,
+      "tag": "0008_fine_zarek",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773436017497,
+      "tag": "0009_strong_beyonder",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773437294707,
+      "tag": "0010_slippery_moonstone",
+      "breakpoints": true
     }
   ]
 }

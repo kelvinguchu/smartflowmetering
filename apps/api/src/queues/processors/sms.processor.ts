@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 import type { SmsJob, SmsNotificationJob, SmsResendJob } from "../types";
 import { isResendJob, isNotificationJob } from "../sms-guards";
 import { sendSms, formatTokenSms } from "../../services/sms.service";
+import { redactTokensInText } from "../../lib/token-redaction";
+import { maskPhoneForLog } from "../../lib/log-redaction";
 
 /**
  * Parse cost string from provider (e.g., "KES 0.8000" -> "0.8000")
@@ -62,9 +64,7 @@ export async function processSmsDelivery(
     otherCharges: transaction.commissionAmount,
   });
 
-  console.log(
-    `[SMS] Sending to ${phoneNumber}: ${message.substring(0, 50)}...`,
-  );
+  console.log(`[SMS] Sending to ${maskPhoneForLog(phoneNumber)}`);
 
   // Create SMS log entry
   const [smsLog] = await db
@@ -72,7 +72,7 @@ export async function processSmsDelivery(
     .values({
       transactionId,
       phoneNumber,
-      messageBody: message,
+      messageBody: redactTokensInText(message),
       provider: "hostpinnacle",
       status: "queued",
     })
@@ -98,7 +98,7 @@ export async function processSmsDelivery(
   }
 
   console.log(
-    `[SMS] Delivered to ${phoneNumber}, messageId: ${result.messageId}`,
+    `[SMS] Delivered to ${maskPhoneForLog(phoneNumber)}, messageId: ${result.messageId}`,
   );
 
   return { messageId: result.messageId! };
@@ -109,7 +109,7 @@ async function processResendSms(
 ): Promise<{ messageId: string }> {
   const { smsLogId, phoneNumber, messageBody } = data;
 
-  console.log(`[SMS] Resending to ${phoneNumber}`);
+  console.log(`[SMS] Resending to ${maskPhoneForLog(phoneNumber)}`);
 
   await db
     .update(smsLogs)
@@ -133,7 +133,9 @@ async function processResendSms(
     throw new Error(`SMS resend failed: ${result.error}`);
   }
 
-  console.log(`[SMS] Resent to ${phoneNumber}, messageId: ${result.messageId}`);
+  console.log(
+    `[SMS] Resent to ${maskPhoneForLog(phoneNumber)}, messageId: ${result.messageId}`,
+  );
 
   return { messageId: result.messageId! };
 }
@@ -156,7 +158,7 @@ async function processNotificationSms(
       .values({
         transactionId: data.transactionId ?? null,
         phoneNumber,
-        messageBody,
+        messageBody: redactTokensInText(messageBody),
         provider: "hostpinnacle",
         status: "queued",
       })

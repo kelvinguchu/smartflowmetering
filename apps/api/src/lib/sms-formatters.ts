@@ -44,13 +44,17 @@ function formatSmsDateTime(date: Date, timezone: string): string {
 
 function formatUnits(units: string): string {
   const parsedUnits = Number.parseFloat(units);
-  if (!Number.isFinite(parsedUnits)) return units;
+  if (!Number.isFinite(parsedUnits)) {
+    return units;
+  }
   return parsedUnits.toString();
 }
 
 function formatMoney(amount: string): string {
   const parsedAmount = Number.parseFloat(amount);
-  if (!Number.isFinite(parsedAmount)) return amount;
+  if (!Number.isFinite(parsedAmount)) {
+    return amount;
+  }
   return parsedAmount.toFixed(2);
 }
 
@@ -79,4 +83,58 @@ export function formatOnboardingApprovedSms(input: {
 Mother meter: ${input.motherMeterNumber}
 Registered sub-meters: ${input.subMeterCount}
 You can now start vending tokens.`;
+}
+
+export function formatAdminTokenSms(input: {
+  meterNumber: string;
+  token: string;
+  tokenType: "clear_tamper" | "clear_credit" | "set_power_limit" | "key_change";
+  power?: number;
+  sgcId?: string;
+}): string {
+  const actionLine = getAdminTokenActionLabel(
+    input.tokenType,
+    input.power,
+    input.sgcId,
+  );
+
+  return `Smart Flow Metering
+Meter:${input.meterNumber}
+Action:${actionLine}
+Token:${formatTokenGroups(input.token)}
+Keep this token secure.`;
+}
+
+function getAdminTokenActionLabel(
+  tokenType: "clear_tamper" | "clear_credit" | "set_power_limit" | "key_change",
+  power?: number,
+  sgcId?: string,
+): string {
+  if (tokenType === "clear_tamper") {
+    return "Clear Tamper";
+  }
+  if (tokenType === "clear_credit") {
+    return "Clear Credit";
+  }
+  if (tokenType === "set_power_limit") {
+    return power ? `Set Power ${power}W` : "Set Power Limit";
+  }
+
+  return sgcId ? `Key Change ${sgcId}` : "Key Change";
+}
+
+export function formatFailedPurchaseFollowUpSms(input: {
+  amount: string;
+  meterNumber: string;
+}): string {
+  return `Smart Flow Metering: We could not complete your token purchase for meter ${input.meterNumber}.
+Amount received: KES ${formatMoney(input.amount)}
+Please try again or contact support if you need help.`;
+}
+
+export function formatBuyTokenNudgeSms(input: {
+  meterNumber: string;
+}): string {
+  return `Smart Flow Metering: Meter ${input.meterNumber} has no recent token purchase.
+Buy tokens early to avoid interruption.`;
 }

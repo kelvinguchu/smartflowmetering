@@ -1,19 +1,18 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { and, desc, eq } from "drizzle-orm";
+import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
-import { meters, tariffs, motherMeters } from "../db/schema";
+import { meters, motherMeters, tariffs } from "../db/schema";
+import type { AppBindings } from "../lib/auth-middleware";
+import {
+  requirePermission,
+} from "../lib/auth-middleware";
 import {
   createMeterSchema,
-  updateMeterSchema,
   meterQuerySchema,
+  updateMeterSchema,
 } from "../validators/meters";
-import { eq, and, desc } from "drizzle-orm";
-import {
-  requireAuth,
-  requireAdmin,
-  type AppBindings,
-} from "../lib/auth-middleware";
 
 const idParamSchema = z.object({
   id: z.uuid(),
@@ -27,7 +26,7 @@ export const meterRoutes = new Hono<AppBindings>();
 
 meterRoutes.get(
   "/",
-  requireAuth,
+  requirePermission("meters:read"),
   zValidator("query", meterQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
@@ -60,7 +59,7 @@ meterRoutes.get(
 
 meterRoutes.get(
   "/:id",
-  requireAuth,
+  requirePermission("meters:read"),
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
@@ -87,7 +86,7 @@ meterRoutes.get(
 
 meterRoutes.get(
   "/lookup/:meterNumber",
-  requireAuth,
+  requirePermission("meters:read"),
   zValidator("param", meterNumberParamSchema),
   async (c) => {
     const { meterNumber } = c.req.valid("param");
@@ -120,7 +119,7 @@ meterRoutes.get(
 
 meterRoutes.post(
   "/",
-  requireAuth,
+  requirePermission("meters:write"),
   zValidator("json", createMeterSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -169,7 +168,7 @@ meterRoutes.post(
 
 meterRoutes.patch(
   "/:id",
-  requireAuth,
+  requirePermission("meters:write"),
   zValidator("param", idParamSchema),
   zValidator("json", updateMeterSchema),
   async (c) => {
@@ -209,40 +208,38 @@ meterRoutes.patch(
 
 meterRoutes.post(
   "/:id/suspend",
-  requireAdmin,
+  requirePermission("meters:status"),
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
-    const [updated] = await db
+    const updatedRows = await db
       .update(meters)
       .set({ status: "suspended", updatedAt: new Date() })
       .where(eq(meters.id, id))
       .returning();
-
-    if (!updated) {
+    if (updatedRows.length === 0) {
       return c.json({ error: "Meter not found" }, 404);
     }
 
-    return c.json({ data: updated });
+    return c.json({ data: updatedRows[0] });
   }
 );
 
 meterRoutes.post(
   "/:id/activate",
-  requireAdmin,
+  requirePermission("meters:status"),
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
-    const [updated] = await db
+    const updatedRows = await db
       .update(meters)
       .set({ status: "active", updatedAt: new Date() })
       .where(eq(meters.id, id))
       .returning();
-
-    if (!updated) {
+    if (updatedRows.length === 0) {
       return c.json({ error: "Meter not found" }, 404);
     }
 
-    return c.json({ data: updated });
+    return c.json({ data: updatedRows[0] });
   }
 );

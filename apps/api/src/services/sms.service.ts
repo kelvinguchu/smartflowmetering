@@ -1,7 +1,13 @@
 import { env } from "../config";
-import { formatTokenSms as formatTokenSmsRaw } from "../lib/sms-formatters";
+import { fetchSensitiveWithTimeout } from "../lib/fetch-sensitive-with-timeout";
+import {
+  formatAdminTokenSms as formatAdminTokenSmsRaw,
+  formatTokenSms as formatTokenSmsRaw,
+} from "../lib/sms-formatters";
 
-export { formatOnboardingApprovedSms } from "../lib/sms-formatters";
+export {
+  formatOnboardingApprovedSms,
+} from "../lib/sms-formatters";
 
 /**
  * SMS Service
@@ -16,6 +22,8 @@ export interface SmsResult {
   error?: string;
   provider?: "hostpinnacle";
 }
+
+const SMS_REQUEST_TIMEOUT_MS = 10_000;
 
 function formatPhoneForSms(phoneNumber: string): string {
   const cleanedPhoneNumber = phoneNumber.replaceAll(/[^0-9+]/g, "");
@@ -99,15 +107,19 @@ export async function sendViaHostpinnacle(
   });
 
   try {
-    const response = await fetch(env.HOSTPINNACLE_API_URL, {
-      method: "POST",
-      headers: {
-        apikey: env.HOSTPINNACLE_API_KEY,
-        "cache-control": "no-cache",
-        "Content-Type": "application/x-www-form-urlencoded",
+    const response = await fetchSensitiveWithTimeout(
+      env.HOSTPINNACLE_API_URL,
+      {
+        method: "POST",
+        timeoutMs: SMS_REQUEST_TIMEOUT_MS,
+        headers: {
+          apikey: env.HOSTPINNACLE_API_KEY,
+          "cache-control": "no-cache",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: payload,
       },
-      body: payload,
-    });
+    );
 
     const rawBody = await response.text();
     const body = parseHostpinnacleResponse(rawBody);
@@ -171,6 +183,16 @@ interface TokenSmsServiceInput {
  */
 export function formatTokenSms(input: TokenSmsServiceInput): string {
   return formatTokenSmsRaw({ ...input, timezone: env.ALERT_TIMEZONE });
+}
+
+export function formatAdminTokenSms(input: {
+  meterNumber: string;
+  token: string;
+  tokenType: "clear_tamper" | "clear_credit" | "set_power_limit" | "key_change";
+  power?: number;
+  sgcId?: string;
+}): string {
+  return formatAdminTokenSmsRaw(input);
 }
 
 /**

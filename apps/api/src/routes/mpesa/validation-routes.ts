@@ -1,32 +1,47 @@
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
+import type { Context } from "hono";
 import { env } from "../../config";
 import { db } from "../../db";
 import { meters } from "../../db/schema";
+import type { AppBindings } from "../../lib/auth-middleware";
+import { requirePermission } from "../../lib/auth-middleware";
+import { maskMeterNumberForLog, maskReferenceForLog } from "../../lib/log-redaction";
 import { mpesaRateLimit } from "../../lib/rate-limit";
 import { paymentProcessingQueue } from "../../queues";
 import {
   mpesaC2BCallbackSchema,
   mpesaValidationSchema,
 } from "../../validators/mpesa";
-import { rejectIfInvalidMpesaSource, type MpesaRouter } from "./shared";
+import { rejectIfInvalidMpesaSource } from "./shared";
+import type { MpesaRouter } from "./shared";
 
 export function registerValidationRoutes(router: MpesaRouter) {
-  const guardValidationSource = async (c: any, next: () => Promise<void>) => {
+  const guardValidationSource = async (
+    c: Context<AppBindings>,
+    next: () => Promise<void>,
+  ) => {
     const rejection = await rejectIfInvalidMpesaSource(c, "M-Pesa Validation", {
       ResultCode: "C2B00016",
       ResultDesc: "Forbidden",
     });
-    if (rejection) return rejection;
+    if (rejection) {
+      return rejection;
+    }
     await next();
   };
 
-  const guardCallbackSource = async (c: any, next: () => Promise<void>) => {
+  const guardCallbackSource = async (
+    c: Context<AppBindings>,
+    next: () => Promise<void>,
+  ) => {
     const rejection = await rejectIfInvalidMpesaSource(c, "M-Pesa Callback", {
       ResultCode: "1",
       ResultDesc: "Forbidden",
     });
-    if (rejection) return rejection;
+    if (rejection) {
+      return rejection;
+    }
     await next();
   };
 
@@ -56,7 +71,9 @@ export function registerValidationRoutes(router: MpesaRouter) {
       });
 
       if (!meter) {
-        console.log(`[M-Pesa Validation] Rejected: Meter ${meterNumber} not found`);
+        console.log(
+          `[M-Pesa Validation] Rejected: Meter ${maskMeterNumberForLog(meterNumber)} not found`,
+        );
         return c.json({
           ResultCode: "C2B00013",
           ResultDesc: "Invalid meter number",
@@ -65,7 +82,7 @@ export function registerValidationRoutes(router: MpesaRouter) {
 
       if (meter.status !== "active") {
         console.log(
-          `[M-Pesa Validation] Rejected: Meter ${meterNumber} is ${meter.status}`
+          `[M-Pesa Validation] Rejected: Meter ${maskMeterNumberForLog(meterNumber)} is ${meter.status}`
         );
         return c.json({
           ResultCode: "C2B00014",
@@ -74,7 +91,7 @@ export function registerValidationRoutes(router: MpesaRouter) {
       }
 
       console.log(
-        `[M-Pesa Validation] Accepted: Meter ${meterNumber}, Amount ${amount}`
+        `[M-Pesa Validation] Accepted: Meter ${maskMeterNumberForLog(meterNumber)}, Amount ${amount}`
       );
       return c.json({
         ResultCode: "0",
@@ -90,7 +107,9 @@ export function registerValidationRoutes(router: MpesaRouter) {
     zValidator("json", mpesaC2BCallbackSchema),
     async (c) => {
       const body = c.req.valid("json");
-      console.log(`[M-Pesa Callback] Received: ${body.TransID}`);
+      console.log(
+        `[M-Pesa Callback] Received: ${maskReferenceForLog(body.TransID)}`,
+      );
 
       try {
         await paymentProcessingQueue.add("process-raw-callback", body, {
@@ -98,7 +117,9 @@ export function registerValidationRoutes(router: MpesaRouter) {
           removeOnComplete: true,
         });
 
-        console.log(`[M-Pesa Callback] Queued raw callback: ${body.TransID}`);
+        console.log(
+          `[M-Pesa Callback] Queued raw callback: ${maskReferenceForLog(body.TransID)}`,
+        );
       } catch (error) {
         console.error("[M-Pesa Callback] Error queuing transaction:", error);
       }
@@ -110,7 +131,7 @@ export function registerValidationRoutes(router: MpesaRouter) {
     }
   );
 
-  router.get("/health", (c) =>
+  router.get("/health", requirePermission("mpesa:health:read"), (c) =>
     c.json({
       status: "ok",
       shortcode: env.MPESA_SHORTCODE,

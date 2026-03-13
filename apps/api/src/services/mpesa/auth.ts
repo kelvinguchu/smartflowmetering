@@ -1,7 +1,9 @@
 import { env } from "../../config";
+import { fetchSensitiveWithTimeout } from "../../lib/fetch-sensitive-with-timeout";
 import { getMpesaApiUrls } from "./constants";
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
+const MPESA_OAUTH_TIMEOUT_MS = 15_000;
 
 export async function getAccessToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now()) {
@@ -13,8 +15,9 @@ export async function getAccessToken(): Promise<string> {
   ).toString("base64");
 
   const urls = getMpesaApiUrls(env.MPESA_ENVIRONMENT, env.MPESA_BASE_URL);
-  const response = await fetch(urls.oauth, {
+  const response = await fetchSensitiveWithTimeout(urls.oauth, {
     method: "GET",
+    timeoutMs: MPESA_OAUTH_TIMEOUT_MS,
     headers: {
       Authorization: `Basic ${credentials}`,
     },

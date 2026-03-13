@@ -1,24 +1,21 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { desc, eq } from "drizzle-orm";
+import { Hono } from "hono";
 import { db } from "../db";
 import { motherMeterEvents, motherMeters } from "../db/schema";
+import type { AppBindings } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
+import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
+import {
+  computeMotherMeterBalance,
+  computeMotherMeterReconciliation,
+} from "../services/mother-meter-analytics.service";
 import {
   motherMeterEventSchema,
   motherMeterIdParamSchema,
   motherMeterListQuerySchema,
   reconciliationQuerySchema,
 } from "../validators/mother-meters";
-import {
-  requireAdmin,
-  requireAuth,
-  type AppBindings,
-} from "../lib/auth-middleware";
-import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
-import {
-  computeMotherMeterBalance,
-  computeMotherMeterReconciliation,
-} from "../services/mother-meter-analytics.service";
 import { motherMeterAlertRoutes } from "./mother-meter-alert-routes";
 
 export const motherMeterRoutes = new Hono<AppBindings>();
@@ -27,7 +24,7 @@ motherMeterRoutes.route("/alerts", motherMeterAlertRoutes);
 
 motherMeterRoutes.get(
   "/",
-  requireAuth,
+  requirePermission("mother_meters:read"),
   zValidator("query", motherMeterListQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
@@ -54,7 +51,7 @@ motherMeterRoutes.get(
 
 motherMeterRoutes.get(
   "/:id/events",
-  requireAuth,
+  requirePermission("mother_meters:read"),
   zValidator("param", motherMeterIdParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
@@ -70,7 +67,7 @@ motherMeterRoutes.get(
 
 motherMeterRoutes.post(
   "/:id/events",
-  requireAdmin,
+  requirePermission("mother_meters:events:create"),
   zValidator("param", motherMeterIdParamSchema),
   zValidator("json", motherMeterEventSchema),
   async (c) => {
@@ -120,7 +117,7 @@ motherMeterRoutes.post(
 
 motherMeterRoutes.get(
   "/:id/balance",
-  requireAuth,
+  requirePermission("mother_meters:read"),
   zValidator("param", motherMeterIdParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
@@ -163,7 +160,7 @@ motherMeterRoutes.get(
 
 motherMeterRoutes.get(
   "/:id/reconciliation",
-  requireAdmin,
+  requirePermission("mother_meters:reconciliation:read"),
   zValidator("param", motherMeterIdParamSchema),
   zValidator("query", reconciliationQuerySchema),
   async (c) => {
@@ -205,7 +202,9 @@ motherMeterRoutes.get(
 );
 
 function toNumber(value: string | null | undefined): number {
-  if (!value) return 0;
+  if (!value) {
+    return 0;
+  }
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }

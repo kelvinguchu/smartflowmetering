@@ -1,6 +1,7 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { requireAdmin, type AppBindings } from "../lib/auth-middleware";
+import { Hono } from "hono";
+import type { AppBindings } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
 import {
   listAdminNotifications,
   markAdminNotificationRead,
@@ -20,7 +21,7 @@ import {
 
 export const notificationRoutes = new Hono<AppBindings>();
 
-notificationRoutes.use("*", requireAdmin);
+notificationRoutes.use("*", requirePermission("notifications:manage"));
 
 notificationRoutes.get(
   "/",
@@ -39,7 +40,7 @@ notificationRoutes.patch(
     const { id } = c.req.valid("param");
     const updated = await markAdminNotificationRead(id);
 
-    if (!updated) {
+    if (updated === null) {
       return c.json({ error: "Notification not found" }, 404);
     }
 

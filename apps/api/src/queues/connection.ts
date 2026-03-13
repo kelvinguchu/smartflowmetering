@@ -1,4 +1,5 @@
-import { Queue, Worker, type Job, type ConnectionOptions } from "bullmq";
+import type { ConnectionOptions, Job } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import { env } from "../config";
 
 // Parse Redis URL for BullMQ connection
@@ -17,6 +18,7 @@ export const redisConnection: ConnectionOptions = parseRedisUrl(env.REDIS_URL);
 
 // Queue names
 export const QUEUE_NAMES = {
+  APP_NOTIFICATION_DELIVERY: "app-notification-delivery",
   PAYMENT_PROCESSING: "payment-processing",
   SMS_DELIVERY: "sms-delivery",
   TOKEN_GENERATION: "token-generation",
@@ -47,12 +49,12 @@ export function createQueue(name: string): Queue {
 }
 
 // Create a worker factory
-export function createWorker<T>(
+export function createWorker<T, TResult>(
   name: string,
-  processor: (job: Job<T>) => Promise<unknown>,
+  processor: (job: Job<T>) => Promise<TResult>,
   concurrency: number = 5
-): Worker<T> {
-  return new Worker<T>(name, processor, {
+): Worker<T, TResult> {
+  return new Worker<T, TResult>(name, processor, {
     connection: redisConnection,
     concurrency,
   });

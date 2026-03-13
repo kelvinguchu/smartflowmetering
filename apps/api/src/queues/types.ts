@@ -81,5 +81,9 @@ export interface SmsResendJob {
   messageBody: string;
 }
 
+export interface AppNotificationDeliveryJob {
+  customerAppNotificationId: string;
+}
+
 export type PaymentJob = PaymentProcessingJob | MpesaRawCallbackJob;
 export type SmsJob = SmsDeliveryJob | SmsNotificationJob | SmsResendJob;

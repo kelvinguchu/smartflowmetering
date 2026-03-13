@@ -3,22 +3,24 @@ import { db } from "../../db";
 import { transactions, generatedTokens } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { env } from "../../config";
+import { protectToken } from "../../lib/token-protection";
+import { maskToken } from "../../lib/token-redaction";
+import { maskMeterNumberForLog } from "../../lib/log-redaction";
 import { smsDeliveryQueue } from "../index";
 import type { TokenGenerationJob } from "../types";
 import {
   isGomelongConfigured,
   vendTokenWithGomelong,
-  type GomelongMeterType,
 } from "../../services/meter-providers/gomelong.service";
+import { mapMeterTypeToGomelong } from "../../services/meter-providers/provider-capabilities";
 
-type MeterBrand = "hexing" | "stron" | "conlog";
 type MeterUtilityType = "electricity" | "water" | "gas";
 
 /**
  * Token Generation Processor
  *
  * This job:
- * 1. Calls the appropriate manufacturer API based on meter brand
+ * 1. Generates a token through Gomelong
  * 2. Stores the generated token
  * 3. Updates transaction status
  * 4. Queues SMS delivery
@@ -30,15 +32,13 @@ export async function processTokenGeneration(
     transactionId,
     meterId,
     meterNumber,
-    brand,
     meterType,
     units,
-    supplyGroupCode,
-    keyRevisionNumber,
-    tariffIndex,
   } = job.data;
 
-  console.log(`[Token] Generating for meter ${meterNumber}, ${units} kWh`);
+  console.log(
+    `[Token] Generating for meter ${maskMeterNumberForLog(meterNumber)}, ${units} kWh`,
+  );
 
   // Get the transaction to fetch phone number
   const transaction = await db.query.transactions.findFirst({
@@ -54,13 +54,9 @@ export async function processTokenGeneration(
   let token: string;
   try {
     token = await generateTokenFromManufacturer({
-      brand,
       meterType,
       meterNumber,
       units,
-      supplyGroupCode,
-      keyRevisionNumber,
-      tariffIndex,
     });
   } catch (error) {
     // Update transaction as failed
@@ -75,7 +71,7 @@ export async function processTokenGeneration(
   await db.insert(generatedTokens).values({
     meterId,
     transactionId,
-    token,
+    token: protectToken(token),
     tokenType: "credit",
     value: units,
     generatedBy: "system",
@@ -90,7 +86,7 @@ export async function processTokenGeneration(
     })
     .where(eq(transactions.id, transactionId));
 
-  console.log(`[Token] Generated: ${formatTokenForDisplay(token)}`);
+  console.log(`[Token] Generated: ${maskToken(token)}`);
 
   // Queue SMS delivery
   await smsDeliveryQueue.add(
@@ -111,151 +107,38 @@ export async function processTokenGeneration(
   return { token };
 }
 
-// Format token for display (add dashes)
-function formatTokenForDisplay(token: string): string {
-  // 20-digit token -> 1234-5678-9012-3456-7890
-  return token.replaceAll(/(.{4})/g, "$1-").slice(0, -1);
-}
-
 // Manufacturer API integration
 interface TokenRequest {
-  brand: MeterBrand;
   meterType: MeterUtilityType;
   meterNumber: string;
   units: string;
-  supplyGroupCode: string;
-  keyRevisionNumber: number;
-  tariffIndex: number;
 }
 
 async function generateTokenFromManufacturer(
   request: TokenRequest,
 ): Promise<string> {
-  const {
-    brand,
-    meterType,
-    meterNumber,
-    units,
-    supplyGroupCode,
-    keyRevisionNumber,
-    tariffIndex,
-  } = request;
+  const { meterType, meterNumber, units } = request;
 
-  const useGomelong = shouldUseGomelongForBrand(brand);
-  if (useGomelong) {
-    const mappedType = mapMeterTypeToGomelong(meterType);
-    if (!mappedType) {
-      throw new Error(
-        `Gomelong does not support meter type '${meterType}' for meter ${meterNumber}`,
-      );
-    }
-
-    if (isGomelongConfigured()) {
-      const quantity = Number.parseFloat(units);
-      if (!Number.isFinite(quantity) || quantity <= 0) {
-        throw new Error(`Invalid units for Gomelong vending: ${units}`);
-      }
-
-      return vendTokenWithGomelong({
-        meterCode: meterNumber,
-        meterType: mappedType,
-        amountOrQuantity: quantity,
-        vendingType: env.GOMELONG_VENDING_TYPE,
-      });
-    }
-
-    if (!isMockTokenFallbackAllowed()) {
-      throw new Error(
-        `Gomelong is enabled for brand '${brand}' but credentials are missing`,
-      );
-    }
-
-    console.warn(
-      `[Token] Gomelong enabled for '${brand}' but credentials are missing, falling back`,
+  const mappedType = mapMeterTypeToGomelong(meterType);
+  if (!mappedType) {
+    throw new Error(
+      `Gomelong does not support meter type '${meterType}' for meter ${meterNumber}`,
     );
   }
 
-  // Select API credentials based on brand
-  const apiConfig = getApiConfig(brand);
-
-  if (!apiConfig.apiKey || !apiConfig.apiUrl) {
-    if (!isMockTokenFallbackAllowed()) {
-      throw new Error(`${brand} API is not configured`);
-    }
-    console.warn(`[Token] ${brand} API not configured, using mock token`);
-    return generateMockToken();
+  if (!isGomelongConfigured()) {
+    throw new Error("Gomelong credentials are not configured");
   }
 
-  // Make API call to manufacturer
-  // Each manufacturer has different API format, this is a generalized example
-  const response = await fetch(apiConfig.apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiConfig.apiKey}`,
-    },
-    body: JSON.stringify({
-      meter_number: meterNumber,
-      amount: units,
-      sgc: supplyGroupCode,
-      krn: keyRevisionNumber,
-      ti: tariffIndex,
-    }),
+  const quantity = Number.parseFloat(units);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error(`Invalid units for Gomelong vending: ${units}`);
+  }
+
+  return vendTokenWithGomelong({
+    meterCode: meterNumber,
+    meterType: mappedType,
+    amountOrQuantity: quantity,
+    vendingType: env.GOMELONG_VENDING_TYPE,
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Manufacturer API error: ${response.status} - ${error}`);
-  }
-
-  const data = (await response.json()) as { token: string };
-  return data.token;
-}
-
-function shouldUseGomelongForBrand(brand: MeterBrand): boolean {
-  if (env.GOMELONG_BRANDS.length > 0)
-    return env.GOMELONG_BRANDS.includes(brand);
-  return isGomelongConfigured();
-}
-
-function mapMeterTypeToGomelong(
-  meterType: MeterUtilityType,
-): GomelongMeterType | null {
-  if (meterType === "electricity") return 1;
-  if (meterType === "water") return 2;
-  return null;
-}
-
-function getApiConfig(brand: MeterBrand): {
-  apiKey: string;
-  apiUrl: string;
-} {
-  switch (brand) {
-    case "hexing":
-      return { apiKey: env.HEXING_API_KEY, apiUrl: env.HEXING_API_URL };
-    case "stron":
-      return { apiKey: env.STRON_API_KEY, apiUrl: env.STRON_API_URL };
-    case "conlog":
-      return { apiKey: env.CONLOG_API_KEY, apiUrl: env.CONLOG_API_URL };
-  }
-}
-
-// Generate mock token for development/testing
-function generateMockToken(): string {
-  const digits = "0123456789";
-  let token = "";
-  for (let i = 0; i < 20; i++) {
-    token += digits.charAt(Math.floor(Math.random() * digits.length));
-  }
-  return token;
-}
-
-function isMockTokenFallbackAllowed(): boolean {
-  const raw = process.env.ALLOW_MOCK_TOKEN_FALLBACK?.trim().toLowerCase();
-  if (raw) {
-    if (raw === "0" || raw === "false" || raw === "no") return false;
-    if (raw === "1" || raw === "true" || raw === "yes") return true;
-  }
-
-  return env.NODE_ENV !== "production";
 }
