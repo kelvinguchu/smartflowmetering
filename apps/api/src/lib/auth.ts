@@ -1,10 +1,15 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { admin, twoFactor } from "better-auth/plugins";
+import { admin, bearer, phoneNumber, twoFactor } from "better-auth/plugins";
 import { env } from "../config";
 import { db } from "../db";
 import { sendSms } from "../services/sms.service";
 import { shouldDisablePublicSignUp } from "./auth-config";
+import {
+  buildLandlordTempEmail,
+  isRegisteredLandlordPhoneNumber,
+  syncLandlordAuthUser,
+} from "./landlord-auth-support";
 import {
   isAllowedKenyanPhoneNumber,
   normalizeKenyanPhoneNumber,
@@ -80,6 +85,30 @@ export const auth = betterAuth({
     admin({
       defaultRole: "user",
       adminRoles: ["admin"],
+    }),
+
+    bearer(),
+
+    phoneNumber({
+      phoneNumberValidator: async (phone) =>
+        isAllowedKenyanPhoneNumber(phone) &&
+        (await isRegisteredLandlordPhoneNumber(phone)),
+      sendOTP: async ({ code, phoneNumber }) => {
+        if (env.NODE_ENV === "test") {
+          return;
+        }
+
+        await sendSms(
+          normalizeKenyanPhoneNumber(phoneNumber),
+          `Smart Flow Metering landlord login code: ${code}. It expires in 5 minutes.`,
+        );
+      },
+      signUpOnVerification: {
+        getTempEmail: buildLandlordTempEmail,
+      },
+      callbackOnVerification: async ({ phoneNumber, user }) => {
+        await syncLandlordAuthUser(phoneNumber, user.id);
+      },
     }),
 
     // Two-factor authentication via SMS OTP and TOTP

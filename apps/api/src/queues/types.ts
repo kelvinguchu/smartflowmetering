@@ -81,9 +81,20 @@ export interface SmsResendJob {
   messageBody: string;
 }
 
+export interface SmsDlrSyncJob {
+  attempt: number;
+  kind: "dlr_sync";
+  provider: "textsms";
+  smsLogId: string;
+}
+
 export interface AppNotificationDeliveryJob {
   customerAppNotificationId: string;
 }
 
 export type PaymentJob = PaymentProcessingJob | MpesaRawCallbackJob;
-export type SmsJob = SmsDeliveryJob | SmsNotificationJob | SmsResendJob;
+export type SmsJob =
+  | SmsDeliveryJob
+  | SmsNotificationJob
+  | SmsResendJob
+  | SmsDlrSyncJob;

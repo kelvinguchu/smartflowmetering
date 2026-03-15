@@ -20,6 +20,7 @@ const REDIS_URL = process.env.REDIS_URL ?? "";
 const FIREBASE_SERVICE_ACCOUNT_PATH =
   process.env.FIREBASE_SERVICE_ACCOUNT_PATH?.trim() ??
   "./smart-flow-metering-firebase-adminsdk-fbsvc-f853c036bd.json";
+const TEXTSMS_PASS_TYPE = process.env.TEXTSMS_PASS_TYPE?.trim();
 const MPESA_CALLBACK_TOKEN_TRANSPORT = normalizeCallbackTokenTransport(
   process.env.MPESA_CALLBACK_TOKEN_TRANSPORT
 );
@@ -130,6 +131,17 @@ export const env = {
   )
     .trim()
     .toLowerCase(),
+  TEXTSMS_API_URL: process.env.TEXTSMS_API_URL ?? "",
+  TEXTSMS_BULK_API_URL: process.env.TEXTSMS_BULK_API_URL ?? "",
+  TEXTSMS_DLR_API_URL: process.env.TEXTSMS_DLR_API_URL ?? "",
+  TEXTSMS_BALANCE_API_URL: process.env.TEXTSMS_BALANCE_API_URL ?? "",
+  TEXTSMS_PARTNER_ID: process.env.TEXTSMS_PARTNER_ID ?? "",
+  TEXTSMS_API_KEY: process.env.TEXTSMS_API_KEY ?? "",
+  TEXTSMS_SENDER_ID: process.env.TEXTSMS_SENDER_ID ?? "",
+  TEXTSMS_PASS_TYPE:
+    TEXTSMS_PASS_TYPE === undefined || TEXTSMS_PASS_TYPE === ""
+      ? "plain"
+      : TEXTSMS_PASS_TYPE,
 
   // Application
   NODE_ENV,

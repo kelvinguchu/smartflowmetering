@@ -12,11 +12,13 @@ import {
   queueLowBalanceNotifications,
   queuePostpaidReminderNotifications,
 } from "../services/mother-meter-alerts.service";
+import { runSmsProviderAlerts } from "../services/sms-provider-alerts.service";
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
   runAlertsBodySchema,
   runDailyUsageBodySchema,
+  runSmsProviderAlertsBodySchema,
 } from "../validators/notifications";
 
 export const notificationRoutes = new Hono<AppBindings>();
@@ -74,6 +76,20 @@ notificationRoutes.post(
       postpaid,
     });
   }
+);
+
+notificationRoutes.post(
+  "/run-sms-provider-alerts",
+  zValidator("json", runSmsProviderAlertsBodySchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    const result = await runSmsProviderAlerts(body);
+
+    return c.json({
+      message: "SMS provider alert checks completed",
+      ...result,
+    });
+  },
 );
 
 notificationRoutes.post(

@@ -1,4 +1,6 @@
 import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { customers } from "./customers";
+import { tenantAppAccesses } from "./tenant-app-accesses";
 
 export const customerDevicePlatformEnum = pgEnum("customer_device_platform", [
   "android",
@@ -13,7 +15,13 @@ export const customerDeviceTokenStatusEnum = pgEnum(
 
 export const customerDeviceTokens = pgTable("customer_device_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
-  phoneNumber: text("phone_number").notNull(),
+  phoneNumber: text("phone_number"),
+  landlordId: uuid("landlord_id").references(() => customers.id, {
+    onDelete: "cascade",
+  }),
+  tenantAccessId: uuid("tenant_access_id").references(() => tenantAppAccesses.id, {
+    onDelete: "cascade",
+  }),
   token: text("token").notNull().unique(),
   platform: customerDevicePlatformEnum("platform").notNull(),
   status: customerDeviceTokenStatusEnum("status").notNull().default("active"),

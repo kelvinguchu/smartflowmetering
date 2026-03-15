@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppBindings } from "../lib/auth-middleware";
 import { requirePermission } from "../lib/auth-middleware";
+import { syncSmsDeliveryStatusById } from "../services/sms-recovery-sync.service";
 import {
   listSmsRecoveryEntries,
   queueSmsRetryById,
@@ -33,6 +34,22 @@ smsRecoveryRoutes.get(
         offset: query.offset ?? 0,
       },
       summary: result.summary,
+    });
+  },
+);
+
+smsRecoveryRoutes.post(
+  "/:id/sync-status",
+  requirePermission("sms:read"),
+  zValidator("param", idParamSchema),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const result = await syncSmsDeliveryStatusById(id);
+    return c.json({
+      message: result.synced
+        ? "SMS delivery status synced"
+        : "No TextSMS delivery report available yet",
+      ...result,
     });
   },
 );

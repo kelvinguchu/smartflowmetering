@@ -12,12 +12,16 @@ const APP_NOTIFICATION_BACKOFF_DELAY_MS = 5000;
 const APP_NOTIFICATION_JOB_PREFIX = "customer-app-notification";
 
 export async function listCustomerAppNotifications(input: {
+  landlordId?: string;
   limit?: number;
   offset?: number;
   phoneNumber?: string;
   status?: "failed" | "pending" | "read" | "sent";
 }) {
   const filters = [
+    input.landlordId
+      ? eq(customerAppNotifications.landlordId, input.landlordId)
+      : undefined,
     input.phoneNumber
       ? eq(customerAppNotifications.phoneNumber, input.phoneNumber)
       : undefined,

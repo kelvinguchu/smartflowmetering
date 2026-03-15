@@ -8,22 +8,19 @@ export interface SupportRecoverySearchCriteria {
 
 export interface SupportRecoveryMeterSummary {
   brand: string;
-  id: string;
   meterNumber: string;
   meterType: string;
-  motherMeter: { id: string; motherMeterNumber: string } | null;
+  motherMeterNumber: string | null;
   status: string;
-  tariff: { id: string; name: string; ratePerKwh: string } | null;
+  tariff: { name: string; ratePerKwh: string } | null;
 }
 
 export interface SupportRecoveryResult {
   meter: SupportRecoveryMeterSummary | null;
   recentAdminTokens: {
     createdAt: Date;
-    id: string;
     maskedToken: string;
     tokenType: string;
-    value: string | null;
   }[];
   recentSmsLogs: {
     createdAt: Date;
@@ -31,9 +28,7 @@ export interface SupportRecoveryResult {
     messageBody: string;
     phoneNumber: string;
     provider: string;
-    providerMessageId: string | null;
     status: string;
-    transactionId: string | null;
   }[];
   search: SupportRecoverySearchCriteria;
   transactions: {
@@ -42,7 +37,6 @@ export interface SupportRecoveryResult {
     createdAt: Date;
     generatedTokens: {
       createdAt: Date;
-      id: string;
       maskedToken: string;
       tokenType: string;
       value: string | null;
@@ -50,15 +44,12 @@ export interface SupportRecoveryResult {
     id: string;
     meter: SupportRecoveryMeterSummary;
     mpesaReceiptNumber: string;
-    netAmount: string;
     phoneNumber: string;
     smsLogs: {
       createdAt: Date;
       id: string;
       messageBody: string;
-      phoneNumber: string;
       provider: string;
-      providerMessageId: string | null;
       status: string;
     }[];
     status: string;

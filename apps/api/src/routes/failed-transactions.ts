@@ -38,18 +38,38 @@ failedTransactionRoutes.get(
       with: {
         mpesaTransaction: {
           columns: {
-            id: true,
             transId: true,
             billRefNumber: true,
             transAmount: true,
-            msisdn: true,
             createdAt: true,
           },
         },
       },
     });
 
-    return c.json({ data: rows, count: rows.length });
+    return c.json({
+      count: rows.length,
+      data: rows.map((row) => ({
+        amount: row.amount,
+        createdAt: row.createdAt,
+        failureDetails: row.failureDetails,
+        failureReason: row.failureReason,
+        id: row.id,
+        meterNumberAttempted: row.meterNumberAttempted,
+        payment: row.mpesaTransaction
+          ? {
+              amount: row.mpesaTransaction.transAmount,
+              billRefNumber: row.mpesaTransaction.billRefNumber,
+              createdAt: row.mpesaTransaction.createdAt,
+              receiptNumber: row.mpesaTransaction.transId,
+            }
+          : null,
+        phoneNumber: row.phoneNumber,
+        resolutionNotes: row.resolutionNotes,
+        resolvedAt: row.resolvedAt,
+        status: row.status,
+      })),
+    });
   }
 );
 

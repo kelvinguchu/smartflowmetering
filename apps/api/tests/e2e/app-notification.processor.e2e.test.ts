@@ -13,6 +13,7 @@ import { processAppNotificationDelivery } from "../../src/queues/processors/app-
 import type { AppNotificationDeliveryJob } from "../../src/queues/types";
 import {
   ensureInfraReady,
+  ensureTestMeterFixture,
   resetE2EState,
   teardownE2E,
   uniqueKenyanPhoneNumber,
@@ -216,5 +217,53 @@ void describe("E2E: app notification processor", () => {
     assert.equal(stored.lastFailureCode, "messaging/server-unavailable");
     assert.equal(stored.lastFailureMessage, "temporary outage");
     assert.ok(stored.lastAttemptAt instanceof Date);
+  });
+
+  void it("delivers landlord notifications using landlord-scoped device tokens", async () => {
+    const fixture = await ensureTestMeterFixture("LANDLORD-PUSH-METER-001");
+    const token = `token-${uniqueRef("landlord")}`;
+
+    await db.insert(customerDeviceTokens).values({
+      landlordId: fixture.customerId,
+      platform: "android",
+      token,
+    });
+
+    const [notification] = await db
+      .insert(customerAppNotifications)
+      .values({
+        landlordId: fixture.customerId,
+        message: "Landlord summary body",
+        meterNumber: "MM-LANDLORD-1",
+        referenceId: uniqueRef("summary"),
+        title: "Daily usage summary",
+        type: "landlord_daily_usage_summary",
+      })
+      .returning({ id: customerAppNotifications.id });
+
+    const messaging: MessagingLike = {
+      sendEachForMulticast: () => {
+        const response: BatchResponse = {
+          failureCount: 0,
+          responses: [{ success: true }],
+          successCount: 1,
+        };
+        return Promise.resolve(response);
+      },
+    };
+    setFirebaseMessagingForTests(messaging);
+
+    const result = await processAppNotificationDelivery(
+      {
+        data: { customerAppNotificationId: notification.id },
+      } as Job<AppNotificationDeliveryJob>,
+    );
+
+    assert.equal(result.deliveredTokens, 1);
+    const stored = await db.query.customerAppNotifications.findFirst({
+      where: (table, { eq }) => eq(table.id, notification.id),
+    });
+    assert.ok(stored);
+    assert.equal(stored.status, "sent");
   });
 });

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."sms_provider" ADD VALUE 'textsms';

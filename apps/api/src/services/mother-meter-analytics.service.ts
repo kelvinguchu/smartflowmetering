@@ -14,21 +14,26 @@ interface ReconciliationOptions {
 }
 
 interface LowBalanceAlertOptions {
+  landlordId?: string;
   limit?: number;
   offset?: number;
   includeAboveThreshold?: boolean;
+  propertyId?: string;
 }
 
 interface PostpaidReminderOptions {
+  landlordId?: string;
   limit?: number;
   offset?: number;
   daysAfterLastPayment?: number;
   includeNotDue?: boolean;
+  propertyId?: string;
 }
 
 export interface MotherMeterLowBalanceAlert {
   motherMeterId: string;
   motherMeterNumber: string;
+  propertyId: string;
   type: "prepaid" | "postpaid";
   landlordId: string;
   landlordName: string;
@@ -41,6 +46,7 @@ export interface MotherMeterLowBalanceAlert {
 export interface PostpaidPaymentReminder {
   motherMeterId: string;
   motherMeterNumber: string;
+  propertyId: string;
   landlordId: string;
   landlordName: string;
   landlordPhoneNumber: string;
@@ -74,9 +80,9 @@ export async function computeMotherMeterBalance(motherMeterId: string) {
       )
     );
 
-  const deposits = toNumber(eventTotals?.deposits);
-  const billPayments = toNumber(eventTotals?.billPayments);
-  const netSales = toNumber(salesTotals?.netSales);
+  const deposits = toNumber(eventTotals.deposits);
+  const billPayments = toNumber(eventTotals.billPayments);
+  const netSales = toNumber(salesTotals.netSales);
   const estimatedBalance = deposits - billPayments - netSales;
 
   return {
@@ -94,8 +100,12 @@ export async function computeMotherMeterReconciliation(
     eq(meters.motherMeterId, options.motherMeterId),
     eq(transactions.status, "completed"),
   ];
-  if (options.startDate) txConditions.push(gte(transactions.createdAt, options.startDate));
-  if (options.endDate) txConditions.push(lte(transactions.createdAt, options.endDate));
+  if (options.startDate) {
+    txConditions.push(gte(transactions.createdAt, options.startDate));
+  }
+  if (options.endDate) {
+    txConditions.push(lte(transactions.createdAt, options.endDate));
+  }
 
   const [sales] = await db
     .select({
@@ -109,10 +119,12 @@ export async function computeMotherMeterReconciliation(
     eq(motherMeterEvents.motherMeterId, options.motherMeterId),
     eq(motherMeterEvents.eventType, "bill_payment"),
   ];
-  if (options.startDate)
+  if (options.startDate) {
     eventConditions.push(gte(motherMeterEvents.createdAt, options.startDate));
-  if (options.endDate)
+  }
+  if (options.endDate) {
     eventConditions.push(lte(motherMeterEvents.createdAt, options.endDate));
+  }
 
   const [billPayments] = await db
     .select({
@@ -121,8 +133,8 @@ export async function computeMotherMeterReconciliation(
     .from(motherMeterEvents)
     .where(and(...eventConditions));
 
-  const netSalesCollected = toNumber(sales?.total);
-  const kplcPayments = toNumber(billPayments?.total);
+  const netSalesCollected = toNumber(sales.total);
+  const kplcPayments = toNumber(billPayments.total);
 
   return {
     netSalesCollected,
@@ -138,12 +150,22 @@ export async function listMotherMeterLowBalanceAlerts(
   const offset = options.offset ?? 0;
   const includeAboveThreshold = options.includeAboveThreshold ?? false;
 
+  const filters = [];
+  if (options.landlordId) {
+    filters.push(eq(motherMeters.landlordId, options.landlordId));
+  }
+  if (options.propertyId) {
+    filters.push(eq(motherMeters.propertyId, options.propertyId));
+  }
+
   const allMeters = await db.query.motherMeters.findMany({
     limit,
     offset,
+    where: filters.length > 0 ? and(...filters) : undefined,
     columns: {
       id: true,
       motherMeterNumber: true,
+      propertyId: true,
       type: true,
       lowBalanceThreshold: true,
       landlordId: true,
@@ -167,6 +189,7 @@ export async function listMotherMeterLowBalanceAlerts(
       return {
         motherMeterId: meter.id,
         motherMeterNumber: meter.motherMeterNumber,
+        propertyId: meter.propertyId,
         type: meter.type,
         landlordId: meter.landlordId,
         landlordName: meter.landlord.name,
@@ -178,7 +201,9 @@ export async function listMotherMeterLowBalanceAlerts(
     })
   );
 
-  if (includeAboveThreshold) return alerts;
+  if (includeAboveThreshold) {
+    return alerts;
+  }
   return alerts.filter((alert) => alert.isBelowThreshold);
 }
 
@@ -191,13 +216,22 @@ export async function listPostpaidPaymentReminders(
   const daysAfterLastPayment = options.daysAfterLastPayment ?? 13;
   const includeNotDue = options.includeNotDue ?? false;
 
+  const filters = [eq(motherMeters.type, "postpaid")];
+  if (options.landlordId) {
+    filters.push(eq(motherMeters.landlordId, options.landlordId));
+  }
+  if (options.propertyId) {
+    filters.push(eq(motherMeters.propertyId, options.propertyId));
+  }
+
   const postpaidMeters = await db.query.motherMeters.findMany({
-    where: eq(motherMeters.type, "postpaid"),
+    where: and(...filters),
     limit,
     offset,
     columns: {
       id: true,
       motherMeterNumber: true,
+      propertyId: true,
       landlordId: true,
     },
     with: {
@@ -236,6 +270,7 @@ export async function listPostpaidPaymentReminders(
       return {
         motherMeterId: meter.id,
         motherMeterNumber: meter.motherMeterNumber,
+        propertyId: meter.propertyId,
         landlordId: meter.landlordId,
         landlordName: meter.landlord.name,
         landlordPhoneNumber: meter.landlord.phoneNumber,
@@ -247,12 +282,16 @@ export async function listPostpaidPaymentReminders(
     })
   );
 
-  if (includeNotDue) return reminders;
+  if (includeNotDue) {
+    return reminders;
+  }
   return reminders.filter((item) => item.isReminderDue);
 }
 
 function toNumber(value: string | null | undefined): number {
-  if (!value) return 0;
+  if (!value) {
+    return 0;
+  }
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }

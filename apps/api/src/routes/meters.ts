@@ -5,9 +5,12 @@ import { z } from "zod";
 import { db } from "../db";
 import { meters, motherMeters, tariffs } from "../db/schema";
 import type { AppBindings } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
 import {
-  requirePermission,
-} from "../lib/auth-middleware";
+  ensureAdminRouteAccess,
+  isAdminStaffUser,
+} from "../lib/staff-route-access";
+import { queueTenantNotificationsForMeter } from "../services/tenant-notification-producer.service";
 import {
   createMeterSchema,
   meterQuerySchema,
@@ -29,9 +32,16 @@ meterRoutes.get(
   requirePermission("meters:read"),
   zValidator("query", meterQuerySchema),
   async (c) => {
+    const actor = c.get("user");
     const query = c.req.valid("query");
-    const conditions = [];
+    if (!isAdminStaffUser(actor) && !query.meterNumber) {
+      ensureAdminRouteAccess(actor, "Broad meter listing");
+    }
 
+    const conditions = [];
+    if (query.meterNumber) {
+      conditions.push(eq(meters.meterNumber, query.meterNumber));
+    }
     if (query.status) {
       conditions.push(eq(meters.status, query.status));
     }
@@ -42,19 +52,19 @@ meterRoutes.get(
     const result = await db.query.meters.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       with: {
-        tariff: {
-          columns: { id: true, name: true, ratePerKwh: true },
-        },
         motherMeter: {
           columns: { id: true, motherMeterNumber: true },
         },
+        tariff: {
+          columns: { id: true, name: true, ratePerKwh: true },
+        },
       },
       orderBy: [desc(meters.createdAt)],
-      limit: 50,
+      limit: isAdminStaffUser(actor) ? 50 : 10,
     });
 
-    return c.json({ data: result, count: result.length });
-  }
+    return c.json({ count: result.length, data: result });
+  },
 );
 
 meterRoutes.get(
@@ -62,17 +72,19 @@ meterRoutes.get(
   requirePermission("meters:read"),
   zValidator("param", idParamSchema),
   async (c) => {
+    ensureAdminRouteAccess(c.get("user"), "Meter detail access by internal ID");
+
     const { id } = c.req.valid("param");
     const meter = await db.query.meters.findFirst({
       where: eq(meters.id, id),
       with: {
-        tariff: true,
         motherMeter: {
           with: {
-            property: true,
             landlord: true,
+            property: true,
           },
         },
+        tariff: true,
       },
     });
 
@@ -81,7 +93,7 @@ meterRoutes.get(
     }
 
     return c.json({ data: meter });
-  }
+  },
 );
 
 meterRoutes.get(
@@ -92,17 +104,17 @@ meterRoutes.get(
     const { meterNumber } = c.req.valid("param");
     const meter = await db.query.meters.findFirst({
       where: eq(meters.meterNumber, meterNumber),
+      columns: {
+        brand: true,
+        id: true,
+        meterNumber: true,
+        meterType: true,
+        status: true,
+      },
       with: {
         tariff: {
           columns: { id: true, name: true, ratePerKwh: true },
         },
-      },
-      columns: {
-        id: true,
-        meterNumber: true,
-        meterType: true,
-        brand: true,
-        status: true,
       },
     });
 
@@ -111,10 +123,10 @@ meterRoutes.get(
     }
 
     return c.json({
-      valid: meter.status === "active",
       data: meter,
+      valid: meter.status === "active",
     });
-  }
+  },
 );
 
 meterRoutes.post(
@@ -123,11 +135,9 @@ meterRoutes.post(
   zValidator("json", createMeterSchema),
   async (c) => {
     const body = c.req.valid("json");
-
     const motherMeter = await db.query.motherMeters.findFirst({
       where: eq(motherMeters.id, body.motherMeterId),
     });
-
     if (!motherMeter) {
       return c.json({ error: "Mother meter not found" }, 400);
     }
@@ -135,7 +145,6 @@ meterRoutes.post(
     const tariff = await db.query.tariffs.findFirst({
       where: eq(tariffs.id, body.tariffId),
     });
-
     if (!tariff) {
       return c.json({ error: "Tariff not found" }, 400);
     }
@@ -143,7 +152,6 @@ meterRoutes.post(
     const existing = await db.query.meters.findFirst({
       where: eq(meters.meterNumber, body.meterNumber),
     });
-
     if (existing) {
       return c.json({ error: "Meter number already exists" }, 409);
     }
@@ -151,19 +159,19 @@ meterRoutes.post(
     const [meter] = await db
       .insert(meters)
       .values({
+        brand: body.brand,
+        keyRevisionNumber: body.keyRevisionNumber ?? 1,
         meterNumber: body.meterNumber,
         meterType: body.meterType,
-        brand: body.brand,
         motherMeterId: body.motherMeterId,
-        tariffId: body.tariffId,
         supplyGroupCode: body.supplyGroupCode,
-        keyRevisionNumber: body.keyRevisionNumber ?? 1,
+        tariffId: body.tariffId,
         tariffIndex: body.tariffIndex ?? 1,
       })
       .returning();
 
     return c.json({ data: meter }, 201);
-  }
+  },
 );
 
 meterRoutes.patch(
@@ -174,11 +182,9 @@ meterRoutes.patch(
   async (c) => {
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
-
     const existing = await db.query.meters.findFirst({
       where: eq(meters.id, id),
     });
-
     if (!existing) {
       return c.json({ error: "Meter not found" }, 404);
     }
@@ -187,7 +193,6 @@ meterRoutes.patch(
       const tariff = await db.query.tariffs.findFirst({
         where: eq(tariffs.id, body.tariffId),
       });
-
       if (!tariff) {
         return c.json({ error: "Tariff not found" }, 400);
       }
@@ -195,15 +200,16 @@ meterRoutes.patch(
 
     const [updated] = await db
       .update(meters)
-      .set({
-        ...body,
-        updatedAt: new Date(),
-      })
+      .set({ ...body, updatedAt: new Date() })
       .where(eq(meters.id, id))
       .returning();
 
+    if (body.status && body.status !== existing.status) {
+      await queueMeterStatusNotification(updated, existing.status);
+    }
+
     return c.json({ data: updated });
-  }
+  },
 );
 
 meterRoutes.post(
@@ -211,18 +217,14 @@ meterRoutes.post(
   requirePermission("meters:status"),
   zValidator("param", idParamSchema),
   async (c) => {
-    const { id } = c.req.valid("param");
-    const updatedRows = await db
-      .update(meters)
-      .set({ status: "suspended", updatedAt: new Date() })
-      .where(eq(meters.id, id))
-      .returning();
-    if (updatedRows.length === 0) {
+    const updated = await updateMeterStatus(c.req.valid("param").id, "suspended");
+    if (!updated) {
       return c.json({ error: "Meter not found" }, 404);
     }
 
-    return c.json({ data: updatedRows[0] });
-  }
+    await queueMeterStatusNotification(updated, "active");
+    return c.json({ data: updated });
+  },
 );
 
 meterRoutes.post(
@@ -230,16 +232,41 @@ meterRoutes.post(
   requirePermission("meters:status"),
   zValidator("param", idParamSchema),
   async (c) => {
-    const { id } = c.req.valid("param");
-    const updatedRows = await db
-      .update(meters)
-      .set({ status: "active", updatedAt: new Date() })
-      .where(eq(meters.id, id))
-      .returning();
-    if (updatedRows.length === 0) {
+    const updated = await updateMeterStatus(c.req.valid("param").id, "active");
+    if (!updated) {
       return c.json({ error: "Meter not found" }, 404);
     }
 
-    return c.json({ data: updatedRows[0] });
-  }
+    await queueMeterStatusNotification(updated, "suspended");
+    return c.json({ data: updated });
+  },
 );
+
+async function updateMeterStatus(id: string, status: "active" | "suspended") {
+  const [updated] = await db
+    .update(meters)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(meters.id, id))
+    .returning();
+
+  return updated ?? null;
+}
+
+async function queueMeterStatusNotification(
+  meter: {
+    id: string;
+    meterNumber: string;
+    status: string;
+    updatedAt: Date;
+  },
+  previousStatus: string,
+) {
+  await queueTenantNotificationsForMeter({
+    meterId: meter.id,
+    meterNumber: meter.meterNumber,
+    meterStatus: meter.status,
+    metadata: { previousStatus },
+    referenceId: `${meter.id}:${meter.updatedAt.toISOString()}`,
+    type: "meter_status_alert",
+  });
+}

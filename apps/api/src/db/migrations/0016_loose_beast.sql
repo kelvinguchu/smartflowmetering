@@ -1,0 +1,1 @@
+ALTER TYPE "public"."customer_app_notification_type" ADD VALUE 'landlord_mother_meter_event_recorded' BEFORE 'landlord_postpaid_payment_due';

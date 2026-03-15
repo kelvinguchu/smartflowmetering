@@ -1,18 +1,30 @@
 import type { Job } from "bullmq";
+import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { smsLogs, transactions } from "../../db/schema";
-import { eq } from "drizzle-orm";
-import type { SmsJob, SmsNotificationJob, SmsResendJob } from "../types";
-import { isResendJob, isNotificationJob } from "../sms-guards";
-import { sendSms, formatTokenSms } from "../../services/sms.service";
-import { redactTokensInText } from "../../lib/token-redaction";
 import { maskPhoneForLog } from "../../lib/log-redaction";
+import { redactTokensInText } from "../../lib/token-redaction";
+import { formatTokenSms, sendSms } from "../../services/sms.service";
+import { syncTextSmsDeliveryStatus } from "../../services/textsms-dlr.service";
+import { createQueue, QUEUE_NAMES } from "../connection";
+import { isDlrSyncJob, isNotificationJob, isResendJob } from "../sms-guards";
+import type {
+  SmsDlrSyncJob,
+  SmsJob,
+  SmsNotificationJob,
+  SmsResendJob,
+} from "../types";
+
+const smsDlrSyncQueue = createQueue(QUEUE_NAMES.SMS_DELIVERY);
+const TEXTSMS_DLR_SYNC_DELAYS_MS = [60_000, 300_000, 900_000] as const;
 
 /**
  * Parse cost string from provider (e.g., "KES 0.8000" -> "0.8000")
  */
 function parseCost(cost: string | undefined): string | null {
-  if (!cost) return null;
+  if (!cost) {
+    return null;
+  }
   // Remove currency code and spaces, e.g., "KES 0.8000" -> "0.8000"
   const numericPart = cost.replace(/[A-Za-z\s]/g, "");
   return numericPart || null;
@@ -29,6 +41,10 @@ function parseCost(cost: string | undefined): string | null {
 export async function processSmsDelivery(
   job: Job<SmsJob>,
 ): Promise<{ messageId: string }> {
+  if (isDlrSyncJob(job.data)) {
+    return processDlrSync(job.data);
+  }
+
   if (isResendJob(job.data)) {
     return processResendSms(job.data);
   }
@@ -37,8 +53,7 @@ export async function processSmsDelivery(
     return processNotificationSms(job.data);
   }
 
-  const { transactionId, phoneNumber, meterNumber, token, units, amount } =
-    job.data;
+  const { transactionId, phoneNumber, meterNumber, token, units } = job.data;
   const transaction = await db.query.transactions.findFirst({
     where: eq(transactions.id, transactionId),
     columns: {
@@ -59,7 +74,7 @@ export async function processSmsDelivery(
     token,
     transactionDate: transaction.completedAt ?? transaction.createdAt,
     units,
-    amountPaid: transaction.amountPaid ?? amount,
+    amountPaid: transaction.amountPaid,
     tokenAmount: transaction.netAmount,
     otherCharges: transaction.commissionAmount,
   });
@@ -86,7 +101,7 @@ export async function processSmsDelivery(
     .update(smsLogs)
     .set({
       status: result.success ? "sent" : "failed",
-      provider: result.provider ?? "hostpinnacle",
+      provider: resolveSmsProvider(result.provider),
       providerMessageId: result.messageId ?? null,
       cost: parseCost(result.cost),
       updatedAt: new Date(),
@@ -97,11 +112,13 @@ export async function processSmsDelivery(
     throw new Error(`SMS delivery failed: ${result.error}`);
   }
 
+  await queueTextSmsDlrSyncIfNeeded(smsLog.id, result);
+
   console.log(
-    `[SMS] Delivered to ${maskPhoneForLog(phoneNumber)}, messageId: ${result.messageId}`,
+    `[SMS] Delivered to ${maskPhoneForLog(phoneNumber)}, messageId: ${getRequiredMessageId(result.messageId, "delivery")}`,
   );
 
-  return { messageId: result.messageId! };
+  return { messageId: getRequiredMessageId(result.messageId, "delivery") };
 }
 
 async function processResendSms(
@@ -122,7 +139,7 @@ async function processResendSms(
     .update(smsLogs)
     .set({
       status: result.success ? "sent" : "failed",
-      provider: result.provider ?? "hostpinnacle",
+      provider: resolveSmsProvider(result.provider),
       providerMessageId: result.messageId ?? null,
       cost: parseCost(result.cost),
       updatedAt: new Date(),
@@ -133,11 +150,13 @@ async function processResendSms(
     throw new Error(`SMS resend failed: ${result.error}`);
   }
 
+  await queueTextSmsDlrSyncIfNeeded(smsLogId, result);
+
   console.log(
-    `[SMS] Resent to ${maskPhoneForLog(phoneNumber)}, messageId: ${result.messageId}`,
+    `[SMS] Resent to ${maskPhoneForLog(phoneNumber)}, messageId: ${getRequiredMessageId(result.messageId, "resend")}`,
   );
 
-  return { messageId: result.messageId! };
+  return { messageId: getRequiredMessageId(result.messageId, "resend") };
 }
 
 async function processNotificationSms(
@@ -173,7 +192,7 @@ async function processNotificationSms(
     .update(smsLogs)
     .set({
       status: result.success ? "sent" : "failed",
-      provider: result.provider ?? "hostpinnacle",
+      provider: resolveSmsProvider(result.provider),
       providerMessageId: result.messageId ?? null,
       cost: parseCost(result.cost),
       updatedAt: new Date(),
@@ -184,5 +203,61 @@ async function processNotificationSms(
     throw new Error(`SMS delivery failed: ${result.error}`);
   }
 
-  return { messageId: result.messageId! };
+  await queueTextSmsDlrSyncIfNeeded(smsLogId, result);
+
+  return { messageId: getRequiredMessageId(result.messageId, "notification") };
+}
+
+async function queueTextSmsDlrSyncIfNeeded(
+  smsLogId: string,
+  result: Awaited<ReturnType<typeof sendSms>>,
+) {
+  if (!result.success || result.provider !== "textsms" || !result.messageId) {
+    return;
+  }
+
+  await scheduleTextSmsDlrSync({
+    attempt: 1,
+    kind: "dlr_sync",
+    provider: "textsms",
+    smsLogId,
+  });
+}
+
+async function processDlrSync(
+  data: SmsDlrSyncJob,
+): Promise<{ messageId: string }> {
+  const result = await syncTextSmsDeliveryStatus(data.smsLogId);
+  if (!result.synced && data.attempt < TEXTSMS_DLR_SYNC_DELAYS_MS.length) {
+    await scheduleTextSmsDlrSync({
+      ...data,
+      attempt: data.attempt + 1,
+    });
+  }
+
+  return { messageId: `dlr-sync-${data.smsLogId}` };
+}
+
+async function scheduleTextSmsDlrSync(data: SmsDlrSyncJob) {
+  const delay = TEXTSMS_DLR_SYNC_DELAYS_MS[data.attempt - 1] ?? 900_000;
+  await smsDlrSyncQueue.add("sms-dlr-sync", data, {
+    attempts: 1,
+    delay,
+    jobId: `sms-dlr-sync-${data.smsLogId}-${data.attempt}`,
+  });
+}
+
+function resolveSmsProvider(provider: Awaited<ReturnType<typeof sendSms>>["provider"]) {
+  return provider ?? "hostpinnacle";
+}
+
+function getRequiredMessageId(
+  messageId: string | undefined,
+  context: "delivery" | "notification" | "resend",
+) {
+  if (!messageId) {
+    throw new Error(`SMS ${context} succeeded without a provider message id`);
+  }
+
+  return messageId;
 }

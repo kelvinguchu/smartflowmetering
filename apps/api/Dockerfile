@@ -3,8 +3,10 @@ ARG NODE_IMAGE=node:22.22.1-alpine3.22
 FROM ${NODE_IMAGE} AS deps
 WORKDIR /usr/src/app
 COPY package.json package-lock.json ./
-COPY apps/admin-dashboard/package.json ./apps/admin-dashboard/package.json
 COPY apps/api/package.json ./apps/api/package.json
+# npm workspaces needs these to resolve the dependency graph, but changes
+# to them are rare so this layer stays cached most of the time.
+COPY apps/admin-dashboard/package.json ./apps/admin-dashboard/package.json
 COPY apps/public-website/package.json ./apps/public-website/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
 RUN npm install --workspace=apps/api --include-workspace-root=false

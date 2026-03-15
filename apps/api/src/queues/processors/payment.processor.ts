@@ -1,15 +1,23 @@
 import type { Job } from "bullmq";
-import { db } from "../../db";
-import { meters, transactions, failedTransactions, mpesaTransactions } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { env } from "../../config";
-import { generateTransactionId } from "../../lib/utils";
-import { calculateTransaction, meetsMinimumAmount } from "../../lib/money";
-import { sanitizeMpesaPayload } from "../../lib/mpesa-payload-sanitizer";
+import { db } from "../../db";
+import {
+  failedTransactions,
+  meters,
+  mpesaTransactions,
+  transactions,
+} from "../../db/schema";
+import type { NewMpesaTransaction } from "../../db/schema";
 import {
   maskMeterNumberForLog,
   maskReferenceForLog,
 } from "../../lib/log-redaction";
+import { calculateTransaction, meetsMinimumAmount } from "../../lib/money";
+import { sanitizeMpesaPayload } from "../../lib/mpesa-payload-sanitizer";
+import { generateTransactionId } from "../../lib/utils";
+import { queueLandlordSubMeterPurchaseNotification } from "../../services/landlord-notification-producer.service";
+import { queueTenantNotificationsForMeter } from "../../services/tenant-notification-producer.service";
 import { tokenGenerationQueue } from "../index";
 import type { PaymentJob, PaymentProcessingJob, MpesaRawCallbackJob } from "../types";
 
@@ -19,7 +27,7 @@ import type { PaymentJob, PaymentProcessingJob, MpesaRawCallbackJob } from "../t
  */
 export async function processPayment(
   job: Job<PaymentJob>
-): Promise<{ transactionId: string } | void> {
+): Promise<{ transactionId: string } | undefined> {
   // Handle Raw M-Pesa Callback (New Flow)
   if (job.name === "process-raw-callback") {
     const rawData = job.data as MpesaRawCallbackJob;
@@ -41,36 +49,40 @@ export async function processPayment(
  * 2. Proceed to processing
  */
 async function handleRawCallback(body: MpesaRawCallbackJob) {
+  const transAmount =
+    typeof body.TransAmount === "number"
+      ? body.TransAmount.toFixed(2)
+      : body.TransAmount;
+  const sanitizedPayload: NewMpesaTransaction["rawCallbackPayload"] =
+    sanitizeMpesaPayload(body);
+
   console.log(
     `[Payment Worker] Handling Raw Callback: ${maskReferenceForLog(body.TransID)}`,
   );
 
   // 1. Store raw callback (Idempotency via unique trans_id)
-  const [mpesaTx] = await db
+  const insertedRows = await db
     .insert(mpesaTransactions)
     .values({
       transactionType: body.TransactionType,
       transId: body.TransID,
       transTime: body.TransTime,
-      transAmount: String(body.TransAmount),
+      transAmount,
       businessShortCode: body.BusinessShortCode,
       billRefNumber: body.BillRefNumber.trim(),
       invoiceNumber: body.InvoiceNumber ?? null,
-      orgAccountBalance: body.OrgAccountBalance
-        ? String(body.OrgAccountBalance)
-        : null,
+      orgAccountBalance: body.OrgAccountBalance,
       thirdPartyTransId: body.ThirdPartyTransID ?? null,
       msisdn: body.MSISDN,
       firstName: body.FirstName ?? null,
       middleName: body.MiddleName ?? null,
       lastName: body.LastName ?? null,
-      rawCallbackPayload:
-        sanitizeMpesaPayload(body) as Record<string, unknown>,
+      rawCallbackPayload: sanitizedPayload,
     })
     .onConflictDoNothing({ target: mpesaTransactions.transId })
     .returning({ id: mpesaTransactions.id });
 
-  let txId: string | undefined = mpesaTx?.id;
+  let txId: string | undefined = insertedRows[0]?.id;
 
   // If duplicate (no insert), fetch existing ID
   if (!txId) {
@@ -89,11 +101,13 @@ async function handleRawCallback(body: MpesaRawCallbackJob) {
     );
   }
 
-  if (!txId) throw new Error("Failed to resolve M-Pesa Transaction ID");
+  if (!txId) {
+    throw new Error("Failed to resolve M-Pesa Transaction ID");
+  }
 
   // 2. Check if we already have a completed transaction for this M-Pesa ID
   const existingTx = await db.query.transactions.findFirst({
-    where: eq(transactions.mpesaTransactionId, txId!),
+    where: eq(transactions.mpesaTransactionId, txId),
   });
 
   if (existingTx) {
@@ -107,7 +121,7 @@ async function handleRawCallback(body: MpesaRawCallbackJob) {
   return processPaymentInternal({
     mpesaTransactionId: txId,
     meterNumber: body.BillRefNumber.trim(),
-    amount: String(body.TransAmount),
+    amount: transAmount,
     phoneNumber: body.MSISDN,
     mpesaReceiptNumber: body.TransID,
     paymentMethod: "paybill",
@@ -142,7 +156,7 @@ async function processPaymentInternal(data: PaymentProcessingJob) {
     // We don't throw here to avoid retrying in queue (since it will always fail)
     // We return empty to signal completion without transaction
     console.warn(`[Payment] Failed: Below Minimum (${amount})`);
-    return; 
+    return;
   }
 
   // Step 2: Find and validate meter
@@ -212,6 +226,26 @@ async function processPaymentInternal(data: PaymentProcessingJob) {
   console.log(
     `[Payment] Created transaction: ${maskReferenceForLog(transactionId)}, Units: ${calculation.unitsPurchased}`
   );
+
+  await queueTenantNotificationsForMeter({
+    amountPaid: calculation.grossAmount,
+    meterId: meter.id,
+    meterNumber: meter.meterNumber,
+    metadata: {
+      mpesaReceiptNumber,
+      transactionId,
+    },
+    referenceId: transaction.id,
+    type: "token_purchase_recorded",
+    unitsPurchased: calculation.unitsPurchased,
+  });
+  await queueLandlordSubMeterPurchaseNotification({
+    amountPaid: calculation.grossAmount,
+    meterId: meter.id,
+    meterNumber: meter.meterNumber,
+    referenceId: transaction.id,
+    unitsPurchased: calculation.unitsPurchased,
+  });
 
   // Step 5: Queue token generation
   await tokenGenerationQueue.add(

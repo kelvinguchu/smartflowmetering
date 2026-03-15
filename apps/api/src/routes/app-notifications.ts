@@ -54,7 +54,10 @@ appNotificationRoutes.get(
   zValidator("query", customerDeviceTokenListQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
-    const data = await listCustomerDeviceTokens(query.phoneNumber);
+    const data = await listCustomerDeviceTokens({
+      landlordId: query.landlordId,
+      phoneNumber: query.phoneNumber,
+    });
     return c.json({ count: data.length, data });
   },
 );

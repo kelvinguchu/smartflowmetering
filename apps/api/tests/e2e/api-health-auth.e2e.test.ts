@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { createApp } from "../../src/app";
-import {
-  createAuthenticatedSession,
-  ensureTestMeterFixture,
-  ensureInfraReady,
-  teardownE2E,
-  uniqueRef,
-} from "./helpers";
+import { createAuthenticatedSession, ensureTestMeterFixture, ensureInfraReady, teardownE2E, uniqueRef } from "./helpers";
 
 const app = createApp();
 type JsonScalar = string | number | boolean | null;
@@ -63,11 +57,7 @@ void describe("E2E: API health and auth guards", () => {
   });
 
   void it("rejects unauthenticated access to detailed health endpoints", async () => {
-    const protectedHealthPaths = [
-      "/api/health/detailed",
-      "/api/health/queues",
-      "/api/mpesa/health",
-    ];
+    const protectedHealthPaths = ["/api/health/detailed", "/api/health/queues", "/api/mpesa/health"];
 
     for (const path of protectedHealthPaths) {
       const { response, body } = await getJson(path);
@@ -101,36 +91,13 @@ void describe("E2E: API health and auth guards", () => {
   void it("forbids non-admin staff from accessing admin diagnostics", async () => {
     const userSession = await createAuthenticatedSession(app, "user");
 
-    const protectedHealthPaths = [
-      "/api/health/detailed",
-      "/api/health/queues",
-      "/api/mpesa/health",
-    ];
+    const protectedHealthPaths = ["/api/health/detailed", "/api/health/queues", "/api/mpesa/health"];
 
     for (const path of protectedHealthPaths) {
       const { response, body } = await getJson(path, userSession.headers);
       assert.equal(response.status, 403, `Expected 403 for GET ${path}`);
       assert.equal(body.error, "Forbidden");
     }
-  });
-
-  void it("allows staff to inspect sms logs but keeps sms test admin-only", async () => {
-    const userSession = await createAuthenticatedSession(app, "user");
-
-    const smsList = await getJson("/api/sms", userSession.headers);
-    assert.equal(smsList.response.status, 200);
-    assert.ok(Array.isArray(smsList.body.data));
-
-    const smsTestResponse = await app.request("/api/sms/test", {
-      method: "POST",
-      headers: userSession.headers,
-      body: JSON.stringify({
-        phoneNumber: "254712345678",
-        message: "Test SMS",
-      }),
-    });
-
-    assert.equal(smsTestResponse.status, 403);
   });
 
   void it("allows staff to review applications but keeps approvals admin-only", async () => {

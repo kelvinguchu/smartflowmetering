@@ -6,6 +6,7 @@ import { customerAppNotifications } from "../../src/db/schema";
 import {
   createAuthenticatedSession,
   ensureInfraReady,
+  ensureTestMeterFixture,
   resetE2EState,
   teardownE2E,
   uniqueKenyanPhoneNumber,
@@ -75,6 +76,39 @@ void describe("E2E: app notifications", () => {
       data: { status: string };
     };
     assert.equal(deletedBody.data.status, "inactive");
+  });
+
+  void it("allows staff to manage landlord device tokens by landlord id", async () => {
+    const staffSession = await createAuthenticatedSession(app, "admin");
+    const fixture = await ensureTestMeterFixture("LANDLORD-DEVICE-METER-001");
+    const token = "fcm-token-landlord-abcdefghijklmnopqrstuvwxyz123456";
+
+    const createResponse = await app.request("/api/app-notifications/device-tokens", {
+      method: "POST",
+      headers: staffSession.headers,
+      body: JSON.stringify({
+        landlordId: fixture.customerId,
+        platform: "android",
+        token,
+      }),
+    });
+    assert.equal(createResponse.status, 200);
+
+    const listResponse = await app.request(
+      `/api/app-notifications/device-tokens?landlordId=${fixture.customerId}`,
+      {
+        method: "GET",
+        headers: staffSession.headers,
+      },
+    );
+    assert.equal(listResponse.status, 200);
+    const listBody = (await listResponse.json()) as {
+      count: number;
+      data: { landlordId: string | null; token: string }[];
+    };
+    assert.equal(listBody.count, 1);
+    assert.equal(listBody.data[0]?.landlordId, fixture.customerId);
+    assert.equal(listBody.data[0]?.token, token);
   });
 
   void it("deduplicates queued app notification delivery jobs", async () => {

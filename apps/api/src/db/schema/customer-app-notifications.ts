@@ -7,10 +7,13 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import { customerAppNotificationTypes } from "../../lib/customer-app-notification-types";
+import { customers } from "./customers";
+import { tenantAppAccesses } from "./tenant-app-accesses";
 
 export const customerAppNotificationTypeEnum = pgEnum(
   "customer_app_notification_type",
-  ["buy_token_nudge", "failed_purchase_follow_up"],
+  customerAppNotificationTypes,
 );
 
 export const customerAppNotificationStatusEnum = pgEnum(
@@ -26,7 +29,13 @@ export const customerAppNotifications = pgTable(
     status: customerAppNotificationStatusEnum("status")
       .notNull()
       .default("pending"),
-    phoneNumber: text("phone_number").notNull(),
+    phoneNumber: text("phone_number"),
+    landlordId: uuid("landlord_id").references(() => customers.id, {
+      onDelete: "cascade",
+    }),
+    tenantAccessId: uuid("tenant_access_id").references(() => tenantAppAccesses.id, {
+      onDelete: "cascade",
+    }),
     meterNumber: text("meter_number").notNull(),
     referenceId: text("reference_id").notNull(),
     title: text("title").notNull(),

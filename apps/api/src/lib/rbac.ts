@@ -34,6 +34,7 @@ const userPermissions: ReadonlySet<StaffPermission> = new Set([
   "app_notifications:manage",
   "applications:read",
   "customer_prompts:manage",
+  "failed_transactions:manage",
   "meters:read",
   "sms:read",
   "sms:resend",

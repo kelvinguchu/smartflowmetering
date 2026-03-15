@@ -9,7 +9,8 @@ type AdminNotificationRecord = typeof adminNotifications.$inferSelect;
 type NotificationType =
   | "mother_meter_low_balance"
   | "postpaid_payment_reminder"
-  | "daily_usage_summary";
+  | "daily_usage_summary"
+  | "sms_provider_outage";
 type NotificationSeverity = "info" | "warning" | "critical";
 
 export interface CreateAdminNotificationInput {

@@ -26,10 +26,7 @@ export async function processAppNotificationDelivery(
   await recordCustomerAppNotificationAttempt(notificationId);
 
   const devices = await db.query.customerDeviceTokens.findMany({
-    where: and(
-      eq(customerDeviceTokens.phoneNumber, notification.phoneNumber),
-      eq(customerDeviceTokens.status, "active"),
-    ),
+    where: buildActiveDeviceFilter(notification),
   });
   if (devices.length === 0) {
     await markCustomerAppNotificationFailed(notificationId, {
@@ -113,6 +110,38 @@ export async function processAppNotificationDelivery(
     message: "FCM permanently rejected all active device tokens",
   });
   return { deliveredTokens: 0, notificationId };
+}
+
+function buildActiveDeviceFilter(notification: {
+  landlordId: string | null;
+  phoneNumber: string | null;
+  tenantAccessId: string | null;
+}) {
+  if (notification.tenantAccessId) {
+    return and(
+      eq(customerDeviceTokens.tenantAccessId, notification.tenantAccessId),
+      eq(customerDeviceTokens.status, "active"),
+    );
+  }
+
+  if (notification.landlordId) {
+    return and(
+      eq(customerDeviceTokens.landlordId, notification.landlordId),
+      eq(customerDeviceTokens.status, "active"),
+    );
+  }
+
+  if (notification.phoneNumber) {
+    return and(
+      eq(customerDeviceTokens.phoneNumber, notification.phoneNumber),
+      eq(customerDeviceTokens.status, "active"),
+    );
+  }
+
+  return and(
+    eq(customerDeviceTokens.status, "active"),
+    eq(customerDeviceTokens.id, "__missing__"),
+  );
 }
 
 async function handleRetryableFailure(

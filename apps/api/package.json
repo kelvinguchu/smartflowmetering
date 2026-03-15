@@ -3,8 +3,8 @@
   "version": "1.0.50",
   "type": "module",
   "scripts": {
-    "test": "tsx --test --test-force-exit tests/env-config.test.ts tests/docker-env-wiring.test.ts tests/date-bounds-timezone.test.ts tests/sms-type-guards.test.ts tests/token-sms-format.test.ts tests/auth-config.test.ts tests/mpesa-config.test.ts tests/fetch-with-timeout.test.ts tests/rate-limit-store.test.ts tests/money.test.ts tests/token-redaction.test.ts tests/process-role.test.ts tests/token-protection.test.ts tests/mpesa-payload-sanitizer.test.ts tests/staff-contact.test.ts",
-    "test:e2e": "tsx --test --test-force-exit --test-concurrency=1 tests/e2e/mpesa-purchase.e2e.test.ts tests/e2e/api-health-auth.e2e.test.ts tests/e2e/applications-onboarding.e2e.test.ts tests/e2e/notifications-alerts.e2e.test.ts tests/e2e/gomelong-token.e2e.test.ts tests/e2e/mpesa-signature.e2e.test.ts tests/e2e/reconciliation-recovery.e2e.test.ts tests/e2e/user-management.e2e.test.ts tests/e2e/audit-logs.e2e.test.ts tests/e2e/auth-security.e2e.test.ts tests/e2e/support-recovery.e2e.test.ts tests/e2e/sms-dlr-webhook.e2e.test.ts tests/e2e/sms-recovery.e2e.test.ts tests/e2e/customer-prompts.e2e.test.ts tests/e2e/app-notifications.e2e.test.ts tests/e2e/app-notification.processor.e2e.test.ts",
+    "test": "tsx --test --test-force-exit tests/env-config.test.ts tests/docker-env-wiring.test.ts tests/date-bounds-timezone.test.ts tests/sms-type-guards.test.ts tests/token-sms-format.test.ts tests/auth-config.test.ts tests/mpesa-config.test.ts tests/fetch-with-timeout.test.ts tests/rate-limit-store.test.ts tests/money.test.ts tests/token-redaction.test.ts tests/process-role.test.ts tests/token-protection.test.ts tests/mpesa-payload-sanitizer.test.ts tests/staff-contact.test.ts tests/sms-fallback.test.ts",
+    "test:e2e": "tsx --test --test-force-exit --test-concurrency=1 tests/e2e/mpesa-purchase.e2e.test.ts tests/e2e/api-health-auth.e2e.test.ts tests/e2e/applications-onboarding.e2e.test.ts tests/e2e/notifications-alerts.e2e.test.ts tests/e2e/gomelong-token.e2e.test.ts tests/e2e/mpesa-signature.e2e.test.ts tests/e2e/reconciliation-recovery.e2e.test.ts tests/e2e/user-management.e2e.test.ts tests/e2e/audit-logs.e2e.test.ts tests/e2e/auth-security.e2e.test.ts tests/e2e/support-recovery.e2e.test.ts tests/e2e/sms-dlr-webhook.e2e.test.ts tests/e2e/sms-recovery.e2e.test.ts tests/e2e/sms-provider-health.e2e.test.ts tests/e2e/customer-prompts.e2e.test.ts tests/e2e/app-notifications.e2e.test.ts tests/e2e/app-notification.processor.e2e.test.ts tests/e2e/tenant-access.e2e.test.ts tests/e2e/tenant-notification-producer.e2e.test.ts tests/e2e/landlord-notification-producer.e2e.test.ts tests/e2e/landlord-access.e2e.test.ts tests/e2e/landlord-dashboard.e2e.test.ts tests/e2e/landlord-history.e2e.test.ts",
     "dev": "tsx watch src/index.ts",
     "start": "node --import tsx src/index.ts",
     "start:api": "node --import tsx -e \"process.env.SFM_PROCESS_ROLE='api'; import('./src/index.ts')\"",
@@ -18,6 +18,7 @@
     "db:drop": "drizzle-kit drop",
     "bench": "tsx benchmarks/run.ts",
     "bench:quick": "tsx benchmarks/run.ts --quick",
+    "bench:landlord-mobile": "tsx benchmarks/landlord-mobile.ts",
     "bench:mpesa-offline": "tsx benchmarks/mpesa-offline.ts"
   },
   "dependencies": {

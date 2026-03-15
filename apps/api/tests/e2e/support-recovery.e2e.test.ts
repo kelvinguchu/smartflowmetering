@@ -80,7 +80,7 @@ void describe("E2E: support recovery", () => {
     const body = (await response.json()) as {
       data: {
         meter: { meterNumber: string } | null;
-        recentAdminTokens: { id: string }[];
+        recentAdminTokens: { maskedToken: string; tokenType: string }[];
         recentSmsLogs: { messageBody: string; phoneNumber: string; status: string }[];
         search: { phoneNumber?: string };
         transactions: {
@@ -103,6 +103,8 @@ void describe("E2E: support recovery", () => {
     assert.equal(body.data.transactions[0].smsLogs[0].status, "failed");
     assert.equal(body.data.recentSmsLogs[0].phoneNumber, phoneNumber);
     assert.ok(body.data.transactions[0].smsLogs[0].messageBody.includes("****"));
+    assert.equal("motherMeter" in body.data.transactions[0].meter, false);
+    assert.equal("providerMessageId" in body.data.transactions[0].smsLogs[0], false);
     assert.equal(body.data.recentAdminTokens.length, 0);
   });
 
@@ -135,6 +137,7 @@ void describe("E2E: support recovery", () => {
     assert.equal(body.data.recentAdminTokens.length, 1);
     assert.equal(body.data.recentAdminTokens[0].tokenType, "clear_tamper");
     assert.match(body.data.recentAdminTokens[0].maskedToken, /^\*+\d{4}$/);
+    assert.equal("id" in body.data.recentAdminTokens[0], false);
   });
 
   void it("keeps support recovery available to staff and blocked for non-staff", async () => {

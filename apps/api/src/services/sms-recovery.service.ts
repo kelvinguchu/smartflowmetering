@@ -1,18 +1,17 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { db } from "../db";
-import { generatedTokens, meters, smsLogs, transactions } from "../db/schema";
+import { meters, smsLogs, transactions } from "../db/schema";
 import { normalizeKenyanPhoneNumber } from "../lib/staff-contact";
-import { revealToken } from "../lib/token-protection";
 import { redactTokensInText } from "../lib/token-redaction";
 import { smsDeliveryQueue } from "../queues";
 import type { SmsRecoveryListQuery } from "../validators/sms-recovery";
+import { resolveSmsMessageBody } from "./sms-recovery-message.service";
 import type {
   SmsRecoveryItem,
   SmsRecoveryListResult,
   SmsRecoverySummary,
 } from "./sms-recovery.types";
-import { formatTokenSms } from "./sms.service";
 
 const PENDING_SMS_STATUSES = ["queued", "sent"] as const;
 
@@ -40,13 +39,20 @@ export async function listSmsRecoveryEntries(
   const [rows, summary] = await Promise.all([
     db
       .select({
-        smsLog: smsLogs,
+        smsLog: {
+          createdAt: smsLogs.createdAt,
+          id: smsLogs.id,
+          messageBody: smsLogs.messageBody,
+          phoneNumber: smsLogs.phoneNumber,
+          provider: smsLogs.provider,
+          providerErrorCode: smsLogs.providerErrorCode,
+          providerStatus: smsLogs.providerStatus,
+          status: smsLogs.status,
+        },
         transaction: {
-          id: transactions.id,
           transactionId: transactions.transactionId,
         },
         meter: {
-          id: meters.id,
           meterNumber: meters.meterNumber,
         },
       })
@@ -69,6 +75,11 @@ export async function listSmsRecoveryEntries(
 export async function queueSmsRetryById(smsLogId: string): Promise<{ jobId: string; smsLogId: string }> {
   const log = await db.query.smsLogs.findFirst({
     where: eq(smsLogs.id, smsLogId),
+    columns: {
+      id: true,
+      messageBody: true,
+      phoneNumber: true,
+    },
   });
   if (!log) {
     throw new HTTPException(404, { message: "SMS log not found" });
@@ -93,66 +104,6 @@ export async function queueSmsRetryById(smsLogId: string): Promise<{ jobId: stri
     jobId: String(job.id),
     smsLogId: log.id,
   };
-}
-
-async function resolveSmsMessageBody(
-  smsLogId: string,
-  fallbackMessageBody: string,
-): Promise<string> {
-  const records = await db
-    .select({
-      token: generatedTokens.token,
-      tokenValue: generatedTokens.value,
-      transactionId: smsLogs.transactionId,
-    })
-    .from(smsLogs)
-    .leftJoin(transactions, eq(smsLogs.transactionId, transactions.id))
-    .leftJoin(
-      generatedTokens,
-      and(eq(generatedTokens.transactionId, transactions.id), eq(generatedTokens.tokenType, "credit")),
-    )
-    .where(eq(smsLogs.id, smsLogId))
-    .orderBy(desc(generatedTokens.createdAt))
-    .limit(1);
-
-  if (records.length === 0) {
-    return fallbackMessageBody;
-  }
-
-  const [record] = records;
-  if (record.transactionId === null || record.token === null) {
-    return fallbackMessageBody;
-  }
-
-  const transaction = await db.query.transactions.findFirst({
-    where: eq(transactions.id, record.transactionId),
-    columns: {
-      amountPaid: true,
-      commissionAmount: true,
-      completedAt: true,
-      createdAt: true,
-      netAmount: true,
-    },
-    with: {
-      meter: {
-        columns: { meterNumber: true },
-      },
-    },
-  });
-
-  if (!transaction) {
-    return fallbackMessageBody;
-  }
-
-  return formatTokenSms({
-    amountPaid: transaction.amountPaid,
-    meterNumber: transaction.meter.meterNumber,
-    otherCharges: transaction.commissionAmount,
-    token: revealToken(record.token),
-    tokenAmount: transaction.netAmount,
-    transactionDate: transaction.completedAt ?? transaction.createdAt,
-    units: record.tokenValue ?? "0",
-  });
 }
 
 function normalizeCriteria(query: SmsRecoveryListQuery) {
@@ -267,14 +218,21 @@ async function loadSmsRecoverySummary(where: ReturnType<typeof buildSmsRecoveryW
 interface SmsRecoveryRow {
   meter:
     | {
-        id: string;
         meterNumber: string;
       }
     | null;
-  smsLog: typeof smsLogs.$inferSelect;
+  smsLog: {
+    createdAt: Date;
+    id: string;
+    messageBody: string;
+    phoneNumber: string;
+    provider: "hostpinnacle" | "textsms";
+    providerErrorCode: string | null;
+    providerStatus: string | null;
+    status: string;
+  };
   transaction:
     | {
-        id: string;
         transactionId: string;
       }
     | null;
@@ -284,9 +242,7 @@ function toSmsRecoveryItem(row: SmsRecoveryRow): SmsRecoveryItem {
   const transaction =
     row.transaction && row.meter
       ? {
-          id: row.transaction.id,
           meter: {
-            id: row.meter.id,
             meterNumber: row.meter.meterNumber,
           },
           transactionId: row.transaction.transactionId,
@@ -294,18 +250,16 @@ function toSmsRecoveryItem(row: SmsRecoveryRow): SmsRecoveryItem {
       : null;
 
   return {
-    cost: row.smsLog.cost,
     createdAt: row.smsLog.createdAt,
     id: row.smsLog.id,
     messageBody: redactTokensInText(row.smsLog.messageBody),
     phoneNumber: row.smsLog.phoneNumber,
+    provider: row.smsLog.provider,
     providerErrorCode: row.smsLog.providerErrorCode,
-    providerMessageId: row.smsLog.providerMessageId,
     providerStatus: row.smsLog.providerStatus,
     retryEligible: row.smsLog.status !== "delivered",
     status: row.smsLog.status,
     transaction,
-    updatedAt: row.smsLog.updatedAt,
   };
 }
 

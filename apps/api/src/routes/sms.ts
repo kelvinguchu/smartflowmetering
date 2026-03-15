@@ -4,9 +4,11 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
 import { smsLogs } from "../db/schema";
-import { requirePermission } from "../lib/auth-middleware";
 import type { AppBindings } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
+import { ensureAdminRouteAccess } from "../lib/staff-route-access";
 import { redactTokensInText } from "../lib/token-redaction";
+import { getSmsProviderHealthSummary } from "../services/sms-provider-health.service";
 import { queueSmsRetryById } from "../services/sms-recovery.service";
 import { sendSms } from "../services/sms.service";
 
@@ -19,9 +21,13 @@ const idParamSchema = z.object({
   id: z.uuid(),
 });
 
+const providerHealthQuerySchema = z.object({
+  hours: z.coerce.number().int().min(1).max(168).optional(),
+});
+
 const testSmsSchema = z.object({
-  phoneNumber: z.string().min(10),
   message: z.string().min(1).max(160),
+  phoneNumber: z.string().min(10),
 });
 
 export const smsRoutes = new Hono<AppBindings>();
@@ -31,10 +37,11 @@ smsRoutes.get(
   requirePermission("sms:read"),
   zValidator("query", smsListQuerySchema),
   async (c) => {
+    ensureAdminRouteAccess(c.get("user"), "Broad SMS log listing");
+
     const query = c.req.valid("query");
     const limit = query.limit ?? 50;
     const offset = query.offset ?? 0;
-
     const logs = await db
       .select()
       .from(smsLogs)
@@ -48,11 +55,23 @@ smsRoutes.get(
         messageBody: redactTokensInText(log.messageBody),
       })),
       pagination: {
+        count: logs.length,
         limit,
         offset,
-        count: logs.length,
       },
     });
+  },
+);
+
+smsRoutes.get(
+  "/provider-health",
+  requirePermission("sms:read"),
+  zValidator("query", providerHealthQuerySchema),
+  async (c) => {
+    const { hours } = c.req.valid("query");
+    const summary = await getSmsProviderHealthSummary(hours ?? 24);
+
+    return c.json({ data: summary });
   },
 );
 
@@ -61,6 +80,8 @@ smsRoutes.get(
   requirePermission("sms:read"),
   zValidator("param", idParamSchema),
   async (c) => {
+    ensureAdminRouteAccess(c.get("user"), "Direct SMS log detail access");
+
     const { id } = c.req.valid("param");
     const log = await db
       .select()
@@ -90,8 +111,8 @@ smsRoutes.post(
     const result = await queueSmsRetryById(id);
 
     return c.json({
-      message: "SMS resend queued",
       jobId: result.jobId,
+      message: "SMS resend queued",
       smsLogId: result.smsLogId,
     });
   },
@@ -108,11 +129,11 @@ smsRoutes.post(
     const result = await sendSms(phoneNumber, message);
 
     return c.json({
-      success: result.success,
-      messageId: result.messageId,
       cost: result.cost,
-      provider: result.provider,
       error: result.error,
+      messageId: result.messageId,
+      provider: result.provider,
+      success: result.success,
     });
   },
 );

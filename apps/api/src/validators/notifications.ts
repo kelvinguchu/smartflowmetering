@@ -35,3 +35,12 @@ export const runDailyUsageBodySchema = z.object({
     )
     .optional(),
 });
+
+export const runSmsProviderAlertsBodySchema = z.object({
+  dedupeWindowHours: z.coerce.number().int().min(1).max(168).optional(),
+  hostpinnacleFailureRatePercent: z.coerce.number().min(1).max(100).optional(),
+  minFailedCount: z.coerce.number().int().min(1).max(10_000).optional(),
+  textsmsFallbackUsageRatePercent: z.coerce.number().min(1).max(100).optional(),
+  textsmsPendingDlrThreshold: z.coerce.number().int().min(1).max(10_000).optional(),
+  windowHours: z.coerce.number().int().min(1).max(168).optional(),
+});

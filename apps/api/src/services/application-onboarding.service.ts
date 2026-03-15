@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
+import type { z } from "zod";
 import { db } from "../db";
 import {
   customers,
@@ -9,7 +9,8 @@ import {
   properties,
   tariffs,
 } from "../db/schema";
-import {
+import { normalizeKenyanPhoneNumber } from "../lib/staff-contact";
+import type {
   approveApplicationSchema,
   applicationQuerySchema,
   createApplicationSchema,
@@ -30,12 +31,14 @@ type ApproveApplicationInput = z.infer<typeof approveApplicationSchema>;
 
 export async function createMeterApplication(input: CreateApplicationInput) {
   const subMeterNumbers = normalizeSubMeterNumbers(input.subMeterNumbers);
+  const phoneNumber = normalizeKenyanPhoneNumber(input.phoneNumber);
+  const technicianPhone = normalizeOptionalPhoneNumber(input.technicianPhone);
   const [application] = await db
     .insert(meterApplications)
     .values({
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
-      phoneNumber: input.phoneNumber.trim(),
+      phoneNumber,
       email: input.email.trim().toLowerCase(),
       idNumber: input.idNumber.trim(),
       kraPin: input.kraPin.trim().toUpperCase(),
@@ -51,10 +54,10 @@ export async function createMeterApplication(input: CreateApplicationInput) {
       paymentMode: input.paymentMode,
       subMeterNumbers,
       installationType: input.installationType,
-      suppliesOtherHouses: input.suppliesOtherHouses ?? false,
+      suppliesOtherHouses: input.suppliesOtherHouses,
       billPayer: input.billPayer,
       technicianName: normalizeOptionalString(input.technicianName),
-      technicianPhone: normalizeOptionalString(input.technicianPhone),
+      technicianPhone,
       termsAccepted: input.termsAccepted,
       status: "pending",
     })
@@ -155,7 +158,7 @@ export async function approveMeterApplication(
       .insert(properties)
       .values({
         landlordId: customerId,
-        name: options.propertyName?.trim() || buildDefaultPropertyName(application),
+        name: options.propertyName?.trim() ?? buildDefaultPropertyName(application),
         location: `${application.location}, ${application.county}`,
         numberOfUnits: subMeterNumbers.length,
       })
@@ -169,7 +172,7 @@ export async function approveMeterApplication(
         landlordId: customerId,
         tariffId: options.tariffId,
         propertyId: property.id,
-        lowBalanceThreshold: formatDecimal(options.lowBalanceThreshold ?? 1000, 2),
+      lowBalanceThreshold: formatDecimal(options.lowBalanceThreshold ?? 1000, 2),
       })
       .returning({ id: motherMeters.id });
 
@@ -212,6 +215,17 @@ export async function approveMeterApplication(
     phoneNumber: application.phoneNumber,
     motherMeterNumber: application.motherMeterNumber,
   };
+}
+
+function normalizeOptionalPhoneNumber(
+  phoneNumber: string | undefined,
+): string | null {
+  const normalized = normalizeOptionalString(phoneNumber);
+  if (normalized === null) {
+    return null;
+  }
+
+  return normalizeKenyanPhoneNumber(normalized);
 }
 
 export async function rejectMeterApplication(applicationId: string) {

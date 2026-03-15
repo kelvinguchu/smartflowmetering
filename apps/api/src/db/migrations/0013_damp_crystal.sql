@@ -1,0 +1,1 @@
+ALTER TYPE "public"."customer_app_notification_type" ADD VALUE 'landlord_daily_usage_summary' BEFORE 'meter_status_alert';

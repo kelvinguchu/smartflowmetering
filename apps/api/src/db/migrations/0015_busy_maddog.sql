@@ -1,0 +1,3 @@
+ALTER TYPE "public"."customer_app_notification_type" ADD VALUE 'landlord_postpaid_payment_due' BEFORE 'meter_status_alert';--> statement-breakpoint
+ALTER TYPE "public"."customer_app_notification_type" ADD VALUE 'landlord_prepaid_low_balance' BEFORE 'meter_status_alert';--> statement-breakpoint
+ALTER TYPE "public"."customer_app_notification_type" ADD VALUE 'landlord_sub_meter_purchase' BEFORE 'meter_status_alert';

@@ -7,6 +7,7 @@ This flow documents the staff-facing app notification endpoints under `/api/app-
 Provide the backend surfaces needed to support FCM delivery:
 
 - customer device token management
+- landlord-scoped device token management
 - listing queued customer app notifications
 - requeueing delivery for pending or failed notifications with queue deduplication
 
@@ -31,6 +32,7 @@ Covered by [app-notifications.e2e.test.ts](/D:/smartflowmetering/apps/api/tests/
 The test verifies:
 
 - staff can save a customer device token
+- staff can save and list a landlord-scoped device token by `landlordId`
 - staff can list customer device tokens
 - staff can deactivate a customer device token
 - staff can requeue an app notification without creating duplicate queued jobs

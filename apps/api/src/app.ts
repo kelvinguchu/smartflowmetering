@@ -25,7 +25,9 @@ import {
   auditLogRoutes,
   authSecurityRoutes,
   customerPromptRoutes,
+  landlordAccessRoutes,
   supportRecoveryRoutes,
+  tenantAccessRoutes,
   userManagementRoutes,
 } from "./routes";
 
@@ -100,6 +102,8 @@ export function createApp() {
   app.route("/api/audit-logs", auditLogRoutes);
   app.route("/api/auth-security", authSecurityRoutes);
   app.route("/api/customer-prompts", customerPromptRoutes);
+  app.route("/api/mobile/landlord-access", landlordAccessRoutes);
+  app.route("/api/mobile/tenant-access", tenantAccessRoutes);
   app.route("/api/support-recovery", supportRecoveryRoutes);
   app.route("/api/users", userManagementRoutes);
 

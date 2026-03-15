@@ -1,37 +1,12 @@
 services:
   # ==========================================
-  # Admin Dashboard
-  # ==========================================
-  admin-dashboard:
-    build:
-      context: ./apps/admin-dashboard
-      dockerfile: Dockerfile
-      args:
-        # Defaults to localhost for local testing
-        # Override in production to: https://api.smartmetering.africa
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
-    container_name: smartflowmetering-admin-dashboard
-    restart: unless-stopped
-    ports:
-      - "80:3000"
-    networks:
-      - backend
-    depends_on:
-      api:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ==========================================
   # API (Smart Flow Metering Backend)
   # ==========================================
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    image: smartflowmetering-api
     container_name: smartflowmetering-api
     restart: unless-stopped
     ports:
@@ -80,6 +55,14 @@ services:
       HOSTPINNACLE_SENDER_ID: ${HOSTPINNACLE_SENDER_ID}
       HOSTPINNACLE_DLR_WEBHOOK_TOKEN: ${HOSTPINNACLE_DLR_WEBHOOK_TOKEN}
       HOSTPINNACLE_DLR_WEBHOOK_HEADER: ${HOSTPINNACLE_DLR_WEBHOOK_HEADER}
+      TEXTSMS_API_URL: ${TEXTSMS_API_URL}
+      TEXTSMS_BULK_API_URL: ${TEXTSMS_BULK_API_URL}
+      TEXTSMS_DLR_API_URL: ${TEXTSMS_DLR_API_URL}
+      TEXTSMS_BALANCE_API_URL: ${TEXTSMS_BALANCE_API_URL}
+      TEXTSMS_PARTNER_ID: ${TEXTSMS_PARTNER_ID}
+      TEXTSMS_API_KEY: ${TEXTSMS_API_KEY}
+      TEXTSMS_SENDER_ID: ${TEXTSMS_SENDER_ID}
+      TEXTSMS_PASS_TYPE: ${TEXTSMS_PASS_TYPE}
       GOMELONG_API_URL: ${GOMELONG_API_URL}
       GOMELONG_USER_ID: ${GOMELONG_USER_ID}
       GOMELONG_PASSWORD: ${GOMELONG_PASSWORD}
@@ -106,9 +89,7 @@ services:
         condition: service_healthy
 
   worker:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+    image: smartflowmetering-api
     container_name: smartflowmetering-worker
     restart: unless-stopped
     environment:
@@ -148,6 +129,14 @@ services:
       HOSTPINNACLE_SENDER_ID: ${HOSTPINNACLE_SENDER_ID}
       HOSTPINNACLE_DLR_WEBHOOK_TOKEN: ${HOSTPINNACLE_DLR_WEBHOOK_TOKEN}
       HOSTPINNACLE_DLR_WEBHOOK_HEADER: ${HOSTPINNACLE_DLR_WEBHOOK_HEADER}
+      TEXTSMS_API_URL: ${TEXTSMS_API_URL}
+      TEXTSMS_BULK_API_URL: ${TEXTSMS_BULK_API_URL}
+      TEXTSMS_DLR_API_URL: ${TEXTSMS_DLR_API_URL}
+      TEXTSMS_BALANCE_API_URL: ${TEXTSMS_BALANCE_API_URL}
+      TEXTSMS_PARTNER_ID: ${TEXTSMS_PARTNER_ID}
+      TEXTSMS_API_KEY: ${TEXTSMS_API_KEY}
+      TEXTSMS_SENDER_ID: ${TEXTSMS_SENDER_ID}
+      TEXTSMS_PASS_TYPE: ${TEXTSMS_PASS_TYPE}
       GOMELONG_API_URL: ${GOMELONG_API_URL}
       GOMELONG_USER_ID: ${GOMELONG_USER_ID}
       GOMELONG_PASSWORD: ${GOMELONG_PASSWORD}
@@ -227,51 +216,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ==========================================
-  # Automated Database Backups
-  # ==========================================
-  # Creates automatic backups with configurable retention:
-  # - Hourly backups kept for 7 days
-  # - Daily backups kept for 4 weeks  
-  # - Weekly backups kept for 6 months
-  # ==========================================
-  backup:
-    image: prodrigestivill/postgres-backup-local:18
-    container_name: smartflowmetering-backup
-    restart: unless-stopped
-    volumes:
-      - ./backups:/backups
-    networks:
-      - backend
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      # Database connection
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-smartflowmetering}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      
-      # Backup schedule (cron format)
-      # Every 15 minutes - for financial data, minimize data loss risk
-      # Max data loss: 15 min = ~150 transactions at 10tx/min
-      SCHEDULE: "*/15 * * * *"
-      
-      # Retention policy (adjusted for 15-min backups)
-      BACKUP_KEEP_HOURS: 672         # Keep 15-min backups for 7 days (96/day * 7)
-      BACKUP_KEEP_DAYS: 28           # Keep daily backups for 4 weeks
-      BACKUP_KEEP_WEEKS: 24          # Keep weekly backups for 6 months
-      BACKUP_KEEP_MONTHS: 12         # Keep monthly backups for 1 year
-      
-      # Compression and naming
-      BACKUP_SUFFIX: .sql.gz
-      POSTGRES_EXTRA_OPTS: --clean --if-exists --no-owner --no-acl
-      
-      # Health check URL (optional - for monitoring)
-      # HEALTHCHECK_URL: https://hc-ping.com/your-uuid
 
 networks:
   backend:

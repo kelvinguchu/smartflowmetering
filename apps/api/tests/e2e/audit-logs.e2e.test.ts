@@ -35,9 +35,10 @@ void describe("E2E: audit logs", () => {
       method: "POST",
       headers: adminSession.headers,
       body: JSON.stringify({
-        email: `${uniqueRef("audit")}@example.com`,
+        email: `${uniqueRef("audit")}@gmail.com`,
         name: "Audit Target",
         password: "Passw0rd!",
+        phoneNumber: "254712345678",
         role: "user",
       }),
     });

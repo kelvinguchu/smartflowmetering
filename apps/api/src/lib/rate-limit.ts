@@ -1,4 +1,5 @@
 import { createMiddleware } from "hono/factory";
+import { randomUUID } from "node:crypto";
 import { env } from "../config";
 import type { AppBindings } from "./auth-middleware";
 import { createRateLimitStore } from "./rate-limit-store";
@@ -26,6 +27,12 @@ function clientIpFromHeaders(headers: Headers): string {
   const cfIp = headers.get("cf-connecting-ip");
   if (cfIp) {
     return cfIp.trim();
+  }
+
+  // Tests often exercise auth flows in-process without proxy headers.
+  // Use a synthetic per-request key so suites do not accidentally share a bucket.
+  if (env.NODE_ENV === "test") {
+    return `test-${randomUUID()}`;
   }
 
   return "unknown";

@@ -23,6 +23,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "mother_meter_low_balance",
   "postpaid_payment_reminder",
   "daily_usage_summary",
+  "sms_provider_outage",
 ]);
 
 export const adminNotifications = pgTable("admin_notifications", {

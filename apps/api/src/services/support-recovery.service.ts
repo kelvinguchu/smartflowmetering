@@ -54,7 +54,6 @@ export async function findSupportRecovery(
       createdAt: transaction.createdAt,
       generatedTokens: transaction.generatedTokens.map((token) => ({
         createdAt: token.createdAt,
-        id: token.id,
         maskedToken: maskToken(revealToken(token.token)),
         tokenType: token.tokenType,
         value: token.value,
@@ -62,15 +61,12 @@ export async function findSupportRecovery(
       id: transaction.id,
       meter: toMeterSummary(transaction.meter),
       mpesaReceiptNumber: transaction.mpesaReceiptNumber,
-      netAmount: transaction.netAmount,
       phoneNumber: transaction.phoneNumber,
       smsLogs: transaction.smsLogs.map((log) => ({
         createdAt: log.createdAt,
         id: log.id,
         messageBody: redactTokensInText(log.messageBody),
-        phoneNumber: log.phoneNumber,
         provider: log.provider,
-        providerMessageId: log.providerMessageId,
         status: log.status,
       })),
       status: transaction.status,
@@ -88,8 +84,8 @@ async function findMeter(meterNumber: string | undefined) {
   return db.query.meters.findFirst({
     where: eq(meters.meterNumber, meterNumber),
     with: {
-      motherMeter: { columns: { id: true, motherMeterNumber: true } },
-      tariff: { columns: { id: true, name: true, ratePerKwh: true } },
+      motherMeter: { columns: { motherMeterNumber: true } },
+      tariff: { columns: { name: true, ratePerKwh: true } },
     },
   });
 }
@@ -129,7 +125,7 @@ async function findTransactions(
     where,
     with: {
       generatedTokens: {
-        columns: { createdAt: true, id: true, token: true, tokenType: true, value: true },
+        columns: { createdAt: true, token: true, tokenType: true, value: true },
       },
       meter: {
         columns: {
@@ -140,8 +136,8 @@ async function findTransactions(
           status: true,
         },
         with: {
-          motherMeter: { columns: { id: true, motherMeterNumber: true } },
-          tariff: { columns: { id: true, name: true, ratePerKwh: true } },
+          motherMeter: { columns: { motherMeterNumber: true } },
+          tariff: { columns: { name: true, ratePerKwh: true } },
         },
       },
       smsLogs: {
@@ -149,9 +145,7 @@ async function findTransactions(
           createdAt: true,
           id: true,
           messageBody: true,
-          phoneNumber: true,
           provider: true,
-          providerMessageId: true,
           status: true,
         },
       },
@@ -177,10 +171,8 @@ async function findRecentAdminTokens(meterId: string | undefined) {
 
   return tokens.map((token) => ({
     createdAt: token.createdAt,
-    id: token.id,
     maskedToken: maskToken(revealToken(token.token)),
     tokenType: token.tokenType,
-    value: token.value,
   }));
 }
 
@@ -198,6 +190,14 @@ async function findRecentSmsLogs(
 
   const logs = await db.query.smsLogs.findMany({
     where: inArray(smsLogs.phoneNumber, phoneNumbers),
+    columns: {
+      createdAt: true,
+      id: true,
+      messageBody: true,
+      phoneNumber: true,
+      provider: true,
+      status: true,
+    },
     orderBy: [desc(smsLogs.createdAt)],
     limit: 10,
   });
@@ -208,9 +208,7 @@ async function findRecentSmsLogs(
     messageBody: redactTokensInText(log.messageBody),
     phoneNumber: log.phoneNumber,
     provider: log.provider,
-    providerMessageId: log.providerMessageId,
     status: log.status,
-    transactionId: log.transactionId,
   }));
 }
 
@@ -240,18 +238,22 @@ function toMeterSummary(meter: {
   id: string;
   meterNumber: string;
   meterType: string;
-  motherMeter: { id: string; motherMeterNumber: string } | null;
+  motherMeter: { motherMeterNumber: string } | null;
   status: string;
-  tariff: { id: string; name: string; ratePerKwh: string } | null;
+  tariff: { name: string; ratePerKwh: string } | null;
 }): SupportRecoveryMeterSummary {
   return {
     brand: meter.brand,
-    id: meter.id,
     meterNumber: meter.meterNumber,
     meterType: meter.meterType,
-    motherMeter: meter.motherMeter,
+    motherMeterNumber: meter.motherMeter?.motherMeterNumber ?? null,
     status: meter.status,
-    tariff: meter.tariff,
+    tariff: meter.tariff
+      ? {
+          name: meter.tariff.name,
+          ratePerKwh: meter.tariff.ratePerKwh,
+        }
+      : null,
   };
 }
 

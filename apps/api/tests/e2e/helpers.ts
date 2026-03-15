@@ -2,6 +2,7 @@ import { hashPassword } from "better-auth/crypto";
 import { eq, sql } from "drizzle-orm";
 import assert from "node:assert/strict";
 import type { App } from "../../src/app";
+import { env } from "../../src/config";
 import { closeDbConnection, db } from "../../src/db";
 import {
   account,
@@ -33,6 +34,7 @@ TRUNCATE TABLE
   sms_logs,
   customer_app_notifications,
   customer_device_tokens,
+  tenant_app_accesses,
   admin_notifications,
   audit_logs,
   meter_applications,
@@ -56,6 +58,7 @@ CASCADE;
 
 export async function ensureInfraReady() {
   try {
+    applyE2EEnvOverrides();
     startQueueWorkers();
     await db.execute(sql`SELECT 1`);
     await paymentProcessingQueue.getJobCounts("waiting");
@@ -67,6 +70,21 @@ export async function ensureInfraReady() {
     );
   }
 }
+
+function applyE2EEnvOverrides() {
+  process.env.NODE_ENV = "test";
+  process.env.MPESA_REQUIRE_SIGNATURE = "false";
+
+  Object.assign(env as MutableE2EEnv, {
+    MPESA_REQUIRE_SIGNATURE: false,
+    NODE_ENV: "test",
+  });
+}
+
+type MutableE2EEnv = {
+  MPESA_REQUIRE_SIGNATURE: boolean;
+  NODE_ENV: "development" | "production" | "test";
+};
 
 type CleanupQueue = Pick<typeof paymentProcessingQueue, "clean" | "drain">;
 

@@ -78,6 +78,62 @@
       "when": 1773437294707,
       "tag": "0010_slippery_moonstone",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773478503635,
+      "tag": "0011_loose_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1773495394564,
+      "tag": "0012_gray_wolfpack",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1773497473438,
+      "tag": "0013_damp_crystal",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1773498290617,
+      "tag": "0014_messy_nick_fury",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1773514853273,
+      "tag": "0015_busy_maddog",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1773516197935,
+      "tag": "0016_loose_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1773582402080,
+      "tag": "0017_worried_lady_vermin",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1773590477520,
+      "tag": "0018_overrated_warbound",
+      "breakpoints": true
     }
   ]
 }

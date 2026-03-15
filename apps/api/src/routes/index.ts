@@ -17,5 +17,7 @@ export { appNotificationRoutes } from "./app-notifications";
 export { auditLogRoutes } from "./audit-logs";
 export { authSecurityRoutes } from "./auth-security";
 export { customerPromptRoutes } from "./customer-prompts";
+export { landlordAccessRoutes } from "./landlord-access";
 export { supportRecoveryRoutes } from "./support-recovery";
+export { tenantAccessRoutes } from "./tenant-access";
 export { userManagementRoutes } from "./users";
