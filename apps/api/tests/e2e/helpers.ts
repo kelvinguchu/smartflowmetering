@@ -59,14 +59,14 @@ CASCADE;
 export async function ensureInfraReady() {
   try {
     applyE2EEnvOverrides();
-    startQueueWorkers();
+    await startQueueWorkers();
     await db.execute(sql`SELECT 1`);
     await paymentProcessingQueue.getJobCounts("waiting");
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown infrastructure error";
     throw new Error(
-      `E2E infrastructure unavailable. Start docker first, then run tests. Cause: ${message}`
+      `E2E infrastructure unavailable. Start docker first, then run tests. Cause: ${message}`,
     );
   }
 }
@@ -116,22 +116,33 @@ interface TestMeterFixture {
   customerId: string;
   propertyId: string;
   motherMeterId: string;
+  motherMeterNumber: string;
   meterId: string;
   meterNumber: string;
 }
 
 export async function ensureTestMeterFixture(
-  meterNumber = "TEST-METER-001"
+  meterNumber = "TEST-METER-001",
 ): Promise<TestMeterFixture> {
   const existingMeter = await db.query.meters.findFirst({
     where: eq(meters.meterNumber, meterNumber),
-    columns: { id: true, tariffId: true, motherMeterId: true, meterNumber: true },
+    columns: {
+      id: true,
+      tariffId: true,
+      motherMeterId: true,
+      meterNumber: true,
+    },
   });
 
   if (existingMeter) {
     const mother = await db.query.motherMeters.findFirst({
       where: eq(motherMeters.id, existingMeter.motherMeterId),
-      columns: { id: true, landlordId: true, propertyId: true },
+      columns: {
+        id: true,
+        landlordId: true,
+        motherMeterNumber: true,
+        propertyId: true,
+      },
     });
 
     assert.ok(mother, "Expected mother meter for existing test meter");
@@ -141,6 +152,7 @@ export async function ensureTestMeterFixture(
       customerId: mother.landlordId,
       propertyId: mother.propertyId,
       motherMeterId: mother.id,
+      motherMeterNumber: mother.motherMeterNumber,
       meterId: existingMeter.id,
       meterNumber: existingMeter.meterNumber,
     };
@@ -186,7 +198,10 @@ export async function ensureTestMeterFixture(
       totalCapacity: "100.00",
       lowBalanceThreshold: "1000",
     } satisfies NewMotherMeter)
-    .returning({ id: motherMeters.id });
+    .returning({
+      id: motherMeters.id,
+      motherMeterNumber: motherMeters.motherMeterNumber,
+    });
 
   const [meter] = await db
     .insert(meters)
@@ -208,6 +223,7 @@ export async function ensureTestMeterFixture(
     customerId: customer.id,
     propertyId: property.id,
     motherMeterId: motherMeter.id,
+    motherMeterNumber: motherMeter.motherMeterNumber,
     meterId: meter.id,
     meterNumber: meter.meterNumber,
   };
@@ -225,7 +241,7 @@ export function uniqueKenyanPhoneNumber(): string {
 export async function waitFor(
   check: () => Promise<boolean>,
   timeoutMs = 15_000,
-  intervalMs = 200
+  intervalMs = 200,
 ) {
   const start = Date.now();
 
@@ -241,7 +257,7 @@ export async function waitFor(
 
 export async function createAuthenticatedSession(
   app: App,
-  role: "admin" | "user" = "admin"
+  role: "admin" | "user" = "admin",
 ) {
   const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
   const email = `e2e-${role}-${suffix}@gmail.com`;
@@ -278,7 +294,7 @@ export async function createAuthenticatedSession(
   assert.equal(
     signInResponse.status,
     200,
-    `Expected sign-in to succeed, got ${signInResponse.status}`
+    `Expected sign-in to succeed, got ${signInResponse.status}`,
   );
 
   const setCookie = signInResponse.headers.get("set-cookie");

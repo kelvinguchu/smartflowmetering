@@ -31,17 +31,18 @@ export async function getLandlordSubMeterTimeline(
     input.startDate
       ? db
           .select({
-            totalNetSales:
-              sql<string>`coalesce(sum(${transactions.netAmount}::numeric), 0)::text`,
-            totalUnitsPurchased:
-              sql<string>`coalesce(sum(${transactions.unitsPurchased}::numeric), 0)::text`,
+            totalNetSales: sql<string>`coalesce(sum(${transactions.netAmount}::numeric), 0)::text`,
+            totalUnitsPurchased: sql<string>`coalesce(sum(${transactions.unitsPurchased}::numeric), 0)::text`,
           })
           .from(transactions)
           .where(
             and(
               eq(transactions.meterId, meterId),
               eq(transactions.status, "completed"),
-              lt(transactions.completedAt, new Date(`${input.startDate}T00:00:00.000Z`)),
+              lt(
+                transactions.completedAt,
+                new Date(`${input.startDate}T00:00:00.000Z`),
+              ),
             ),
           )
           .limit(1)
@@ -53,7 +54,10 @@ export async function getLandlordSubMeterTimeline(
   let cumulativeUnitsPurchased = toNumber(baselineRows[0]?.totalUnitsPurchased);
 
   const orderedRows = purchaseRows
-    .filter((row): row is typeof row & { occurredAt: Date } => row.occurredAt !== null)
+    .filter(
+      (row): row is typeof row & { occurredAt: Date } =>
+        row.occurredAt !== null,
+    )
     .sort((left, right) => {
       const timeDelta = left.occurredAt.getTime() - right.occurredAt.getTime();
       if (timeDelta !== 0) {
@@ -70,19 +74,26 @@ export async function getLandlordSubMeterTimeline(
       cumulativeNetSales: cumulativeNetSales.toFixed(2),
       cumulativeUnitsPurchased: cumulativeUnitsPurchased.toFixed(4),
       meterCreditAmount: toNumber(row.meterCreditAmount).toFixed(2),
-      mpesaReceiptNumber: row.mpesaReceiptNumber,
       occurredAt: row.occurredAt.toISOString(),
-      phoneNumber: row.phoneNumber,
-      transactionId: row.transactionId,
       unitsPurchased: toNumber(row.unitsPurchased).toFixed(4),
     };
   });
 
-  return timeline.reverse().slice(input.offset ?? 0, (input.offset ?? 0) + (input.limit ?? 50));
+  const descendingTimeline = [...timeline].reverse();
+  return descendingTimeline.slice(
+    input.offset ?? 0,
+    (input.offset ?? 0) + (input.limit ?? 50),
+  );
 }
 
-async function listTimelinePurchases(meterId: string, input: TimelineWindowInput) {
-  const filters = [eq(transactions.meterId, meterId), eq(transactions.status, "completed")];
+async function listTimelinePurchases(
+  meterId: string,
+  input: TimelineWindowInput,
+) {
+  const filters = [
+    eq(transactions.meterId, meterId),
+    eq(transactions.status, "completed"),
+  ];
   if (input.startDate) {
     filters.push(gte(transactions.completedAt, new Date(input.startDate)));
   }

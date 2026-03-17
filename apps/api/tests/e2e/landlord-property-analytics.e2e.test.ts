@@ -65,6 +65,8 @@ void describe("E2E: landlord property analytics", () => {
         totals: { tenantPurchasesNetAmount: string };
       };
     };
+    assert.equal("property" in summaryBody.data, false);
+    assert.equal("companyPaymentsToUtility" in summaryBody.data.totals, false);
     assert.equal(summaryBody.data.motherMeterCounts.total, 2);
     assert.equal(summaryBody.data.motherMeterCounts.prepaid, 1);
     assert.equal(summaryBody.data.motherMeterCounts.postpaid, 1);
@@ -134,7 +136,7 @@ void describe("E2E: landlord property analytics", () => {
         offset: number;
       };
     };
-    assert.equal(rollupBody.count, 3);
+    assert.equal(rollupBody.count, 2);
     assert.equal(rollupBody.pagination.limit, null);
     assert.equal(rollupBody.pagination.offset, 0);
     assert.equal(rollupBody.pagination.hasMore, false);
@@ -145,6 +147,12 @@ void describe("E2E: landlord property analytics", () => {
     assert.equal(rollupBody.data[0]?.bucketMeta.endDate, "2026-03-13");
     assert.equal(rollupBody.data[0]?.granularity, "day");
     assert.equal(rollupBody.data[0]?.motherMeterType, null);
+    assert.equal("property" in (rollupBody.data[0] ?? {}), false);
+    assert.equal("financialSnapshot" in (rollupBody.data[0] ?? {}), false);
+    assert.equal(
+      "companyPaymentsToUtility" in (rollupBody.data[0]?.totals ?? {}),
+      false,
+    );
     assert.equal(rollupBody.data[0]?.totals.tenantPurchasesNetAmount, "90.00");
     assert.equal(
       rollupBody.data[0]?.breakdown.postpaid.tenantPurchasesNetAmount,
@@ -167,7 +175,7 @@ void describe("E2E: landlord property analytics", () => {
         totals: { tenantPurchasesNetAmount: string };
       }[];
     };
-    assert.equal(filteredRollupBody.count, 2);
+    assert.equal(filteredRollupBody.count, 1);
     assert.equal(filteredRollupBody.data[0]?.motherMeterType, "prepaid");
     assert.equal(filteredRollupBody.data[0]?.totals.tenantPurchasesNetAmount, "130.00");
 
@@ -204,8 +212,7 @@ void describe("E2E: landlord property analytics", () => {
     const comparisonBody = (await comparisonResponse.json()) as {
       count: number;
       data: {
-        financialSnapshot: { postpaidOutstandingAmount: string | null; prepaidEstimatedBalance: string | null };
-        motherMeter: { id: string; type: "postpaid" | "prepaid" };
+        motherMeter: { motherMeterNumber: string; type: "postpaid" | "prepaid" };
         motherMeterType: string | null;
         totals: { tenantPurchasesNetAmount: string };
       }[];
@@ -222,17 +229,17 @@ void describe("E2E: landlord property analytics", () => {
     assert.equal(comparisonBody.pagination.hasMore, false);
     assert.equal(comparisonBody.pagination.nextOffset, null);
     const prepaidComparison = comparisonBody.data.find(
-      (item) => item.motherMeter.id === fixture.motherMeterId,
+      (item) => item.motherMeter.motherMeterNumber === fixture.motherMeterNumber,
     );
     const postpaidComparison = comparisonBody.data.find(
-      (item) => item.motherMeter.id === seeded.postpaidMotherMeterId,
+      (item) => item.motherMeter.motherMeterNumber === seeded.postpaidMotherMeterNumber,
     );
     assert.ok(prepaidComparison);
     assert.ok(postpaidComparison);
     assert.equal(prepaidComparison.motherMeterType, null);
     assert.equal(prepaidComparison.totals.tenantPurchasesNetAmount, "130.00");
-    assert.equal(prepaidComparison.financialSnapshot.prepaidEstimatedBalance, "50.00");
-    assert.equal(postpaidComparison.financialSnapshot.postpaidOutstandingAmount, "50.00");
+    assert.equal("financialSnapshot" in prepaidComparison, false);
+    assert.equal("id" in prepaidComparison.motherMeter, false);
     assert.equal(postpaidComparison.motherMeter.type, "postpaid");
 
     const filteredComparisonResponse = await app.request(

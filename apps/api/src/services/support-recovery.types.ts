@@ -1,3 +1,8 @@
+import type {
+  FailedTransactionResolutionAction,
+  FailedTransactionStatus,
+} from "./failed-transaction-policy.service";
+
 export interface SupportRecoverySearchCriteria {
   meterNumber?: string;
   mpesaReceiptNumber?: string;
@@ -13,6 +18,27 @@ export interface SupportRecoveryMeterSummary {
   motherMeterNumber: string | null;
   status: string;
   tariff: { name: string; ratePerKwh: string } | null;
+}
+
+export interface SupportRecoveryAssessment {
+  allowedResolutionActions: FailedTransactionResolutionAction[];
+  caseId:
+    | "completed_without_token"
+    | "payment_still_processing"
+    | "provider_failure_before_token"
+    | "sms_delivery_failed"
+    | "sms_delivery_pending"
+    | "token_delivery_confirmed"
+    | "token_generated_no_sms";
+  closurePrecondition: string;
+  manualInterventionRequired: boolean;
+  recommendedAction: string;
+  recommendedClosureStatus: Exclude<
+    FailedTransactionStatus,
+    "pending_review"
+  > | null;
+  resolutionRequired: boolean;
+  summary: string;
 }
 
 export interface SupportRecoveryResult {
@@ -45,6 +71,7 @@ export interface SupportRecoveryResult {
     meter: SupportRecoveryMeterSummary;
     mpesaReceiptNumber: string;
     phoneNumber: string;
+    recoveryAssessment: SupportRecoveryAssessment;
     smsLogs: {
       createdAt: Date;
       id: string;

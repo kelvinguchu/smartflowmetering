@@ -30,6 +30,12 @@ export const customerDeviceTokenListQuerySchema = z.object({
   phoneNumber: z.string().trim().min(10).max(20).optional(),
 });
 
+export const customerLookupScopeQuerySchema = z.object({
+  landlordId: z.uuid().optional(),
+  meterNumber: z.string().trim().min(1).optional(),
+  phoneNumber: z.string().trim().min(10).max(20).optional(),
+});
+
 export const appNotificationIdParamSchema = z.object({
   id: z.uuid(),
 });

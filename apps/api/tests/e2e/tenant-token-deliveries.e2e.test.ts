@@ -195,8 +195,8 @@ void describe("E2E: tenant token deliveries", () => {
       data: {
         maskedToken: string | null;
         smsDelivery: {
-          providerStatus: string | null;
           status: string;
+          updatedAt: string;
         } | null;
         status: string;
         transactionId: string;
@@ -207,7 +207,19 @@ void describe("E2E: tenant token deliveries", () => {
     assert.equal(body.data.maskedToken, "****************7890");
     assert.ok(body.data.smsDelivery);
     assert.equal(body.data.smsDelivery.status, "delivered");
-    assert.equal(body.data.smsDelivery.providerStatus, "DELIVRD");
+    assert.ok(body.data.smsDelivery.updatedAt);
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(body.data.smsDelivery, "providerStatus"),
+      false,
+    );
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(body.data.smsDelivery, "provider"),
+      false,
+    );
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(body.data.smsDelivery, "errorCode"),
+      false,
+    );
   });
 
   void it("acknowledges a tenant token-delivery notification by transaction reference", async () => {

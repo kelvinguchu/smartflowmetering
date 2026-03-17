@@ -112,7 +112,6 @@ export async function listLandlordMotherMeters(
         lastPurchaseAt: subMeter.lastPurchaseAt,
         totalCompletedPurchases: subMeter.totalCompletedPurchases,
       },
-      id: subMeter.id,
       meterNumber: subMeter.meterNumber,
       meterType: subMeter.meterType,
       status: subMeter.status,
@@ -160,11 +159,9 @@ export async function listLandlordMotherMeters(
           row.type === "prepaid" ? prepaidEstimatedBalance.toFixed(2) : null,
         utilityFundingLoaded: aggregate.utilityFundingLoaded.toFixed(2),
       },
-      id: row.id,
       lowBalanceThreshold: toNumber(row.lowBalanceThreshold).toFixed(2),
       motherMeterNumber: row.motherMeterNumber,
       property: {
-        id: row.propertyId,
         location: row.propertyLocation,
         name: row.propertyName,
       },
@@ -241,14 +238,12 @@ export async function listLandlordPurchases(
   return rows.map((row) => ({
     completedAt: row.completedAt?.toISOString() ?? null,
     meter: {
-      id: row.meterId,
       meterNumber: row.meterNumber,
       meterType: row.meterType,
       status: row.meterStatus,
     },
     meterCreditAmount: toNumber(row.meterCreditAmount).toFixed(2),
     motherMeter: {
-      id: row.motherMeterId,
       motherMeterNumber: row.motherMeterNumber,
       type: row.motherMeterType,
     },

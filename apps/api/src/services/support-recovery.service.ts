@@ -8,6 +8,7 @@ import {
 import { revealToken } from "../lib/token-protection";
 import { maskToken, redactTokensInText } from "../lib/token-redaction";
 import type { SupportRecoveryQuery } from "../validators/support-recovery";
+import { buildSupportRecoveryAssessment } from "./support-recovery-assessment.service";
 import type {
   SupportRecoveryMeterSummary,
   SupportRecoveryResult,
@@ -23,6 +24,9 @@ const ADMIN_TOKEN_TYPES = [
 
 export async function findSupportRecovery(
   query: SupportRecoveryQuery,
+  options: {
+    includeAdminTokens: boolean;
+  },
 ): Promise<SupportRecoveryResult> {
   const criteria = normalizeCriteria(query);
   const directMeter = (await findMeter(criteria.meterNumber)) ?? null;
@@ -45,7 +49,9 @@ export async function findSupportRecovery(
 
   return {
     meter: meterSummary,
-    recentAdminTokens: await findRecentAdminTokens(resolvedMeterId),
+    recentAdminTokens: options.includeAdminTokens
+      ? await findRecentAdminTokens(resolvedMeterId)
+      : [],
     recentSmsLogs: await findRecentSmsLogs(criteria.phoneNumber, transactionRows),
     search: criteria,
     transactions: transactionRows.map((transaction) => ({
@@ -62,6 +68,11 @@ export async function findSupportRecovery(
       meter: toMeterSummary(transaction.meter),
       mpesaReceiptNumber: transaction.mpesaReceiptNumber,
       phoneNumber: transaction.phoneNumber,
+      recoveryAssessment: buildSupportRecoveryAssessment({
+        generatedTokens: transaction.generatedTokens,
+        smsLogs: transaction.smsLogs,
+        status: transaction.status,
+      }),
       smsLogs: transaction.smsLogs.map((log) => ({
         createdAt: log.createdAt,
         id: log.id,

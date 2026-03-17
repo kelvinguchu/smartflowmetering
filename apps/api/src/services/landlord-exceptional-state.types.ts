@@ -8,7 +8,6 @@ export interface LandlordExceptionalStateSummary {
   prepaid: {
     negativeBalanceCount: number;
   };
-  propertyId: string | null;
   totalExceptionalMotherMeters: number;
 }
 
@@ -20,11 +19,7 @@ export interface LandlordExceptionalMotherMeterStateItem {
     lastBillPaymentAt: string | null;
   };
   motherMeter: {
-    id: string;
     motherMeterNumber: string;
-    property: {
-      id: string;
-    };
     type: "postpaid" | "prepaid";
   };
   postpaidStatus: {

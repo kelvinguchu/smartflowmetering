@@ -60,7 +60,10 @@ export async function seedLandlordPropertyAnalyticsFixture(input: {
       tariffId: input.tariffId,
       type: "postpaid",
     } satisfies NewMotherMeter)
-    .returning({ id: motherMeters.id });
+    .returning({
+      id: motherMeters.id,
+      motherMeterNumber: motherMeters.motherMeterNumber,
+    });
   const [postpaidMeter] = await db
     .insert(meters)
     .values({
@@ -131,5 +134,8 @@ export async function seedLandlordPropertyAnalyticsFixture(input: {
     },
   ]);
 
-  return { postpaidMotherMeterId: postpaidMotherMeter.id };
+  return {
+    postpaidMotherMeterId: postpaidMotherMeter.id,
+    postpaidMotherMeterNumber: postpaidMotherMeter.motherMeterNumber,
+  };
 }

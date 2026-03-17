@@ -10,11 +10,9 @@ export interface LandlordSubMeterDetail {
     lastPurchaseAt: string | null;
     totalCompletedPurchases: number;
   };
-  id: string;
   meterNumber: string;
   meterType: MeterType;
   motherMeter: {
-    id: string;
     motherMeterNumber: string;
     type: MotherMeterType;
   };
@@ -39,9 +37,6 @@ export interface LandlordSubMeterTimelineItem {
   cumulativeNetSales: string;
   cumulativeUnitsPurchased: string;
   meterCreditAmount: string;
-  mpesaReceiptNumber: string;
   occurredAt: string;
-  phoneNumber: string;
-  transactionId: string;
   unitsPurchased: string;
 }

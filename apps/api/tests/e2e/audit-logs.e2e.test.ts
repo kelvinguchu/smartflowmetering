@@ -27,6 +27,16 @@ void describe("E2E: audit logs", () => {
     });
 
     assert.equal(response.status, 403);
+
+    const detailResponse = await app.request(
+      "/api/audit-logs/00000000-0000-0000-0000-000000000000",
+      {
+        method: "GET",
+        headers: userSession.headers,
+      },
+    );
+
+    assert.equal(detailResponse.status, 403);
   });
 
   void it("lets admins filter and read audit logs for user-management actions", async () => {
@@ -48,11 +58,14 @@ void describe("E2E: audit logs", () => {
       data: { id: string };
     };
 
-    const roleResponse = await app.request(`/api/users/${createdBody.data.id}/role`, {
-      method: "POST",
-      headers: adminSession.headers,
-      body: JSON.stringify({ role: "admin" }),
-    });
+    const roleResponse = await app.request(
+      `/api/users/${createdBody.data.id}/role`,
+      {
+        method: "POST",
+        headers: adminSession.headers,
+        body: JSON.stringify({ role: "admin" }),
+      },
+    );
     assert.equal(roleResponse.status, 200);
 
     const listResponse = await app.request(

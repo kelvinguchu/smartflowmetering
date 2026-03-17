@@ -39,6 +39,7 @@ void describe("E2E: customer prompts", () => {
     const staleFixture = await ensureTestMeterFixture("PROMPT-STABLE-001");
     const failedFixture = await ensureTestMeterFixture("PROMPT-FAILED-001");
     const staffSession = await createAuthenticatedSession(app, "user");
+    const adminSession = await createAuthenticatedSession(app, "admin");
     const stalePhoneNumber = uniqueKenyanPhoneNumber();
     const failedPhoneNumber = uniqueKenyanPhoneNumber();
     const tenDaysAgo = new Date(Date.now() - 10 * 24 * 3_600_000);
@@ -83,11 +84,40 @@ void describe("E2E: customer prompts", () => {
       status: "pending_review",
     });
 
-    const response = await app.request("/api/customer-prompts?type=all&limit=10", {
+    const supportBroadResponse = await app.request("/api/customer-prompts?type=all&limit=10", {
       method: "GET",
       headers: staffSession.headers,
     });
+    assert.equal(supportBroadResponse.status, 403);
 
+    const supportScopedResponse = await app.request(
+      `/api/customer-prompts?type=all&limit=10&meterNumber=${failedFixture.meterNumber}`,
+      {
+        method: "GET",
+        headers: staffSession.headers,
+      },
+    );
+    assert.equal(supportScopedResponse.status, 200);
+    const supportScopedBody = (await supportScopedResponse.json()) as {
+      data: {
+        meterNumber: string;
+        phoneNumber: string;
+        promptType: string;
+      }[];
+      summary: {
+        buyTokenNudges: number;
+        failedPurchaseFollowUps: number;
+        total: number;
+      };
+    };
+    assert.equal(supportScopedBody.summary.total, 1);
+    assert.equal(supportScopedBody.summary.failedPurchaseFollowUps, 1);
+    assert.equal(supportScopedBody.summary.buyTokenNudges, 0);
+
+    const response = await app.request("/api/customer-prompts?type=all&limit=10", {
+      method: "GET",
+      headers: adminSession.headers,
+    });
     assert.equal(response.status, 200);
     const body = (await response.json()) as {
       data: {
@@ -127,6 +157,7 @@ void describe("E2E: customer prompts", () => {
     const staleFixture = await ensureTestMeterFixture("PROMPT-STABLE-002");
     const failedFixture = await ensureTestMeterFixture("PROMPT-FAILED-002");
     const staffSession = await createAuthenticatedSession(app, "user");
+    const adminSession = await createAuthenticatedSession(app, "admin");
     const stalePhoneNumber = uniqueKenyanPhoneNumber();
     const failedPhoneNumber = uniqueKenyanPhoneNumber();
     const eightDaysAgo = new Date(Date.now() - 8 * 24 * 3_600_000);
@@ -190,9 +221,20 @@ void describe("E2E: customer prompts", () => {
       type: "failed_purchase_follow_up",
     });
 
-    const response = await app.request("/api/customer-prompts/queue", {
+    const supportBroadQueueResponse = await app.request("/api/customer-prompts/queue", {
       method: "POST",
       headers: staffSession.headers,
+      body: JSON.stringify({
+        maxPrompts: 10,
+        staleDays: 7,
+        type: "all",
+      }),
+    });
+    assert.equal(supportBroadQueueResponse.status, 403);
+
+    const response = await app.request("/api/customer-prompts/queue", {
+      method: "POST",
+      headers: adminSession.headers,
       body: JSON.stringify({
         maxPrompts: 10,
         staleDays: 7,

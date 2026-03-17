@@ -10,7 +10,15 @@ type JsonObject = Record<string, JsonValue>;
 
 async function getJson(path: string, headers?: Record<string, string>) {
   const response = await app.request(path, { method: "GET", headers });
-  const body = (await response.json()) as JsonObject;
+  const text = await response.text();
+  let body = {} as JsonObject;
+  if (text) {
+    try {
+      body = JSON.parse(text) as JsonObject;
+    } catch {
+      body = { raw: text };
+    }
+  }
   return { response, body };
 }
 
@@ -103,6 +111,7 @@ void describe("E2E: API health and auth guards", () => {
   void it("allows staff to review applications but keeps approvals admin-only", async () => {
     const userSession = await createAuthenticatedSession(app, "user");
     const adminSession = await createAuthenticatedSession(app, "admin");
+    const fixture = await ensureTestMeterFixture();
 
     const createResponse = await app.request("/api/applications", {
       method: "POST",
@@ -117,30 +126,56 @@ void describe("E2E: API health and auth guards", () => {
     const listResponse = await getJson("/api/applications", userSession.headers);
     assert.equal(listResponse.response.status, 200);
     assert.ok(Array.isArray(listResponse.body.data));
+    const [supportListItem] = listResponse.body.data as Record<string, JsonValue>[];
+    assert.ok(supportListItem);
+    assert.equal("idNumber" in supportListItem, false);
+    assert.equal("kraPin" in supportListItem, false);
+
+    const nonPendingListResponse = await getJson(
+      "/api/applications?status=approved",
+      userSession.headers,
+    );
+    assert.equal(nonPendingListResponse.response.status, 403);
 
     const detailResponse = await getJson(
       `/api/applications/${createdBody.data.id}`,
       userSession.headers,
     );
     assert.equal(detailResponse.response.status, 200);
+    assert.equal("idNumber" in (detailResponse.body.data as Record<string, JsonValue>), false);
+    assert.equal("kraPin" in (detailResponse.body.data as Record<string, JsonValue>), false);
 
     const approveResponse = await app.request(
       `/api/applications/${createdBody.data.id}/approve`,
       {
         method: "POST",
-        headers: userSession.headers,
+        headers: adminSession.headers,
         body: JSON.stringify({
-          tariffId: "00000000-0000-0000-0000-000000000000",
+          tariffId: fixture.tariffId,
         }),
       },
     );
-    assert.equal(approveResponse.status, 403);
+    assert.equal(approveResponse.status, 200);
+
+    const supportApprovedDetailResponse = await getJson(
+      `/api/applications/${createdBody.data.id}`,
+      userSession.headers,
+    );
+    assert.equal(supportApprovedDetailResponse.response.status, 404);
 
     const adminDetailResponse = await getJson(
       `/api/applications/${createdBody.data.id}`,
       adminSession.headers,
     );
     assert.equal(adminDetailResponse.response.status, 200);
+    assert.equal(
+      "idNumber" in (adminDetailResponse.body.data as Record<string, JsonValue>),
+      true,
+    );
+    assert.equal(
+      "kraPin" in (adminDetailResponse.body.data as Record<string, JsonValue>),
+      true,
+    );
   });
 
   void it("keeps meter mutations admin-only", async () => {

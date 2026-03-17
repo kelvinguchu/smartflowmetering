@@ -41,7 +41,6 @@ export async function getLandlordThresholdSummary(
       aboveThresholdCount: prepaidThresholds.filter((item) => !item.isBelowThreshold).length,
       belowThresholdCount: prepaidThresholds.filter((item) => item.isBelowThreshold).length,
     },
-    propertyId: input.propertyId ?? null,
   };
 }
 
@@ -69,11 +68,7 @@ export async function listLandlordMotherMeterThresholdStates(
   for (const alert of prepaidThresholds) {
     states.set(alert.motherMeterId, {
       motherMeter: {
-        id: alert.motherMeterId,
         motherMeterNumber: alert.motherMeterNumber,
-        property: {
-          id: alert.propertyId,
-        },
         type: alert.type,
       },
       postpaidStatus: null,
@@ -88,11 +83,7 @@ export async function listLandlordMotherMeterThresholdStates(
   for (const reminder of postpaidReminders) {
     states.set(reminder.motherMeterId, {
       motherMeter: {
-        id: reminder.motherMeterId,
         motherMeterNumber: reminder.motherMeterNumber,
-        property: {
-          id: reminder.propertyId,
-        },
         type: "postpaid",
       },
       postpaidStatus: {

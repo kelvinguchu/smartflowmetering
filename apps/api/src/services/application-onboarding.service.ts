@@ -16,6 +16,13 @@ import type {
   createApplicationSchema,
 } from "../validators/applications";
 import {
+  toMeterApplicationAdminDetail,
+  toMeterApplicationSupportDetail,
+  toMeterApplicationSummary,
+  type MeterApplicationAdminDetail,
+  type MeterApplicationSupportDetail,
+} from "./application-onboarding-response.service";
+import {
   ApplicationError,
   buildDefaultPropertyName,
   formatDecimal,
@@ -66,7 +73,7 @@ export async function createMeterApplication(input: CreateApplicationInput) {
   return application;
 }
 
-export async function listMeterApplications(query: ApplicationQueryInput) {
+export async function listMeterApplicationSummaries(query: ApplicationQueryInput) {
   const where = query.status
     ? eq(meterApplications.status, query.status)
     : undefined;
@@ -75,19 +82,87 @@ export async function listMeterApplications(query: ApplicationQueryInput) {
   const offset = query.offset ?? 0;
 
   const result = await db.query.meterApplications.findMany({
+    columns: {
+      buildingType: true,
+      county: true,
+      createdAt: true,
+      email: true,
+      firstName: true,
+      id: true,
+      lastName: true,
+      location: true,
+      motherMeterNumber: true,
+      paymentMode: true,
+      phoneNumber: true,
+      status: true,
+      subMeterNumbers: true,
+      utilityType: true,
+    },
     where,
     orderBy: [desc(meterApplications.createdAt)],
     limit,
     offset,
   });
 
-  return { data: result, count: result.length, limit, offset };
+  return {
+    count: result.length,
+    data: result.map(toMeterApplicationSummary),
+    limit,
+    offset,
+  };
 }
 
-export async function getMeterApplicationById(id: string) {
-  return db.query.meterApplications.findFirst({
+export async function getMeterApplicationSupportDetailById(
+  id: string,
+): Promise<MeterApplicationSupportDetail | null> {
+  const application = await db.query.meterApplications.findFirst({
+    where: and(
+      eq(meterApplications.id, id),
+      eq(meterApplications.status, "pending"),
+    ),
+    columns: {
+      billPayer: true,
+      buildingType: true,
+      county: true,
+      createdAt: true,
+      email: true,
+      firstName: true,
+      id: true,
+      initialReading: true,
+      installationType: true,
+      lastName: true,
+      location: true,
+      motherMeterNumber: true,
+      paymentMode: true,
+      phoneNumber: true,
+      status: true,
+      subMeterNumbers: true,
+      suppliesOtherHouses: true,
+      technicianName: true,
+      technicianPhone: true,
+      utilityType: true,
+    },
+  });
+
+  if (!application) {
+    return null;
+  }
+
+  return toMeterApplicationSupportDetail(application);
+}
+
+export async function getMeterApplicationAdminDetailById(
+  id: string,
+): Promise<MeterApplicationAdminDetail | null> {
+  const application = await db.query.meterApplications.findFirst({
     where: eq(meterApplications.id, id),
   });
+
+  if (!application) {
+    return null;
+  }
+
+  return toMeterApplicationAdminDetail(application);
 }
 
 export async function approveMeterApplication(

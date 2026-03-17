@@ -130,10 +130,15 @@ void describe("E2E: landlord threshold history", () => {
       count: number;
       data: {
         date: string;
+        motherMeter: {
+          motherMeterNumber: string;
+          type: "postpaid" | "prepaid";
+        };
         prepaidStatus: { estimatedBalance: string; isBelowThreshold: boolean } | null;
       }[];
     };
     assert.equal(prepaidBody.count, 3);
+    assert.equal("id" in (prepaidBody.data[0]?.motherMeter ?? {}), false);
     assert.equal(prepaidBody.data[0]?.date, "2026-03-11");
     assert.equal(prepaidBody.data[0]?.prepaidStatus?.estimatedBalance, "300.00");
     assert.equal(prepaidBody.data[1]?.prepaidStatus?.isBelowThreshold, true);
@@ -151,10 +156,15 @@ void describe("E2E: landlord threshold history", () => {
       count: number;
       data: {
         date: string;
+        motherMeter: {
+          motherMeterNumber: string;
+          type: "postpaid" | "prepaid";
+        };
         postpaidStatus: { isReminderDue: boolean; outstandingAmount: string } | null;
       }[];
     };
     assert.equal(postpaidBody.count, 3);
+    assert.equal("id" in (postpaidBody.data[0]?.motherMeter ?? {}), false);
     assert.equal(postpaidBody.data[0]?.date, "2026-03-10");
     assert.equal(postpaidBody.data[0]?.postpaidStatus?.isReminderDue, true);
     assert.equal(postpaidBody.data[1]?.postpaidStatus?.outstandingAmount, "0.00");

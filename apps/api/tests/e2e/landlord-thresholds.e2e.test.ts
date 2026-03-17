@@ -52,7 +52,10 @@ void describe("E2E: landlord thresholds", () => {
         tariffId: fixture.tariffId,
         type: "postpaid",
       } satisfies NewMotherMeter)
-      .returning({ id: motherMeters.id });
+      .returning({
+        id: motherMeters.id,
+        motherMeterNumber: motherMeters.motherMeterNumber,
+      });
     const [postpaidMeter] = await db
       .insert(meters)
       .values({
@@ -130,10 +133,9 @@ void describe("E2E: landlord thresholds", () => {
       data: {
         postpaid: { dueCount: number; notDueCount: number };
         prepaid: { aboveThresholdCount: number; belowThresholdCount: number };
-        propertyId: string | null;
       };
     };
-    assert.equal(summaryBody.data.propertyId, fixture.propertyId);
+    assert.equal("propertyId" in summaryBody.data, false);
     assert.equal(summaryBody.data.prepaid.belowThresholdCount, 1);
     assert.equal(summaryBody.data.postpaid.dueCount, 1);
 
@@ -148,20 +150,25 @@ void describe("E2E: landlord thresholds", () => {
     const statesBody = (await statesResponse.json()) as {
       count: number;
       data: {
-        motherMeter: { id: string; type: "postpaid" | "prepaid" };
+        motherMeter: {
+          motherMeterNumber: string;
+          type: "postpaid" | "prepaid";
+        };
         postpaidStatus: { isReminderDue: boolean } | null;
         prepaidStatus: { isBelowThreshold: boolean; estimatedBalance: string } | null;
       }[];
     };
     assert.equal(statesBody.count, 2);
     const prepaidState = statesBody.data.find(
-      (item) => item.motherMeter.id === fixture.motherMeterId,
+      (item) => item.motherMeter.motherMeterNumber === fixture.motherMeterNumber,
     );
     const postpaidState = statesBody.data.find(
-      (item) => item.motherMeter.id === postpaidMotherMeter.id,
+      (item) =>
+        item.motherMeter.motherMeterNumber === postpaidMotherMeter.motherMeterNumber,
     );
     assert.ok(prepaidState);
     assert.ok(postpaidState);
+    assert.equal("id" in prepaidState.motherMeter, false);
     assert.ok(prepaidState.prepaidStatus);
     assert.ok(postpaidState.postpaidStatus);
     assert.equal(prepaidState.prepaidStatus.isBelowThreshold, true);

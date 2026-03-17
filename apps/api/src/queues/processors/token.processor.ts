@@ -1,8 +1,12 @@
-import type { Job } from "bullmq";
+import { UnrecoverableError, type Job } from "bullmq";
 import { createHash } from "node:crypto";
 import { db } from "../../db";
-import { transactions, generatedTokens } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import {
+  failedTransactions,
+  generatedTokens,
+  transactions,
+} from "../../db/schema";
+import { and, eq } from "drizzle-orm";
 import { env } from "../../config";
 import { protectToken } from "../../lib/token-protection";
 import { maskToken } from "../../lib/token-redaction";
@@ -14,6 +18,12 @@ import {
   isGomelongConfigured,
   vendTokenWithGomelong,
 } from "../../services/meter-providers/gomelong.service";
+import {
+  formatGomelongFailureDetails,
+  getGomelongFailurePolicy,
+  hasGomelongRetriesExhausted,
+  markGomelongRetriesExhausted,
+} from "../../services/meter-providers/gomelong-failure-policy";
 import { mapMeterTypeToGomelong } from "../../services/meter-providers/provider-capabilities";
 
 type MeterUtilityType = "electricity" | "water" | "gas";
@@ -30,13 +40,7 @@ type MeterUtilityType = "electricity" | "water" | "gas";
 export async function processTokenGeneration(
   job: Job<TokenGenerationJob>,
 ): Promise<{ token: string }> {
-  const {
-    transactionId,
-    meterId,
-    meterNumber,
-    meterType,
-    units,
-  } = job.data;
+  const { transactionId, meterId, meterNumber, meterType, units } = job.data;
 
   console.log(
     `[Token] Generating for meter ${maskMeterNumberForLog(meterNumber)}, ${units} kWh`,
@@ -45,7 +49,7 @@ export async function processTokenGeneration(
   // Get the transaction to fetch phone number
   const transaction = await db.query.transactions.findFirst({
     where: eq(transactions.id, transactionId),
-    columns: { phoneNumber: true, amountPaid: true },
+    columns: { phoneNumber: true, amountPaid: true, mpesaTransactionId: true },
   });
 
   if (!transaction) {
@@ -61,11 +65,44 @@ export async function processTokenGeneration(
       units,
     });
   } catch (error) {
-    // Update transaction as failed
+    const failurePolicy = getGomelongFailurePolicy(error);
+    const retriesAlreadyExhausted = hasGomelongRetriesExhausted(error);
+    const hasRetriesRemaining =
+      !retriesAlreadyExhausted &&
+      job.attemptsMade + 1 < (job.opts.attempts ?? 1);
+    const retriesExhausted =
+      failurePolicy.retryable &&
+      (retriesAlreadyExhausted || !hasRetriesRemaining);
+
+    if (failurePolicy.retryable && hasRetriesRemaining) {
+      await db
+        .update(transactions)
+        .set({ status: "processing" })
+        .where(eq(transactions.id, transactionId));
+
+      throw error;
+    }
+
     await db
       .update(transactions)
       .set({ status: "failed" })
       .where(eq(transactions.id, transactionId));
+
+    await createManufacturerFailedTransactionRecord({
+      amountPaid: transaction.amountPaid,
+      error,
+      meterNumber,
+      mpesaTransactionId: transaction.mpesaTransactionId,
+      phoneNumber: transaction.phoneNumber,
+      retriesExhausted,
+    });
+
+    if (!failurePolicy.retryable || retriesAlreadyExhausted) {
+      throw new UnrecoverableError(
+        error instanceof Error ? error.message : "Gomelong vend failed",
+      );
+    }
+
     throw error;
   }
 
@@ -128,7 +165,7 @@ interface TokenRequest {
   units: string;
 }
 
-async function generateTokenFromManufacturer(
+export async function generateTokenFromManufacturer(
   request: TokenRequest,
 ): Promise<string> {
   const { meterType, meterNumber, units } = request;
@@ -177,14 +214,17 @@ function shouldUseTestTokenStub(): boolean {
 }
 
 function shouldUseInlineGomelongRetries(): boolean {
-  return env.NODE_ENV === "test" && /^http:\/\/(127\.0\.0\.1|localhost):\d+$/i.test(env.GOMELONG_API_URL);
+  return (
+    env.NODE_ENV === "test" &&
+    /^http:\/\/(127\.0\.0\.1|localhost):\d+$/i.test(env.GOMELONG_API_URL)
+  );
 }
 
 function buildTestToken(meterNumber: string, units: string): string {
   const digest = createHash("sha256")
     .update(`${meterNumber}:${units}`)
     .digest("hex");
-  const digits = digest.replace(/\D/g, "");
+  const digits = digest.replaceAll(/\D/g, "");
 
   return `${digits}12345678901234567890`.slice(0, 20);
 }
@@ -202,13 +242,61 @@ async function vendTokenWithInlineRetries(request: {
       return await vendTokenWithGomelong(request);
     } catch (error) {
       lastError = error;
+      if (!getGomelongFailurePolicy(error).retryable) {
+        break;
+      }
+
       if (attempt === 2) {
         break;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+      await waitMs(100 * (attempt + 1));
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("Gomelong vend failed");
+  throw markGomelongRetriesExhausted(
+    lastError instanceof Error ? lastError : new Error("Gomelong vend failed"),
+  );
+}
+
+async function createManufacturerFailedTransactionRecord(input: {
+  amountPaid: string;
+  error: unknown;
+  meterNumber: string;
+  mpesaTransactionId: string | null;
+  phoneNumber: string;
+  retriesExhausted: boolean;
+}) {
+  if (!input.mpesaTransactionId) {
+    return;
+  }
+
+  const existing = await db.query.failedTransactions.findFirst({
+    where: and(
+      eq(failedTransactions.mpesaTransactionId, input.mpesaTransactionId),
+      eq(failedTransactions.failureReason, "manufacturer_error"),
+      eq(failedTransactions.status, "pending_review"),
+    ),
+    columns: { id: true },
+  });
+
+  if (existing) {
+    return;
+  }
+
+  await db.insert(failedTransactions).values({
+    mpesaTransactionId: input.mpesaTransactionId,
+    failureReason: "manufacturer_error",
+    failureDetails: formatGomelongFailureDetails(input.error, {
+      retriesExhausted: input.retriesExhausted,
+    }),
+    meterNumberAttempted: input.meterNumber,
+    amount: input.amountPaid,
+    phoneNumber: input.phoneNumber,
+    status: "pending_review",
+  });
+}
+
+function waitMs(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

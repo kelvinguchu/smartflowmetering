@@ -11,11 +11,9 @@ export interface LandlordMotherMeterDetail {
     prepaidEstimatedBalance: string | null;
     utilityFundingLoaded: string;
   };
-  id: string;
   lowBalanceThreshold: string;
   motherMeterNumber: string;
   property: {
-    id: string;
     location: string;
     name: string;
   };
@@ -26,7 +24,6 @@ export interface LandlordMotherMeterDetail {
       lastPurchaseAt: string | null;
       totalCompletedPurchases: number;
     };
-    id: string;
     meterNumber: string;
     meterType: "electricity" | "gas" | "water";
     status: "active" | "inactive" | "suspended";
@@ -44,7 +41,6 @@ export interface LandlordMotherMeterEventItem {
   amount: string;
   createdAt: string;
   eventType: "bill_payment" | "initial_deposit" | "refill";
-  id: string;
   kplcReceiptNumber: string | null;
   kplcToken: string | null;
 }
@@ -64,7 +60,6 @@ export interface LandlordUsageHistoryItem {
   latestPurchaseAt: string | null;
   meterCreditAmountTotal: string;
   motherMeter: {
-    id: string;
     motherMeterNumber: string;
     type: "postpaid" | "prepaid";
   };

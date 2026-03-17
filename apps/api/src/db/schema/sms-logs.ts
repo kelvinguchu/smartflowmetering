@@ -35,6 +35,7 @@ export const smsLogs = pgTable("sms_logs", {
   providerStatus: text("provider_status"),
   providerErrorCode: text("provider_error_code"),
   providerMessageId: text("provider_message_id"), // External ID from provider
+  providerReference: text("provider_reference"), // Fallback provider-side reference
   providerReceivedAt: timestamp("provider_received_at", { withTimezone: true }),
   providerDeliveredAt: timestamp("provider_delivered_at", {
     withTimezone: true,

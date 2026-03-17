@@ -6,11 +6,20 @@ import { db } from "../db";
 import { smsLogs } from "../db/schema";
 import type { AppBindings } from "../lib/auth-middleware";
 import { requirePermission } from "../lib/auth-middleware";
-import { ensureAdminRouteAccess } from "../lib/staff-route-access";
+import {
+  ensureAdminRouteAccess,
+  isAdminStaffUser,
+  ensureSupportScopedSmsRecoveryLookup,
+  matchesSmsRecoveryScope,
+} from "../lib/staff-route-access";
 import { redactTokensInText } from "../lib/token-redaction";
 import { getSmsProviderHealthSummary } from "../services/sms-provider-health.service";
-import { queueSmsRetryById } from "../services/sms-recovery.service";
+import {
+  getSmsRecoveryScopeTargetById,
+  queueSmsRetryById,
+} from "../services/sms-recovery.service";
 import { sendSms } from "../services/sms.service";
+import { smsRecoveryScopeQuerySchema } from "../validators/sms-recovery";
 
 const smsListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -68,6 +77,8 @@ smsRoutes.get(
   requirePermission("sms:read"),
   zValidator("query", providerHealthQuerySchema),
   async (c) => {
+    ensureAdminRouteAccess(c.get("user"), "SMS provider health visibility");
+
     const { hours } = c.req.valid("query");
     const summary = await getSmsProviderHealthSummary(hours ?? 24);
 
@@ -106,8 +117,23 @@ smsRoutes.post(
   "/resend/:id",
   requirePermission("sms:resend"),
   zValidator("param", idParamSchema),
+  zValidator("query", smsRecoveryScopeQuerySchema),
   async (c) => {
+    const actor = c.get("user");
     const { id } = c.req.valid("param");
+    const query = c.req.valid("query");
+
+    ensureSupportScopedSmsRecoveryLookup(actor, query, "SMS resend");
+
+    const scopeTarget = await getSmsRecoveryScopeTargetById(id);
+    if (
+      scopeTarget &&
+      !isAdminStaffUser(actor) &&
+      !matchesSmsRecoveryScope(scopeTarget, query)
+    ) {
+      return c.json({ error: "SMS log not found" }, 404);
+    }
+
     const result = await queueSmsRetryById(id);
 
     return c.json({

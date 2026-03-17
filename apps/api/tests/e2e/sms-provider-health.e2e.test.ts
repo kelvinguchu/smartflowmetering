@@ -26,8 +26,8 @@ void describe("E2E: sms provider health", () => {
     await teardownE2E();
   });
 
-  void it("returns provider failure and fallback visibility for staff", async () => {
-    const staffSession = await createAuthenticatedSession(app, "user");
+  void it("returns provider failure and fallback visibility for admins", async () => {
+    const adminSession = await createAuthenticatedSession(app, "admin");
 
     await db.insert(smsLogs).values([
       {
@@ -53,7 +53,7 @@ void describe("E2E: sms provider health", () => {
 
     const response = await app.request("/api/sms/provider-health?hours=24", {
       method: "GET",
-      headers: staffSession.headers,
+      headers: adminSession.headers,
     });
 
     assert.equal(response.status, 200);

@@ -56,11 +56,7 @@ export async function listLandlordMotherMeterThresholdHistory(
     history.push({
       date,
       motherMeter: {
-        id: motherMeter.id,
         motherMeterNumber: motherMeter.motherMeterNumber,
-        property: {
-          id: motherMeter.propertyId,
-        },
         type: motherMeter.type,
       },
       postpaidStatus:

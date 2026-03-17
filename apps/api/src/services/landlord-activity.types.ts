@@ -17,13 +17,11 @@ export interface LandlordActivityItem {
   kplcReceiptNumber: string | null;
   kplcToken: string | null;
   meter: {
-    id: string;
     meterNumber: string;
     meterType: MeterType;
     status: MeterStatus;
   } | null;
   motherMeter: {
-    id: string;
     motherMeterNumber: string;
     type: MotherMeterType;
   };

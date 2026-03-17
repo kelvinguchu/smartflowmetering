@@ -2,7 +2,10 @@ import { serve } from "@hono/node-server";
 import { env } from "./config";
 import { closeAllQueues, startQueueWorkers } from "./queues";
 import { createApp } from "./app";
-import { startAlertAutomation, stopAlertAutomation } from "./services/alert-automation.service";
+import {
+  startAlertAutomation,
+  stopAlertAutomation,
+} from "./services/alert-automation.service";
 import {
   resolveProcessRole,
   shouldStartApiServer,
@@ -16,7 +19,7 @@ const startBackground = shouldStartBackgroundServices(processRole);
 let server: ReturnType<typeof serve> | null = null;
 
 if (startBackground) {
-  startQueueWorkers();
+  await startQueueWorkers();
   startAlertAutomation();
 }
 

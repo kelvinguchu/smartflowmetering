@@ -178,6 +178,11 @@ export function registerStkRoutes(router: MpesaRouter) {
               backoff: { type: "exponential", delay: 5000 },
             },
           );
+
+          console.log("[STK Callback] Payment job queued:", {
+            mpesaReceiptNumber: parsed.mpesaReceiptNumber,
+            mpesaTransactionId: existingTx.id,
+          });
         } else {
           const existingPayload =
             (existingTx.rawPayload as Record<string, unknown>) || {};

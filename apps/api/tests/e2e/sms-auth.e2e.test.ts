@@ -33,7 +33,7 @@ void describe("E2E: SMS auth guards", () => {
     await teardownE2E();
   });
 
-  void it("keeps broad sms log access admin-only while allowing provider health to support staff", async () => {
+  void it("keeps broad sms log access and provider health admin-only", async () => {
     const userSession = await createAuthenticatedSession(app, "user");
     const adminSession = await createAuthenticatedSession(app, "admin");
 
@@ -41,11 +41,14 @@ void describe("E2E: SMS auth guards", () => {
     assert.equal(smsList.response.status, 403);
 
     const smsHealth = await getJson("/api/sms/provider-health", userSession.headers);
-    assert.equal(smsHealth.response.status, 200);
+    assert.equal(smsHealth.response.status, 403);
 
     const adminSmsList = await getJson("/api/sms", adminSession.headers);
     assert.equal(adminSmsList.response.status, 200);
     assert.ok(Array.isArray(adminSmsList.body.data));
+
+    const adminSmsHealth = await getJson("/api/sms/provider-health", adminSession.headers);
+    assert.equal(adminSmsHealth.response.status, 200);
 
     const smsTestResponse = await app.request("/api/sms/test", {
       method: "POST",

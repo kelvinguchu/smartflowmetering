@@ -12,7 +12,11 @@ import {
   transactions,
   verification,
 } from "../../src/db/schema";
-import type { NewMeter, NewMotherMeter, NewProperty } from "../../src/db/schema";
+import type {
+  NewMeter,
+  NewMotherMeter,
+  NewProperty,
+} from "../../src/db/schema";
 import {
   ensureInfraReady,
   ensureTestMeterFixture,
@@ -22,6 +26,7 @@ import {
 } from "./helpers";
 
 const app = createApp();
+const hasOwnProperty = Object.prototype.hasOwnProperty;
 
 void describe("E2E: landlord timeline", () => {
   before(async () => {
@@ -47,42 +52,79 @@ void describe("E2E: landlord timeline", () => {
     await seedPrimaryTimelineFixture(fixture);
     const token = await loginAsLandlord(landlord.phoneNumber);
 
-    const response = await app.request("/api/mobile/landlord-access/timeline?limit=10", {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await app.request(
+      "/api/mobile/landlord-access/timeline?limit=10",
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     assert.equal(response.status, 200);
     const body = (await response.json()) as {
       count: number;
       data: {
-        financialSnapshot: {
-          companyPaymentsToUtility: string;
-          postpaidOutstandingAmount: string | null;
-          prepaidEstimatedBalance: string | null;
-          utilityFundingLoaded: string;
+        motherMeter: {
+          motherMeterNumber: string;
+          property: { name: string };
+          type: "postpaid" | "prepaid";
         };
-        motherMeter: { id: string; type: "postpaid" | "prepaid" };
-        transaction: { mpesaReceiptNumber: string; unitsPurchased: string } | null;
+        transaction: { unitsPurchased: string } | null;
         type: string;
       }[];
     };
     assert.equal(body.count, 7);
     assert.equal(body.data[0]?.type, "tenant_purchase");
-    assert.equal(body.data[0]?.motherMeter.id, extra.motherMeterId);
+    assert.equal(
+      body.data[0]?.motherMeter.motherMeterNumber,
+      extra.motherMeterNumber,
+    );
     assert.equal(body.data[0]?.motherMeter.type, "postpaid");
-    assert.equal(body.data[0]?.financialSnapshot.postpaidOutstandingAmount, "70.00");
-    assert.equal(body.data[0]?.financialSnapshot.prepaidEstimatedBalance, null);
+    const firstTimelineItem = body.data[0] as Record<string, unknown> & {
+      motherMeter: Record<string, unknown> & {
+        property: Record<string, unknown>;
+      };
+      transaction: Record<string, unknown> | null;
+    };
+    assert.equal(
+      hasOwnProperty.call(firstTimelineItem, "financialSnapshot"),
+      false,
+    );
+    assert.equal(hasOwnProperty.call(firstTimelineItem, "referenceId"), false);
+    assert.equal(
+      hasOwnProperty.call(firstTimelineItem.motherMeter, "id"),
+      false,
+    );
+    assert.equal(
+      hasOwnProperty.call(firstTimelineItem.motherMeter.property, "id"),
+      false,
+    );
+    assert.equal(
+      hasOwnProperty.call(
+        firstTimelineItem.transaction ?? {},
+        "mpesaReceiptNumber",
+      ),
+      false,
+    );
+    assert.equal(
+      hasOwnProperty.call(firstTimelineItem.transaction ?? {}, "phoneNumber"),
+      false,
+    );
 
     const prepaidPurchase = body.data.find(
       (item) =>
         item.type === "tenant_purchase" &&
-        item.motherMeter.id === fixture.motherMeterId &&
+        item.motherMeter.motherMeterNumber === fixture.motherMeterNumber &&
         item.transaction?.unitsPurchased === "5.0000",
     );
     assert.ok(prepaidPurchase);
-    assert.equal(prepaidPurchase.financialSnapshot.utilityFundingLoaded, "500.00");
-    assert.equal(prepaidPurchase.financialSnapshot.companyPaymentsToUtility, "120.00");
-    assert.equal(prepaidPurchase.financialSnapshot.prepaidEstimatedBalance, "130.00");
+    assert.equal(prepaidPurchase.motherMeter.property.name, "Test Property");
+    assert.equal(
+      hasOwnProperty.call(
+        prepaidPurchase as Record<string, unknown>,
+        "referenceId",
+      ),
+      false,
+    );
 
     const propertyResponse = await app.request(
       `/api/mobile/landlord-access/timeline?propertyId=${fixture.propertyId}`,
@@ -94,21 +136,27 @@ void describe("E2E: landlord timeline", () => {
     assert.equal(propertyResponse.status, 200);
     const propertyBody = (await propertyResponse.json()) as {
       count: number;
-      data: { motherMeter: { id: string } }[];
+      data: { motherMeter: { motherMeterNumber: string } }[];
     };
     assert.equal(propertyBody.count, 5);
     assert.ok(
-      propertyBody.data.every((item) => item.motherMeter.id === fixture.motherMeterId),
+      propertyBody.data.every(
+        (item) =>
+          item.motherMeter.motherMeterNumber === fixture.motherMeterNumber,
+      ),
     );
   });
 });
 
 async function loginAsLandlord(phoneNumber: string): Promise<string> {
-  const sendResponse = await app.request("/api/mobile/landlord-access/send-otp", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phoneNumber }),
-  });
+  const sendResponse = await app.request(
+    "/api/mobile/landlord-access/send-otp",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phoneNumber }),
+    },
+  );
   assert.equal(sendResponse.status, 200);
 
   const otpVerification = await db.query.verification.findFirst({
@@ -118,11 +166,14 @@ async function loginAsLandlord(phoneNumber: string): Promise<string> {
   const [code] = otpVerification.value.split(":");
   assert.ok(code);
 
-  const verifyResponse = await app.request("/api/mobile/landlord-access/verify-otp", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, phoneNumber }),
-  });
+  const verifyResponse = await app.request(
+    "/api/mobile/landlord-access/verify-otp",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, phoneNumber }),
+    },
+  );
   assert.equal(verifyResponse.status, 200);
   const verifyBody = (await verifyResponse.json()) as {
     data: { token: string };
@@ -214,7 +265,10 @@ async function seedAdditionalTimelineFixture(fixture: {
       tariffId: fixture.tariffId,
       type: "postpaid",
     } satisfies NewMotherMeter)
-    .returning({ id: motherMeters.id });
+    .returning({
+      id: motherMeters.id,
+      motherMeterNumber: motherMeters.motherMeterNumber,
+    });
   const [meter] = await db
     .insert(meters)
     .values({
@@ -252,5 +306,8 @@ async function seedAdditionalTimelineFixture(fixture: {
     unitsPurchased: "3.7500",
   });
 
-  return { motherMeterId: motherMeter.id };
+  return {
+    motherMeterId: motherMeter.id,
+    motherMeterNumber: motherMeter.motherMeterNumber,
+  };
 }

@@ -3,9 +3,15 @@ import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db";
 import { failedTransactions } from "../db/schema";
+import { HTTPException } from "hono/http-exception";
 import type { AppBindings } from "../lib/auth-middleware";
 import { requirePermission } from "../lib/auth-middleware";
+import { ensureSupportPendingQueueAccess } from "../lib/staff-route-access";
 import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
+import {
+  getFailedTransactionGuidance,
+  validateFailedTransactionStatusUpdate,
+} from "../services/failed-transaction-policy.service";
 import {
   failedTransactionIdParamSchema,
   failedTransactionListQuerySchema,
@@ -14,20 +20,33 @@ import {
 
 export const failedTransactionRoutes = new Hono<AppBindings>();
 
-failedTransactionRoutes.use("*", requirePermission("failed_transactions:manage"));
+failedTransactionRoutes.use(
+  "*",
+  requirePermission("failed_transactions:manage"),
+);
 
 failedTransactionRoutes.get(
   "/",
   zValidator("query", failedTransactionListQuerySchema),
   async (c) => {
+    const actor = c.get("user");
     const query = c.req.valid("query");
+    ensureSupportPendingQueueAccess(actor, query.status, {
+      pendingStatus: "pending_review",
+      workflow: "failed transactions",
+    });
+
+    const effectiveStatus =
+      actor.role === "admin" || query.status ? query.status : "pending_review";
     const conditions = [];
 
-    if (query.status) {
-      conditions.push(eq(failedTransactions.status, query.status));
+    if (effectiveStatus) {
+      conditions.push(eq(failedTransactions.status, effectiveStatus));
     }
     if (query.failureReason) {
-      conditions.push(eq(failedTransactions.failureReason, query.failureReason));
+      conditions.push(
+        eq(failedTransactions.failureReason, query.failureReason),
+      );
     }
 
     const rows = await db.query.failedTransactions.findMany({
@@ -49,28 +68,33 @@ failedTransactionRoutes.get(
 
     return c.json({
       count: rows.length,
-      data: rows.map((row) => ({
-        amount: row.amount,
-        createdAt: row.createdAt,
-        failureDetails: row.failureDetails,
-        failureReason: row.failureReason,
-        id: row.id,
-        meterNumberAttempted: row.meterNumberAttempted,
-        payment: row.mpesaTransaction
-          ? {
-              amount: row.mpesaTransaction.transAmount,
-              billRefNumber: row.mpesaTransaction.billRefNumber,
-              createdAt: row.mpesaTransaction.createdAt,
-              receiptNumber: row.mpesaTransaction.transId,
-            }
-          : null,
-        phoneNumber: row.phoneNumber,
-        resolutionNotes: row.resolutionNotes,
-        resolvedAt: row.resolvedAt,
-        status: row.status,
-      })),
+      data: rows.map((row) => {
+        const guidance = getFailedTransactionGuidance(row.failureReason);
+
+        return {
+          amount: row.amount,
+          createdAt: row.createdAt,
+          failureDetails: row.failureDetails,
+          failureReason: row.failureReason,
+          guidance,
+          id: row.id,
+          meterNumberAttempted: row.meterNumberAttempted,
+          payment: row.mpesaTransaction
+            ? {
+                amount: row.mpesaTransaction.transAmount,
+                billRefNumber: row.mpesaTransaction.billRefNumber,
+                createdAt: row.mpesaTransaction.createdAt,
+                receiptNumber: row.mpesaTransaction.transId,
+              }
+            : null,
+          phoneNumber: row.phoneNumber,
+          resolutionNotes: row.resolutionNotes,
+          resolvedAt: row.resolvedAt,
+          status: row.status,
+        };
+      }),
     });
-  }
+  },
 );
 
 failedTransactionRoutes.patch(
@@ -84,10 +108,23 @@ failedTransactionRoutes.patch(
 
     const existing = await db.query.failedTransactions.findFirst({
       where: eq(failedTransactions.id, id),
-      columns: { id: true, status: true },
+      columns: { failureReason: true, id: true, status: true },
     });
     if (!existing) {
       return c.json({ error: "Failed transaction not found" }, 404);
+    }
+
+    const validation = validateFailedTransactionStatusUpdate({
+      failureReason: existing.failureReason,
+      nextStatus: body.status,
+      previousStatus: existing.status,
+      resolutionAction: body.resolutionAction,
+      resolutionNotes: body.resolutionNotes,
+    });
+    if (!validation.ok) {
+      throw new HTTPException(400, {
+        message: validation.message,
+      });
     }
 
     const resolvedBy =
@@ -111,20 +148,22 @@ failedTransactionRoutes.patch(
       entityType: "failed_transaction",
       entityId: id,
       details: {
+        failureReason: existing.failureReason,
         previousStatus: existing.status,
         newStatus: body.status,
+        resolutionAction: body.resolutionAction ?? null,
         resolutionNotes: body.resolutionNotes ?? null,
       },
       ipAddress: extractClientIp(c.req.raw.headers),
     });
 
     return c.json({ data: updated });
-  }
+  },
 );
 
 function toOptionalUuid(value: string): string | null {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
+    value,
   )
     ? value
     : null;

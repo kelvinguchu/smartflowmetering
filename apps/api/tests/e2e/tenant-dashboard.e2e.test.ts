@@ -84,12 +84,17 @@ void describe("E2E: tenant dashboard", () => {
     const summaryBody = (await summaryResponse.json()) as {
       data: {
         activity: { totalCompletedPurchases: number };
-        meter: { meterNumber: string; status: string };
+        meter: { id?: string; meterNumber: string; status: string };
+        motherMeter: { id?: string; motherMeterNumber: string };
+        property: { id?: string; name: string };
         totals: { totalMeterCreditAmount: string; totalUnitsPurchased: string };
       };
     };
     assert.equal(summaryBody.data.meter.meterNumber, fixture.meterNumber);
     assert.equal(summaryBody.data.meter.status, "active");
+    assert.equal("id" in summaryBody.data.meter, false);
+    assert.equal("id" in summaryBody.data.motherMeter, false);
+    assert.equal("id" in summaryBody.data.property, false);
     assert.equal(summaryBody.data.activity.totalCompletedPurchases, 2);
     assert.equal(summaryBody.data.totals.totalMeterCreditAmount, "250.00");
     assert.equal(summaryBody.data.totals.totalUnitsPurchased, "10.0000");

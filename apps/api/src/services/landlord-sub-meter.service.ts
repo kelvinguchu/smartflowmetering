@@ -72,11 +72,9 @@ export async function getLandlordSubMeterDetail(
       lastPurchaseAt: aggregateRow.lastPurchaseAt,
       totalCompletedPurchases: aggregateRow.totalCompletedPurchases,
     },
-    id: meterRow.id,
     meterNumber: meterRow.meterNumber,
     meterType: meterRow.meterType,
     motherMeter: {
-      id: meterRow.motherMeterId,
       motherMeterNumber: meterRow.motherMeterNumber,
       type: meterRow.motherMeterType,
     },

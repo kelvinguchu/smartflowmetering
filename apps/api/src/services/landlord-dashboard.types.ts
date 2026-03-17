@@ -32,11 +32,9 @@ export interface LandlordMotherMeterItem {
     prepaidEstimatedBalance: string | null;
     utilityFundingLoaded: string;
   };
-  id: string;
   lowBalanceThreshold: string;
   motherMeterNumber: string;
   property: {
-    id: string;
     location: string;
     name: string;
   };
@@ -51,14 +49,12 @@ export interface LandlordMotherMeterItem {
 export interface LandlordPurchaseItem {
   completedAt: string | null;
   meter: {
-    id: string;
     meterNumber: string;
     meterType: "electricity" | "gas" | "water";
     status: "active" | "inactive" | "suspended";
   };
   meterCreditAmount: string;
   motherMeter: {
-    id: string;
     motherMeterNumber: string;
     type: "postpaid" | "prepaid";
   };
@@ -75,7 +71,6 @@ export interface LandlordSubMeterItem {
     lastPurchaseAt: string | null;
     totalCompletedPurchases: number;
   };
-  id: string;
   meterNumber: string;
   meterType: "electricity" | "gas" | "water";
   status: "active" | "inactive" | "suspended";

@@ -18,6 +18,7 @@ import {
 } from "./helpers";
 
 const app = createApp();
+const hasOwnProperty = Object.prototype.hasOwnProperty;
 
 void describe("E2E: landlord timeline detail", () => {
   before(async () => {
@@ -33,7 +34,9 @@ void describe("E2E: landlord timeline detail", () => {
   });
 
   void it("returns mother meter and sub meter timeline drill-down for the landlord", async () => {
-    const fixture = await ensureTestMeterFixture("LANDLORD-TIMELINE-DETAIL-001");
+    const fixture = await ensureTestMeterFixture(
+      "LANDLORD-TIMELINE-DETAIL-001",
+    );
     const landlord = await db.query.customers.findFirst({
       where: eq(customers.id, fixture.customerId),
     });
@@ -106,14 +109,63 @@ void describe("E2E: landlord timeline detail", () => {
     assert.equal(motherMeterResponse.status, 200);
     const motherMeterBody = (await motherMeterResponse.json()) as {
       count: number;
-      data: { motherMeter: { id: string }; type: string }[];
+      data: {
+        motherMeter: { motherMeterNumber: string; property: { name: string } };
+        transaction: { unitsPurchased: string } | null;
+        type: string;
+      }[];
     };
     assert.equal(motherMeterBody.count, 5);
-    assert.ok(
-      motherMeterBody.data.every((item) => item.motherMeter.id === fixture.motherMeterId),
+    const firstMotherMeterItem = motherMeterBody.data[0] as Record<
+      string,
+      unknown
+    > & {
+      motherMeter: Record<string, unknown> & {
+        property: Record<string, unknown>;
+      };
+    };
+    assert.equal(
+      hasOwnProperty.call(firstMotherMeterItem, "referenceId"),
+      false,
     );
-    assert.ok(motherMeterBody.data.some((item) => item.type === "bill_payment"));
-    assert.ok(motherMeterBody.data.some((item) => item.type === "tenant_purchase"));
+    assert.equal(
+      hasOwnProperty.call(firstMotherMeterItem.motherMeter, "id"),
+      false,
+    );
+    assert.equal(
+      hasOwnProperty.call(firstMotherMeterItem.motherMeter.property, "id"),
+      false,
+    );
+    const purchaseItem = motherMeterBody.data.find(
+      (item) => item.type === "tenant_purchase",
+    );
+    assert.ok(purchaseItem);
+    assert.equal(
+      hasOwnProperty.call(
+        (purchaseItem.transaction ?? {}) as Record<string, unknown>,
+        "mpesaReceiptNumber",
+      ),
+      false,
+    );
+    assert.equal(
+      hasOwnProperty.call(
+        (purchaseItem.transaction ?? {}) as Record<string, unknown>,
+        "phoneNumber",
+      ),
+      false,
+    );
+    assert.ok(
+      motherMeterBody.data.every(
+        (item) =>
+          item.motherMeter.motherMeterNumber === fixture.motherMeterNumber,
+      ),
+    );
+    assert.ok(
+      motherMeterBody.data.some((item) => item.type === "bill_payment"),
+    );
+    assert.ok(
+      motherMeterBody.data.some((item) => item.type === "tenant_purchase"),
+    );
 
     const subMeterResponse = await app.request(
       `/api/mobile/landlord-access/sub-meters/${fixture.meterId}/timeline`,
@@ -129,6 +181,8 @@ void describe("E2E: landlord timeline detail", () => {
         cumulativeNetSales: string;
         cumulativeUnitsPurchased: string;
         meterCreditAmount: string;
+        occurredAt: string;
+        unitsPurchased: string;
       }[];
     };
     assert.equal(subMeterBody.count, 2);
@@ -136,15 +190,29 @@ void describe("E2E: landlord timeline detail", () => {
     assert.equal(subMeterBody.data[0]?.cumulativeNetSales, "250.00");
     assert.equal(subMeterBody.data[0]?.cumulativeUnitsPurchased, "9.5000");
     assert.equal(subMeterBody.data[1]?.cumulativeNetSales, "130.00");
+    const [firstSubMeterItem] = subMeterBody.data;
+    assert.ok(firstSubMeterItem);
+    assert.equal(
+      hasOwnProperty.call(firstSubMeterItem, "mpesaReceiptNumber"),
+      false,
+    );
+    assert.equal(hasOwnProperty.call(firstSubMeterItem, "phoneNumber"), false);
+    assert.equal(
+      hasOwnProperty.call(firstSubMeterItem, "transactionId"),
+      false,
+    );
   });
 });
 
 async function loginAsLandlord(phoneNumber: string): Promise<string> {
-  const sendResponse = await app.request("/api/mobile/landlord-access/send-otp", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phoneNumber }),
-  });
+  const sendResponse = await app.request(
+    "/api/mobile/landlord-access/send-otp",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phoneNumber }),
+    },
+  );
   assert.equal(sendResponse.status, 200);
 
   const otpVerification = await db.query.verification.findFirst({
@@ -154,11 +222,14 @@ async function loginAsLandlord(phoneNumber: string): Promise<string> {
   const [code] = otpVerification.value.split(":");
   assert.ok(code);
 
-  const verifyResponse = await app.request("/api/mobile/landlord-access/verify-otp", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, phoneNumber }),
-  });
+  const verifyResponse = await app.request(
+    "/api/mobile/landlord-access/verify-otp",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, phoneNumber }),
+    },
+  );
   assert.equal(verifyResponse.status, 200);
   const verifyBody = (await verifyResponse.json()) as {
     data: { token: string };

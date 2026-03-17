@@ -1,5 +1,6 @@
 import { env } from "../../config";
 import { fetchSensitiveWithTimeout } from "../../lib/fetch-sensitive-with-timeout";
+import { createGomelongProviderError } from "./gomelong-failure-policy";
 
 export type GomelongMeterType = 1 | 2;
 export type GomelongVendingType = 0 | 1;
@@ -33,9 +34,9 @@ export function assertGomelongConfigured() {
   if (!env.GOMELONG_PASSWORD) missing.push("GOMELONG_PASSWORD");
 
   if (missing.length > 0) {
-    throw new Error(
-      `Gomelong credentials are not configured: ${missing.join(", ")}`,
-    );
+    throw createGomelongProviderError({
+      message: `Gomelong credentials are not configured: ${missing.join(", ")}`,
+    });
   }
 }
 
@@ -112,9 +113,10 @@ async function gomelongRequest<T = unknown>(
   }) as GomelongRichResult;
 
   if (!response.ok) {
-    throw new Error(
-      `Gomelong HTTP ${response.status}: ${getMessage(payload) ?? "request failed"}`,
-    );
+    throw createGomelongProviderError({
+      code: response.status,
+      message: `Gomelong request failed: HTTP ${response.status}`,
+    });
   }
 
   return {

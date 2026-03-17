@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db";
 import {
   meters,
@@ -10,7 +10,6 @@ import {
 import type {
   BaseTimelineRow,
   LandlordTimelineInput,
-  TimelineState,
 } from "./landlord-timeline.types";
 import { toNumber } from "./landlord-timeline.utils";
 
@@ -30,74 +29,6 @@ export async function listScopedMotherMeters(
     .select({ id: motherMeters.id })
     .from(motherMeters)
     .where(and(...filters));
-}
-
-export async function buildBaselineState(
-  motherMeterIds: string[],
-  startDate?: string,
-): Promise<Map<string, TimelineState>> {
-  const baseline = new Map<string, TimelineState>();
-  for (const motherMeterId of motherMeterIds) {
-    baseline.set(motherMeterId, emptyTimelineState());
-  }
-
-  if (!startDate) {
-    return baseline;
-  }
-
-  const start = new Date(startDate);
-  const [eventRows, saleRows] = await Promise.all([
-    db
-      .select({
-        billPayments:
-          sql<string>`coalesce(sum(case when ${motherMeterEvents.eventType} = 'bill_payment' then ${motherMeterEvents.amount}::numeric else 0 end), 0)::text`,
-        motherMeterId: motherMeterEvents.motherMeterId,
-        utilityFundingLoaded:
-          sql<string>`coalesce(sum(case when ${motherMeterEvents.eventType} in ('initial_deposit', 'refill') then ${motherMeterEvents.amount}::numeric else 0 end), 0)::text`,
-      })
-      .from(motherMeterEvents)
-      .where(
-        and(
-          inArray(motherMeterEvents.motherMeterId, motherMeterIds),
-          lt(motherMeterEvents.createdAt, start),
-        ),
-      )
-      .groupBy(motherMeterEvents.motherMeterId),
-    db
-      .select({
-        motherMeterId: meters.motherMeterId,
-        netSales:
-          sql<string>`coalesce(sum(${transactions.netAmount}::numeric), 0)::text`,
-      })
-      .from(transactions)
-      .innerJoin(meters, eq(transactions.meterId, meters.id))
-      .where(
-        and(
-          inArray(meters.motherMeterId, motherMeterIds),
-          eq(transactions.status, "completed"),
-          lt(transactions.completedAt, start),
-        ),
-      )
-      .groupBy(meters.motherMeterId),
-  ]);
-
-  for (const row of eventRows) {
-    baseline.set(row.motherMeterId, {
-      companyPaymentsToUtility: toNumber(row.billPayments),
-      netSalesCollected: baseline.get(row.motherMeterId)?.netSalesCollected ?? 0,
-      utilityFundingLoaded: toNumber(row.utilityFundingLoaded),
-    });
-  }
-
-  for (const row of saleRows) {
-    const current = baseline.get(row.motherMeterId) ?? emptyTimelineState();
-    baseline.set(row.motherMeterId, {
-      ...current,
-      netSalesCollected: toNumber(row.netSales),
-    });
-  }
-
-  return baseline;
 }
 
 export async function listTimelineRows(
@@ -213,12 +144,4 @@ export async function listTimelineRows(
   return rows
     .sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime())
     .slice(input.offset ?? 0, (input.offset ?? 0) + (input.limit ?? 50));
-}
-
-function emptyTimelineState(): TimelineState {
-  return {
-    companyPaymentsToUtility: 0,
-    netSalesCollected: 0,
-    utilityFundingLoaded: 0,
-  };
 }

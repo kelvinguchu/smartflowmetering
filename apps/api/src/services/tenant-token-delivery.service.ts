@@ -30,13 +30,7 @@ interface TenantTokenDeliveryRecord {
 }
 
 interface TenantSmsDeliveryRecord {
-  createdAt: Date;
-  id: string;
-  provider: "hostpinnacle" | "textsms";
   providerDeliveredAt: Date | null;
-  providerErrorCode: string | null;
-  providerReceivedAt: Date | null;
-  providerStatus: string | null;
   status: "delivered" | "failed" | "queued" | "sent";
   updatedAt: Date;
 }
@@ -101,13 +95,7 @@ export async function getTenantTokenDeliveryDetail(
   const smsLogRows = (await db.query.smsLogs.findMany({
     where: eq(smsLogs.transactionId, transactionRow.id),
     columns: {
-      createdAt: true,
-      id: true,
-      provider: true,
       providerDeliveredAt: true,
-      providerErrorCode: true,
-      providerReceivedAt: true,
-      providerStatus: true,
       status: true,
       updatedAt: true,
     },
@@ -124,13 +112,7 @@ export async function getTenantTokenDeliveryDetail(
       latestSms === null
         ? null
         : {
-            createdAt: latestSms.createdAt.toISOString(),
             deliveredAt: latestSms.providerDeliveredAt?.toISOString() ?? null,
-            errorCode: latestSms.providerErrorCode,
-            id: latestSms.id,
-            provider: latestSms.provider,
-            providerStatus: latestSms.providerStatus,
-            receivedAt: latestSms.providerReceivedAt?.toISOString() ?? null,
             status: latestSms.status,
             updatedAt: latestSms.updatedAt.toISOString(),
           },

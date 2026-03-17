@@ -40,7 +40,6 @@ export async function getLandlordExceptionalStateSummary(
         (item) => item.prepaidStatus?.isNegativeBalance === true,
       ).length,
     },
-    propertyId: input.propertyId ?? null,
     totalExceptionalMotherMeters: states.filter(hasAnyExceptionalState).length,
   };
 }
@@ -101,11 +100,7 @@ export async function listLandlordExceptionalMotherMeterStates(
         lastBillPaymentAt: aggregate.lastBillPaymentAt,
       },
       motherMeter: {
-        id: row.id,
         motherMeterNumber: row.motherMeterNumber,
-        property: {
-          id: row.propertyId,
-        },
         type: row.type,
       },
       postpaidStatus:

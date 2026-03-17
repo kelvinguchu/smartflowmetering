@@ -52,7 +52,10 @@ void describe("E2E: landlord exceptional state", () => {
         tariffId: fixture.tariffId,
         type: "postpaid",
       } satisfies NewMotherMeter)
-      .returning({ id: motherMeters.id });
+      .returning({
+        id: motherMeters.id,
+        motherMeterNumber: motherMeters.motherMeterNumber,
+      });
 
     const [postpaidMeter] = await db
       .insert(meters)
@@ -139,7 +142,6 @@ void describe("E2E: landlord exceptional state", () => {
         companyPayment: { staleCount: number };
         postpaid: { largeOutstandingCount: number };
         prepaid: { negativeBalanceCount: number };
-        propertyId: string | null;
         totalExceptionalMotherMeters: number;
       };
       defaults: {
@@ -147,7 +149,7 @@ void describe("E2E: landlord exceptional state", () => {
         postpaidOutstandingAmountThreshold: string;
       };
     };
-    assert.equal(summaryBody.data.propertyId, fixture.propertyId);
+    assert.equal("propertyId" in summaryBody.data, false);
     assert.equal(summaryBody.data.prepaid.negativeBalanceCount, 1);
     assert.equal(summaryBody.data.postpaid.largeOutstandingCount, 1);
     assert.equal(summaryBody.data.companyPayment.staleCount, 1);
@@ -170,7 +172,10 @@ void describe("E2E: landlord exceptional state", () => {
           inactivityThresholdDays: number;
           isStale: boolean;
         };
-        motherMeter: { id: string; type: "postpaid" | "prepaid" };
+        motherMeter: {
+          motherMeterNumber: string;
+          type: "postpaid" | "prepaid";
+        };
         postpaidStatus: {
           isLargeOutstanding: boolean;
           outstandingAmount: string;
@@ -185,9 +190,10 @@ void describe("E2E: landlord exceptional state", () => {
     assert.equal(statesBody.count, 2);
 
     const prepaidState = statesBody.data.find(
-      (item) => item.motherMeter.id === fixture.motherMeterId,
+      (item) => item.motherMeter.motherMeterNumber === fixture.motherMeterNumber,
     );
     assert.ok(prepaidState);
+    assert.equal("id" in prepaidState.motherMeter, false);
     assert.equal(prepaidState.motherMeter.type, "prepaid");
     assert.equal(prepaidState.prepaidStatus?.estimatedBalance, "-40.00");
     assert.equal(prepaidState.prepaidStatus.isNegativeBalance, true);
@@ -195,7 +201,8 @@ void describe("E2E: landlord exceptional state", () => {
     assert.equal(prepaidState.companyPaymentStatus.inactivityThresholdDays, 20);
 
     const postpaidState = statesBody.data.find(
-      (item) => item.motherMeter.id === postpaidMotherMeter.id,
+      (item) =>
+        item.motherMeter.motherMeterNumber === postpaidMotherMeter.motherMeterNumber,
     );
     assert.ok(postpaidState);
     assert.equal(postpaidState.motherMeter.type, "postpaid");
@@ -214,7 +221,7 @@ void describe("E2E: landlord exceptional state", () => {
     assert.equal(exceptionalOnlyResponse.status, 200);
     const exceptionalOnlyBody = (await exceptionalOnlyResponse.json()) as {
       count: number;
-      data: { motherMeter: { id: string } }[];
+      data: { motherMeter: { motherMeterNumber: string } }[];
     };
     assert.equal(exceptionalOnlyBody.count, 2);
   });

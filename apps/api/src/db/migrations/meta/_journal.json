@@ -134,6 +134,13 @@
       "when": 1773590477520,
       "tag": "0018_overrated_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1773746744164,
+      "tag": "0019_tense_the_anarchist",
+      "breakpoints": true
     }
   ]
 }

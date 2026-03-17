@@ -51,7 +51,9 @@ void describe("E2E: landlord history", () => {
           prepaidEstimatedBalance: string | null;
           utilityFundingLoaded: string;
         };
-        recentEvents: { eventType: string }[];
+        motherMeterNumber: string;
+        property: { id?: string; name: string };
+        recentEvents: { eventType: string; id?: string }[];
         recentPurchases: {
           amountPaid?: string;
           commissionAmount?: string;
@@ -59,18 +61,21 @@ void describe("E2E: landlord history", () => {
           meterCreditAmount: string;
           rateUsed?: string;
         }[];
-        subMeters: { meterNumber: string; totalUnitsPurchased: string }[];
+        subMeters: { id?: string; meterNumber: string; totalUnitsPurchased: string }[];
       };
     };
     assert.equal(detailBody.data.financials.utilityFundingLoaded, "500.00");
     assert.equal(detailBody.data.financials.companyPaymentsToUtility, "120.00");
     assert.equal(detailBody.data.financials.prepaidEstimatedBalance, "130.00");
+    assert.equal("id" in detailBody.data.property, false);
     assert.equal(detailBody.data.subMeters[0]?.meterNumber, fixture.meterNumber);
     assert.equal(detailBody.data.subMeters[0]?.totalUnitsPurchased, "9.5000");
+    assert.equal("id" in (detailBody.data.subMeters[0] ?? {}), false);
     assert.equal(detailBody.data.recentPurchases[0]?.meterCreditAmount, "120.00");
     assert.ok(!("amountPaid" in (detailBody.data.recentPurchases[0] ?? {})));
     assert.ok(!("commissionAmount" in (detailBody.data.recentPurchases[0] ?? {})));
     assert.ok(!("rateUsed" in (detailBody.data.recentPurchases[0] ?? {})));
+    assert.equal("id" in (detailBody.data.recentEvents[0] ?? {}), false);
     assert.ok(
       detailBody.data.recentEvents.some((event) => event.eventType === "bill_payment"),
     );
@@ -88,8 +93,8 @@ void describe("E2E: landlord history", () => {
       data: {
         commissionAmount?: string;
         amount: string;
-        meter: { meterNumber: string } | null;
-        motherMeter: { id: string };
+        meter: { id?: string; meterNumber: string } | null;
+        motherMeter: { id?: string; motherMeterNumber: string };
         rateUsed?: string;
         type: string;
         unitsPurchased: string | null;
@@ -114,7 +119,12 @@ void describe("E2E: landlord history", () => {
     assert.equal(tenantPurchase.amount, "120.00");
     assert.equal(tenantPurchase.meter?.meterNumber, fixture.meterNumber);
     assert.equal(tenantPurchase.unitsPurchased, "5.0000");
-    assert.equal(tenantPurchase.motherMeter.id, fixture.motherMeterId);
+    assert.equal(
+      tenantPurchase.motherMeter.motherMeterNumber,
+      detailBody.data.motherMeterNumber,
+    );
+    assert.equal("id" in (tenantPurchase.meter ?? {}), false);
+    assert.equal("id" in tenantPurchase.motherMeter, false);
     assert.ok(!("commissionAmount" in tenantPurchase));
     assert.ok(!("rateUsed" in tenantPurchase));
 
@@ -128,10 +138,14 @@ void describe("E2E: landlord history", () => {
     assert.equal(filteredActivityResponse.status, 200);
     const filteredActivityBody = (await filteredActivityResponse.json()) as {
       count: number;
-      data: { motherMeter: { id: string } }[];
+      data: { motherMeter: { id?: string; motherMeterNumber: string } }[];
     };
     assert.equal(filteredActivityBody.count, 5);
-    assert.equal(filteredActivityBody.data[0]?.motherMeter.id, fixture.motherMeterId);
+    assert.equal(
+      filteredActivityBody.data[0]?.motherMeter.motherMeterNumber,
+      detailBody.data.motherMeterNumber,
+    );
+    assert.equal("id" in (filteredActivityBody.data[0]?.motherMeter ?? {}), false);
 
     const subMeterResponse = await app.request(
       `/api/mobile/landlord-access/sub-meters/${fixture.meterId}?purchaseLimit=5`,
@@ -144,8 +158,9 @@ void describe("E2E: landlord history", () => {
     const subMeterBody = (await subMeterResponse.json()) as {
       data: {
         activity: { totalCompletedPurchases: number };
+        id?: string;
         meterNumber: string;
-        motherMeter: { id: string };
+        motherMeter: { id?: string; motherMeterNumber: string };
         recentPurchases: {
           amountPaid?: string;
           commissionAmount?: string;
@@ -157,7 +172,12 @@ void describe("E2E: landlord history", () => {
       };
     };
     assert.equal(subMeterBody.data.meterNumber, fixture.meterNumber);
-    assert.equal(subMeterBody.data.motherMeter.id, fixture.motherMeterId);
+    assert.equal("id" in subMeterBody.data, false);
+    assert.equal(
+      subMeterBody.data.motherMeter.motherMeterNumber,
+      detailBody.data.motherMeterNumber,
+    );
+    assert.equal("id" in subMeterBody.data.motherMeter, false);
     assert.equal(subMeterBody.data.activity.totalCompletedPurchases, 2);
     assert.equal(subMeterBody.data.totals.totalNetSales, "250.00");
     assert.equal(subMeterBody.data.totals.totalUnitsPurchased, "9.5000");
@@ -180,7 +200,7 @@ void describe("E2E: landlord history", () => {
       data: {
         date: string;
         meterCreditAmountTotal: string;
-        motherMeter: { id: string };
+        motherMeter: { id?: string; motherMeterNumber: string };
         subMeters: { meterNumber: string; transactionCount: number }[];
         totals: { transactionCount: number; unitsPurchased: string };
       }[];
@@ -196,7 +216,11 @@ void describe("E2E: landlord history", () => {
     assert.equal(historyBody.pagination.offset, 0);
     assert.equal(historyBody.pagination.hasMore, false);
     assert.equal(historyBody.pagination.nextOffset, null);
-    assert.equal(historyBody.data[0]?.motherMeter.id, fixture.motherMeterId);
+    assert.equal(
+      historyBody.data[0]?.motherMeter.motherMeterNumber,
+      detailBody.data.motherMeterNumber,
+    );
+    assert.equal("id" in (historyBody.data[0]?.motherMeter ?? {}), false);
     assert.equal(historyBody.data[0]?.meterCreditAmountTotal, "120.00");
     assert.equal(historyBody.data[0]?.totals.transactionCount, 1);
     assert.equal(historyBody.data[0]?.totals.unitsPurchased, "5.0000");
@@ -214,9 +238,13 @@ void describe("E2E: landlord history", () => {
     assert.equal(filteredHistoryResponse.status, 200);
     const filteredHistoryBody = (await filteredHistoryResponse.json()) as {
       count: number;
-      data: { motherMeter: { id: string } }[];
+      data: { motherMeter: { id?: string; motherMeterNumber: string } }[];
     };
     assert.equal(filteredHistoryBody.count, 2);
-    assert.equal(filteredHistoryBody.data[0]?.motherMeter.id, fixture.motherMeterId);
+    assert.equal(
+      filteredHistoryBody.data[0]?.motherMeter.motherMeterNumber,
+      detailBody.data.motherMeterNumber,
+    );
+    assert.equal("id" in (filteredHistoryBody.data[0]?.motherMeter ?? {}), false);
   });
 });

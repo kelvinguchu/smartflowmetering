@@ -12,12 +12,17 @@ import {
   ApplicationError,
   approveMeterApplication,
   createMeterApplication,
-  getMeterApplicationById,
-  listMeterApplications,
+  getMeterApplicationAdminDetailById,
+  getMeterApplicationSupportDetailById,
+  listMeterApplicationSummaries,
   rejectMeterApplication,
 } from "../services/application-onboarding.service";
 import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
 import { formatOnboardingApprovedSms } from "../services/sms.service";
+import {
+  ensureSupportPendingQueueAccess,
+  isAdminStaffUser,
+} from "../lib/staff-route-access";
 import {
   approveApplicationSchema,
   applicationQuerySchema,
@@ -39,7 +44,13 @@ applicationRoutes.post(
     try {
       const body = c.req.valid("json");
       const application = await createMeterApplication(body);
-      return c.json({ data: application }, 201);
+      return c.json({
+        data: {
+          createdAt: application.createdAt,
+          id: application.id,
+          status: application.status,
+        },
+      }, 201);
     } catch (error) {
       return handleApplicationError(
         c,
@@ -56,8 +67,18 @@ applicationRoutes.get(
   requirePermission("applications:read"),
   zValidator("query", applicationQuerySchema),
   async (c) => {
+    const actor = c.get("user");
     const query = c.req.valid("query");
-    const result = await listMeterApplications(query);
+    ensureSupportPendingQueueAccess(actor, query.status, {
+      pendingStatus: "pending",
+      workflow: "applications",
+    });
+    const effectiveQuery =
+      isAdminStaffUser(actor) || query.status
+        ? query
+        : { ...query, status: "pending" as const };
+
+    const result = await listMeterApplicationSummaries(effectiveQuery);
     return c.json(result);
   },
 );
@@ -67,8 +88,11 @@ applicationRoutes.get(
   requirePermission("applications:read"),
   zValidator("param", applicationIdParamSchema),
   async (c) => {
+    const actor = c.get("user");
     const { id } = c.req.valid("param");
-    const application = await getMeterApplicationById(id);
+    const application = isAdminStaffUser(actor)
+      ? await getMeterApplicationAdminDetailById(id)
+      : await getMeterApplicationSupportDetailById(id);
     if (!application) {
       return c.json({ error: "Application not found" }, 404);
     }

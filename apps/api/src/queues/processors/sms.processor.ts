@@ -8,6 +8,7 @@ import { formatTokenSms, sendSms } from "../../services/sms.service";
 import { syncTextSmsDeliveryStatus } from "../../services/textsms-dlr.service";
 import { createQueue, QUEUE_NAMES } from "../connection";
 import { isDlrSyncJob, isNotificationJob, isResendJob } from "../sms-guards";
+import { finalizeSmsProcessResult, type SmsProcessResult } from "./sms-result";
 import type {
   SmsDlrSyncJob,
   SmsJob,
@@ -40,7 +41,7 @@ function parseCost(cost: string | undefined): string | null {
  */
 export async function processSmsDelivery(
   job: Job<SmsJob>,
-): Promise<{ messageId: string }> {
+): Promise<SmsProcessResult> {
   if (isDlrSyncJob(job.data)) {
     return processDlrSync(job.data);
   }
@@ -79,7 +80,9 @@ export async function processSmsDelivery(
     otherCharges: transaction.commissionAmount,
   });
 
-  console.log(`[SMS] Sending to ${maskPhoneForLog(phoneNumber)}`);
+  console.log(
+    `[SMS] Sending to ${maskPhoneForLog(phoneNumber)}`,
+  );
 
   // Create SMS log entry
   const [smsLog] = await db
@@ -103,6 +106,7 @@ export async function processSmsDelivery(
       status: result.success ? "sent" : "failed",
       provider: resolveSmsProvider(result.provider),
       providerMessageId: result.messageId ?? null,
+      providerReference: result.providerReference ?? null,
       cost: parseCost(result.cost),
       updatedAt: new Date(),
     })
@@ -113,17 +117,18 @@ export async function processSmsDelivery(
   }
 
   await queueTextSmsDlrSyncIfNeeded(smsLog.id, result);
+  const smsResult = finalizeSmsProcessResult(result.messageId, "delivery");
 
   console.log(
-    `[SMS] Delivered to ${maskPhoneForLog(phoneNumber)}, messageId: ${getRequiredMessageId(result.messageId, "delivery")}`,
+    `[SMS] Delivered to ${maskPhoneForLog(phoneNumber)}, messageId: ${smsResult.messageId ?? "none"}`,
   );
 
-  return { messageId: getRequiredMessageId(result.messageId, "delivery") };
+  return smsResult;
 }
 
 async function processResendSms(
   data: SmsResendJob,
-): Promise<{ messageId: string }> {
+): Promise<SmsProcessResult> {
   const { smsLogId, phoneNumber, messageBody } = data;
 
   console.log(`[SMS] Resending to ${maskPhoneForLog(phoneNumber)}`);
@@ -141,6 +146,7 @@ async function processResendSms(
       status: result.success ? "sent" : "failed",
       provider: resolveSmsProvider(result.provider),
       providerMessageId: result.messageId ?? null,
+      providerReference: result.providerReference ?? null,
       cost: parseCost(result.cost),
       updatedAt: new Date(),
     })
@@ -151,17 +157,18 @@ async function processResendSms(
   }
 
   await queueTextSmsDlrSyncIfNeeded(smsLogId, result);
+  const smsResult = finalizeSmsProcessResult(result.messageId, "resend");
 
   console.log(
-    `[SMS] Resent to ${maskPhoneForLog(phoneNumber)}, messageId: ${getRequiredMessageId(result.messageId, "resend")}`,
+    `[SMS] Resent to ${maskPhoneForLog(phoneNumber)}, messageId: ${smsResult.messageId ?? "none"}`,
   );
 
-  return { messageId: getRequiredMessageId(result.messageId, "resend") };
+  return smsResult;
 }
 
 async function processNotificationSms(
   data: SmsNotificationJob,
-): Promise<{ messageId: string }> {
+): Promise<SmsProcessResult> {
   const phoneNumber = data.phoneNumber;
   const messageBody = data.messageBody;
 
@@ -194,6 +201,7 @@ async function processNotificationSms(
       status: result.success ? "sent" : "failed",
       provider: resolveSmsProvider(result.provider),
       providerMessageId: result.messageId ?? null,
+      providerReference: result.providerReference ?? null,
       cost: parseCost(result.cost),
       updatedAt: new Date(),
     })
@@ -205,7 +213,7 @@ async function processNotificationSms(
 
   await queueTextSmsDlrSyncIfNeeded(smsLogId, result);
 
-  return { messageId: getRequiredMessageId(result.messageId, "notification") };
+  return finalizeSmsProcessResult(result.messageId, "notification");
 }
 
 async function queueTextSmsDlrSyncIfNeeded(
@@ -249,15 +257,4 @@ async function scheduleTextSmsDlrSync(data: SmsDlrSyncJob) {
 
 function resolveSmsProvider(provider: Awaited<ReturnType<typeof sendSms>>["provider"]) {
   return provider ?? "hostpinnacle";
-}
-
-function getRequiredMessageId(
-  messageId: string | undefined,
-  context: "delivery" | "notification" | "resend",
-) {
-  if (!messageId) {
-    throw new Error(`SMS ${context} succeeded without a provider message id`);
-  }
-
-  return messageId;
 }

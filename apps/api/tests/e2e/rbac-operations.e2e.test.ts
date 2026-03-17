@@ -33,6 +33,23 @@ void describe("E2E: RBAC admin-only operations", () => {
       headers: userSession.headers,
     });
     assert.equal(userFailedTransactionsResponse.status, 200);
+    const userFailedTransactionsBody = (await userFailedTransactionsResponse.json()) as {
+      count: number;
+      data: Array<{ status: string }>;
+    };
+    assert.equal(
+      userFailedTransactionsBody.data.every((item) => item.status === "pending_review"),
+      true,
+    );
+
+    const userResolvedFailedTransactionsResponse = await app.request(
+      "/api/failed-transactions?status=resolved",
+      {
+        method: "GET",
+        headers: userSession.headers,
+      },
+    );
+    assert.equal(userResolvedFailedTransactionsResponse.status, 403);
 
     const userFailedTransactionPatchResponse = await app.request(
       "/api/failed-transactions/00000000-0000-0000-0000-000000000000/status",

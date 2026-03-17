@@ -43,18 +43,15 @@ export async function getTenantDashboardSummary(
       totalCompletedPurchases: row.totalCompletedPurchases,
     },
     meter: {
-      id: row.meterId,
       meterNumber: row.meterNumber,
       meterType: row.meterType,
       status: row.meterStatus,
     },
     motherMeter: {
-      id: row.motherMeterId,
       motherMeterNumber: row.motherMeterNumber,
       type: row.motherMeterType,
     },
     property: {
-      id: row.propertyId,
       name: row.propertyName,
     },
     totals: {

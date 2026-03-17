@@ -1,7 +1,6 @@
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db";
-import { meters, motherMeterEvents, transactions } from "../db/schema";
-import { toNumber } from "./landlord-dashboard.utils";
+import { meters, transactions } from "../db/schema";
 import { getScopedLandlordPropertyAnalytics } from "./landlord-property-analytics.scope";
 import type { LandlordPropertyAnalyticsSummary } from "./landlord-property-analytics.types";
 
@@ -24,12 +23,11 @@ export async function getLandlordPropertyAnalyticsSummary(
   if (scope === null) {
     return null;
   }
-
-  const summary = createEmptySummary(propertyId, input.motherMeterType);
   if (scope.motherMeters.length === 0) {
-    return summary;
+    return createEmptySummary(input.motherMeterType);
   }
 
+  const summary = createEmptySummary(input.motherMeterType);
   const motherMeterIds = scope.motherMeters.map((row) => row.id);
   const typeByMotherMeterId = new Map(
     scope.motherMeters.map((row) => [row.id, row.type] as const),
@@ -44,23 +42,7 @@ export async function getLandlordPropertyAnalyticsSummary(
   summary.breakdown.postpaid.motherMeterCount = summary.motherMeterCounts.postpaid;
   summary.breakdown.prepaid.motherMeterCount = summary.motherMeterCounts.prepaid;
 
-  const [eventRows, purchaseRows] = await Promise.all([
-    listScopedEventTotals(motherMeterIds, input),
-    listScopedPurchaseTotals(motherMeterIds, input),
-  ]);
-
-  for (const row of eventRows) {
-    const type = typeByMotherMeterId.get(row.motherMeterId);
-    if (!type) {
-      continue;
-    }
-    summary.breakdown[type].companyPaymentsToUtility = toNumber(
-      row.companyPaymentsToUtility,
-    ).toFixed(2);
-    summary.breakdown[type].utilityFundingLoaded = toNumber(
-      row.utilityFundingLoaded,
-    ).toFixed(2);
-  }
+  const purchaseRows = await listScopedPurchaseTotals(motherMeterIds, input);
 
   for (const row of purchaseRows) {
     const type = typeByMotherMeterId.get(row.motherMeterId);
@@ -68,62 +50,25 @@ export async function getLandlordPropertyAnalyticsSummary(
       continue;
     }
     summary.breakdown[type].tenantPurchaseCount = row.tenantPurchaseCount;
-    summary.breakdown[type].tenantPurchasesNetAmount = toNumber(
-      row.tenantPurchasesNetAmount,
-    ).toFixed(2);
-    summary.breakdown[type].tenantUnitsPurchased = toNumber(
-      row.tenantUnitsPurchased,
-    ).toFixed(4);
+    summary.breakdown[type].tenantPurchasesNetAmount = row.tenantPurchasesNetAmount;
+    summary.breakdown[type].tenantUnitsPurchased = row.tenantUnitsPurchased;
   }
 
   summary.totals = {
-    companyPaymentsToUtility: (
-      toNumber(summary.breakdown.prepaid.companyPaymentsToUtility) +
-      toNumber(summary.breakdown.postpaid.companyPaymentsToUtility)
-    ).toFixed(2),
     tenantPurchaseCount:
       summary.breakdown.prepaid.tenantPurchaseCount +
       summary.breakdown.postpaid.tenantPurchaseCount,
-    tenantPurchasesNetAmount: (
-      toNumber(summary.breakdown.prepaid.tenantPurchasesNetAmount) +
-      toNumber(summary.breakdown.postpaid.tenantPurchasesNetAmount)
-    ).toFixed(2),
-    tenantUnitsPurchased: (
-      toNumber(summary.breakdown.prepaid.tenantUnitsPurchased) +
-      toNumber(summary.breakdown.postpaid.tenantUnitsPurchased)
-    ).toFixed(4),
-    utilityFundingLoaded: (
-      toNumber(summary.breakdown.prepaid.utilityFundingLoaded) +
-      toNumber(summary.breakdown.postpaid.utilityFundingLoaded)
-    ).toFixed(2),
+    tenantPurchasesNetAmount: sumMoney(
+      summary.breakdown.prepaid.tenantPurchasesNetAmount,
+      summary.breakdown.postpaid.tenantPurchasesNetAmount,
+    ),
+    tenantUnitsPurchased: sumUnits(
+      summary.breakdown.prepaid.tenantUnitsPurchased,
+      summary.breakdown.postpaid.tenantUnitsPurchased,
+    ),
   };
 
   return summary;
-}
-
-async function listScopedEventTotals(
-  motherMeterIds: string[],
-  input: PropertyAnalyticsSummaryInput,
-) {
-  const filters = [inArray(motherMeterEvents.motherMeterId, motherMeterIds)];
-  if (input.startDate) {
-    filters.push(gte(motherMeterEvents.createdAt, new Date(input.startDate)));
-  }
-  if (input.endDate) {
-    filters.push(lte(motherMeterEvents.createdAt, new Date(input.endDate)));
-  }
-
-  return db
-    .select({
-      companyPaymentsToUtility:
-        sql<string>`coalesce(sum(case when ${motherMeterEvents.eventType} = 'bill_payment' then ${motherMeterEvents.amount}::numeric else 0 end), 0)::text`,
-      motherMeterId: motherMeterEvents.motherMeterId,
-      utilityFundingLoaded:
-        sql<string>`coalesce(sum(case when ${motherMeterEvents.eventType} in ('initial_deposit', 'refill') then ${motherMeterEvents.amount}::numeric else 0 end), 0)::text`,
-    })
-    .from(motherMeterEvents)
-    .where(and(...filters))
-    .groupBy(motherMeterEvents.motherMeterId);
 }
 
 async function listScopedPurchaseTotals(
@@ -146,9 +91,9 @@ async function listScopedPurchaseTotals(
       motherMeterId: meters.motherMeterId,
       tenantPurchaseCount: sql<number>`count(${transactions.id})::int`,
       tenantPurchasesNetAmount:
-        sql<string>`coalesce(sum(${transactions.netAmount}::numeric), 0)::text`,
+        sql<string>`coalesce(sum(${transactions.netAmount}::numeric), 0)::numeric(12,2)::text`,
       tenantUnitsPurchased:
-        sql<string>`coalesce(sum(${transactions.unitsPurchased}::numeric), 0)::text`,
+        sql<string>`coalesce(sum(${transactions.unitsPurchased}::numeric), 0)::numeric(12,4)::text`,
     })
     .from(transactions)
     .innerJoin(meters, eq(transactions.meterId, meters.id))
@@ -157,26 +102,21 @@ async function listScopedPurchaseTotals(
 }
 
 function createEmptySummary(
-  propertyId: string,
   motherMeterType?: "postpaid" | "prepaid",
 ): LandlordPropertyAnalyticsSummary {
   return {
     breakdown: {
       postpaid: {
-        companyPaymentsToUtility: "0.00",
         motherMeterCount: 0,
         tenantPurchaseCount: 0,
         tenantPurchasesNetAmount: "0.00",
         tenantUnitsPurchased: "0.0000",
-        utilityFundingLoaded: "0.00",
       },
       prepaid: {
-        companyPaymentsToUtility: "0.00",
         motherMeterCount: 0,
         tenantPurchaseCount: 0,
         tenantPurchasesNetAmount: "0.00",
         tenantUnitsPurchased: "0.0000",
-        utilityFundingLoaded: "0.00",
       },
     },
     motherMeterCounts: {
@@ -185,15 +125,18 @@ function createEmptySummary(
       total: 0,
     },
     motherMeterType: motherMeterType ?? null,
-    property: {
-      id: propertyId,
-    },
     totals: {
-      companyPaymentsToUtility: "0.00",
       tenantPurchaseCount: 0,
       tenantPurchasesNetAmount: "0.00",
       tenantUnitsPurchased: "0.0000",
-      utilityFundingLoaded: "0.00",
     },
   };
+}
+
+function sumMoney(left: string, right: string) {
+  return (Number.parseFloat(left) + Number.parseFloat(right)).toFixed(2);
+}
+
+function sumUnits(left: string, right: string) {
+  return (Number.parseFloat(left) + Number.parseFloat(right)).toFixed(4);
 }

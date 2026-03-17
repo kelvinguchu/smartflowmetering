@@ -81,6 +81,7 @@ export async function sendViaHostpinnacle(
     const body = parseJsonObject(rawBody) ?? {};
     const status = getResponseValue(body, ["status", "responseCode"]).toLowerCase();
     const messageId = getResponseValue(body, ["msgid", "messageId", "id"]);
+    const providerReference = getResponseValue(body, ["transactionId", "transaction_id"]);
     const errorMessage =
       getResponseValue(body, ["message", "error", "responseDescription"]) ||
       (rawBody.trim() ? rawBody : `HTTP ${response.status}`);
@@ -91,6 +92,7 @@ export async function sendViaHostpinnacle(
       return {
         success: true,
         messageId: messageId || undefined,
+        providerReference: providerReference || undefined,
         provider: "hostpinnacle",
       };
     }
@@ -162,6 +164,7 @@ export async function sendViaTextSms(
       return {
         success: true,
         messageId: messageId || undefined,
+        providerReference: messageId || undefined,
         provider: "textsms",
       };
     }

@@ -7,16 +7,11 @@ export interface LandlordThresholdSummary {
     aboveThresholdCount: number;
     belowThresholdCount: number;
   };
-  propertyId: string | null;
 }
 
 export interface LandlordMotherMeterThresholdStateItem {
   motherMeter: {
-    id: string;
     motherMeterNumber: string;
-    property: {
-      id: string;
-    };
     type: "postpaid" | "prepaid";
   };
   postpaidStatus: {
@@ -35,11 +30,7 @@ export interface LandlordMotherMeterThresholdStateItem {
 export interface LandlordMotherMeterThresholdHistoryItem {
   date: string;
   motherMeter: {
-    id: string;
     motherMeterNumber: string;
-    property: {
-      id: string;
-    };
     type: "postpaid" | "prepaid";
   };
   postpaidStatus: {

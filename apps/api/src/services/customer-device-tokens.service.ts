@@ -132,6 +132,12 @@ export async function deactivateCustomerDeviceToken(id: string) {
   return updated;
 }
 
+export async function getCustomerDeviceTokenById(id: string) {
+  return db.query.customerDeviceTokens.findFirst({
+    where: eq(customerDeviceTokens.id, id),
+  });
+}
+
 export async function invalidateCustomerDeviceTokens(
   tokens: string[],
   reason: string,

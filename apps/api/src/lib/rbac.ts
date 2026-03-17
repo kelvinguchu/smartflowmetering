@@ -71,7 +71,9 @@ const rolePermissions: Record<StaffRole, ReadonlySet<StaffPermission>> = {
   user: userPermissions,
 };
 
-export function isStaffRole(role: string | null | undefined): role is StaffRole {
+export function isStaffRole(
+  role: string | null | undefined,
+): role is StaffRole {
   return role === "admin" || role === "user";
 }
 

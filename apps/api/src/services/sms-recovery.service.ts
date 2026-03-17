@@ -13,6 +13,13 @@ import type {
   SmsRecoverySummary,
 } from "./sms-recovery.types";
 
+export interface SmsRecoveryScopeTarget {
+  id: string;
+  meterNumber: string | null;
+  phoneNumber: string | null;
+  transactionId: string | null;
+}
+
 const PENDING_SMS_STATUSES = ["queued", "sent"] as const;
 
 export async function listSmsRecoveryEntries(
@@ -24,12 +31,19 @@ export async function listSmsRecoveryEntries(
     return emptyRecoveryList();
   }
 
-  const transactionIds = await findTransactionIds(criteria.transactionId, meterId);
+  const transactionIds = await findTransactionIds(
+    criteria.transactionId,
+    meterId,
+  );
   if ((criteria.transactionId || meterId) && transactionIds.length === 0) {
     return emptyRecoveryList();
   }
 
-  const where = buildSmsRecoveryWhere(criteria.phoneNumber, transactionIds, criteria.deliveryState);
+  const where = buildSmsRecoveryWhere(
+    criteria.phoneNumber,
+    transactionIds,
+    criteria.deliveryState,
+  );
   if (!where) {
     return emptyRecoveryList();
   }
@@ -72,7 +86,9 @@ export async function listSmsRecoveryEntries(
   };
 }
 
-export async function queueSmsRetryById(smsLogId: string): Promise<{ jobId: string; smsLogId: string }> {
+export async function queueSmsRetryById(
+  smsLogId: string,
+): Promise<{ jobId: string; smsLogId: string }> {
   const log = await db.query.smsLogs.findFirst({
     where: eq(smsLogs.id, smsLogId),
     columns: {
@@ -106,6 +122,19 @@ export async function queueSmsRetryById(smsLogId: string): Promise<{ jobId: stri
   };
 }
 
+export async function getSmsRecoveryScopeTargetById(
+  smsLogId: string,
+): Promise<SmsRecoveryScopeTarget | null> {
+  const [target] = await loadSmsRecoveryScopeTargets([smsLogId]);
+  return target ?? null;
+}
+
+export async function listSmsRecoveryScopeTargetsByIds(
+  smsLogIds: string[],
+): Promise<SmsRecoveryScopeTarget[]> {
+  return loadSmsRecoveryScopeTargets(smsLogIds);
+}
+
 function normalizeCriteria(query: SmsRecoveryListQuery) {
   const q = query.q?.trim();
   return {
@@ -116,7 +145,9 @@ function normalizeCriteria(query: SmsRecoveryListQuery) {
   };
 }
 
-function normalizePhoneNumber(phoneNumber: string | undefined): string | undefined {
+function normalizePhoneNumber(
+  phoneNumber: string | undefined,
+): string | undefined {
   if (!phoneNumber) {
     return undefined;
   }
@@ -128,7 +159,9 @@ function normalizePhoneNumber(phoneNumber: string | undefined): string | undefin
   }
 }
 
-async function findMeterId(meterNumber: string | undefined): Promise<string | undefined> {
+async function findMeterId(
+  meterNumber: string | undefined,
+): Promise<string | undefined> {
   if (!meterNumber) {
     return undefined;
   }
@@ -183,25 +216,31 @@ function buildSmsRecoveryWhere(
   return filters.length === 1 ? filters[0] : and(...filters);
 }
 
-function buildDeliveryStateFilter(deliveryState: SmsRecoveryListQuery["deliveryState"]) {
+function buildDeliveryStateFilter(
+  deliveryState: SmsRecoveryListQuery["deliveryState"],
+) {
   switch (deliveryState) {
     case "delivered":
       return eq(smsLogs.status, "delivered");
     case "pending":
       return inArray(smsLogs.status, [...PENDING_SMS_STATUSES]);
     case "all":
-      return or(
-        eq(smsLogs.status, "delivered"),
-        eq(smsLogs.status, "failed"),
-        inArray(smsLogs.status, [...PENDING_SMS_STATUSES]),
-      ) ?? sql`true`;
+      return (
+        or(
+          eq(smsLogs.status, "delivered"),
+          eq(smsLogs.status, "failed"),
+          inArray(smsLogs.status, [...PENDING_SMS_STATUSES]),
+        ) ?? sql`true`
+      );
     case "failed":
     default:
       return eq(smsLogs.status, "failed");
   }
 }
 
-async function loadSmsRecoverySummary(where: ReturnType<typeof buildSmsRecoveryWhere>): Promise<SmsRecoverySummary> {
+async function loadSmsRecoverySummary(
+  where: ReturnType<typeof buildSmsRecoveryWhere>,
+): Promise<SmsRecoverySummary> {
   const [summary] = await db
     .select({
       delivered: sql<number>`count(*) filter (where ${smsLogs.status} = 'delivered')::int`,
@@ -216,11 +255,9 @@ async function loadSmsRecoverySummary(where: ReturnType<typeof buildSmsRecoveryW
 }
 
 interface SmsRecoveryRow {
-  meter:
-    | {
-        meterNumber: string;
-      }
-    | null;
+  meter: {
+    meterNumber: string;
+  } | null;
   smsLog: {
     createdAt: Date;
     id: string;
@@ -231,11 +268,9 @@ interface SmsRecoveryRow {
     providerStatus: string | null;
     status: string;
   };
-  transaction:
-    | {
-        transactionId: string;
-      }
-    | null;
+  transaction: {
+    transactionId: string;
+  } | null;
 }
 
 function toSmsRecoveryItem(row: SmsRecoveryRow): SmsRecoveryItem {
@@ -268,4 +303,24 @@ function emptyRecoveryList(): SmsRecoveryListResult {
     items: [],
     summary: { delivered: 0, failed: 0, pending: 0, total: 0 },
   };
+}
+
+async function loadSmsRecoveryScopeTargets(
+  smsLogIds: string[],
+): Promise<SmsRecoveryScopeTarget[]> {
+  if (smsLogIds.length === 0) {
+    return [];
+  }
+
+  return db
+    .select({
+      id: smsLogs.id,
+      meterNumber: meters.meterNumber,
+      phoneNumber: smsLogs.phoneNumber,
+      transactionId: transactions.transactionId,
+    })
+    .from(smsLogs)
+    .leftJoin(transactions, eq(smsLogs.transactionId, transactions.id))
+    .leftJoin(meters, eq(transactions.meterId, meters.id))
+    .where(inArray(smsLogs.id, smsLogIds));
 }

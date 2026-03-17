@@ -121,7 +121,8 @@ void describe("E2E: landlord dashboard", () => {
           prepaidEstimatedBalance: string | null;
         };
         motherMeterNumber: string;
-        subMeters: { meterNumber: string; totalNetSales: string }[];
+        property: { id?: string; name: string };
+        subMeters: { id?: string; meterNumber: string; totalNetSales: string }[];
         type: "postpaid" | "prepaid";
       }[];
     };
@@ -130,13 +131,16 @@ void describe("E2E: landlord dashboard", () => {
     const prepaidItem = motherMetersBody.data.find((item) => item.type === "prepaid");
     assert.ok(prepaidItem);
     assert.equal(prepaidItem.financials.prepaidEstimatedBalance, "220.00");
+    assert.equal("id" in prepaidItem.property, false);
     assert.equal(prepaidItem.subMeters[0]?.meterNumber, fixture.meterNumber);
     assert.equal(prepaidItem.subMeters[0]?.totalNetSales, "180.00");
+    assert.equal("id" in (prepaidItem.subMeters[0] ?? {}), false);
 
     const postpaidItem = motherMetersBody.data.find((item) => item.type === "postpaid");
     assert.ok(postpaidItem);
     assert.equal(postpaidItem.motherMeterNumber, postpaidMeter.motherMeterNumber);
     assert.equal(postpaidItem.financials.postpaidOutstandingAmount, "70.00");
+    assert.equal("id" in postpaidItem.property, false);
 
     const filteredMotherMetersResponse = await app.request(
       `/api/mobile/landlord-access/mother-meters?propertyId=${fixture.propertyId}`,
@@ -171,9 +175,9 @@ void describe("E2E: landlord dashboard", () => {
         amountPaid?: string;
         commissionAmount?: string;
         createdAt?: string;
-        meter: { meterNumber: string };
+        meter: { id?: string; meterNumber: string };
         meterCreditAmount: string;
-        motherMeter: { motherMeterNumber: string };
+        motherMeter: { id?: string; motherMeterNumber: string };
         rateUsed?: string;
         transactionId: string;
       }[];
@@ -185,6 +189,8 @@ void describe("E2E: landlord dashboard", () => {
       postpaidMeter.motherMeterNumber,
     );
     assert.equal(purchasesBody.data[0]?.meterCreditAmount, "120.00");
+    assert.equal("id" in (purchasesBody.data[0]?.meter ?? {}), false);
+    assert.equal("id" in (purchasesBody.data[0]?.motherMeter ?? {}), false);
     assert.ok(!("amountPaid" in (purchasesBody.data[0] ?? {})));
     assert.ok(!("commissionAmount" in (purchasesBody.data[0] ?? {})));
     assert.ok(!("createdAt" in (purchasesBody.data[0] ?? {})));

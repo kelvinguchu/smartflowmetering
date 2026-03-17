@@ -1,31 +1,18 @@
 export interface LandlordTimelineItem {
   amount: string;
-  financialSnapshot: {
-    companyPaymentsToUtility: string;
-    netSalesCollected: string;
-    postpaidOutstandingAmount: string | null;
-    prepaidEstimatedBalance: string | null;
-    utilityFundingLoaded: string;
-  };
   meter: {
-    id: string;
     meterNumber: string;
     meterType: "electricity" | "gas" | "water";
   } | null;
   motherMeter: {
-    id: string;
     motherMeterNumber: string;
     property: {
-      id: string;
       name: string;
     };
     type: "postpaid" | "prepaid";
   };
   occurredAt: string;
-  referenceId: string;
   transaction: {
-    mpesaReceiptNumber: string;
-    phoneNumber: string;
     unitsPurchased: string;
   } | null;
   type: "bill_payment" | "initial_deposit" | "refill" | "tenant_purchase";
@@ -38,12 +25,6 @@ export interface LandlordTimelineInput {
   offset?: number;
   propertyId?: string;
   startDate?: string;
-}
-
-export interface TimelineState {
-  companyPaymentsToUtility: number;
-  netSalesCollected: number;
-  utilityFundingLoaded: number;
 }
 
 export interface BaseTimelineRow {

@@ -2,10 +2,8 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppBindings } from "../lib/auth-middleware";
 import { requirePermission } from "../lib/auth-middleware";
-import {
-  getAuditLog,
-  listAuditLogs,
-} from "../services/audit-log-read.service";
+import { ensureAdminRouteAccess } from "../lib/staff-route-access";
+import { getAuditLog, listAuditLogs } from "../services/audit-log-read.service";
 import {
   auditLogIdParamSchema,
   auditLogListQuerySchema,
@@ -14,6 +12,10 @@ import {
 export const auditLogRoutes = new Hono<AppBindings>();
 
 auditLogRoutes.use("*", requirePermission("audit_logs:read"));
+auditLogRoutes.use("*", async (c, next) => {
+  ensureAdminRouteAccess(c.get("user"), "Audit log access");
+  await next();
+});
 
 auditLogRoutes.get(
   "/",

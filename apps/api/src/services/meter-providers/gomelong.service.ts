@@ -7,6 +7,7 @@ import {
   gomelongPostJson,
   type GomelongMeterType,
 } from "./gomelong-client";
+import { createGomelongProviderError } from "./gomelong-failure-policy";
 
 export {
   isGomelongConfigured,
@@ -242,14 +243,18 @@ export async function vendTokenWithGomelong(
   const result = await getVendingToken(request);
   const code = result.code;
   if (code !== 0) {
-    throw new Error(
-      `Gomelong vend failed (${code}): ${result.message ?? "unknown error"}`,
-    );
+    throw createGomelongProviderError({
+      code,
+      message: result.message ?? `Gomelong vend failed (${code})`,
+    });
   }
 
   const token = extractToken(result.data);
   if (!token) {
-    throw new Error("Gomelong vend succeeded but no STS token was returned");
+    throw createGomelongProviderError({
+      code,
+      message: "Gomelong vend succeeded but no STS token was returned",
+    });
   }
 
   return token;

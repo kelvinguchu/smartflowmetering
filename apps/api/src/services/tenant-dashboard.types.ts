@@ -4,18 +4,15 @@ export interface TenantDashboardSummary {
     totalCompletedPurchases: number;
   };
   meter: {
-    id: string;
     meterNumber: string;
     meterType: "electricity" | "gas" | "water";
     status: "active" | "inactive" | "suspended";
   };
   motherMeter: {
-    id: string;
     motherMeterNumber: string;
     type: "postpaid" | "prepaid";
   };
   property: {
-    id: string;
     name: string;
   };
   totals: {
@@ -88,13 +85,7 @@ export interface TenantTokenDeliveryItem {
 
 export interface TenantTokenDeliveryDetail extends TenantTokenDeliveryItem {
   smsDelivery: {
-    createdAt: string;
     deliveredAt: string | null;
-    errorCode: string | null;
-    id: string;
-    provider: "hostpinnacle" | "textsms";
-    providerStatus: string | null;
-    receivedAt: string | null;
     status: "delivered" | "failed" | "queued" | "sent";
     updatedAt: string;
   } | null;

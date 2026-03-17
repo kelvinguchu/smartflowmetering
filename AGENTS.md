@@ -101,6 +101,9 @@ Before finishing a change, verify:
 - Do not run Docker commands when the user has said Docker is broken or storage-constrained until the user explicitly confirms it is fixed.
 - Before rebuilding images, inspect likely impact first and avoid rebuilds unless code or image configuration actually changed.
 - Prefer one clean rebuild followed by all relevant checks, instead of repeated incremental rebuilds.
+- For diagnostics, benchmarks, migrations, and ad hoc commands that need the app service environment or Docker network access, prefer `docker compose exec <service> ...` against the existing service container instead of `docker run ...`.
+- Verify Compose-resolved environment values with `docker compose config --environment` before inventing workarounds for env loading or interpolation issues.
+- Do not start one-off containers from app images for routine debugging or benchmarking when the existing Compose service can run the command; avoid leaving stray containers that duplicate running services.
 - Do not copy test files or ad hoc assets into running containers as part of the normal workflow.
 - Do not use `docker compose up --force-recreate` unless image/config changes require container recreation.
 - Keep Docker build context small and respect `.dockerignore` to reduce cache invalidation and disk usage.
@@ -116,6 +119,12 @@ Before finishing a change, verify:
   - https://docs.docker.com/reference/cli/docker/builder/prune/
   - https://docs.docker.com/reference/cli/docker/image/prune/
   - https://docs.docker.com/reference/cli/docker/system/prune/
+- Backend E2E constraint to remember:
+  - `apps/api` host-side `.env` uses Docker-internal hostnames like `postgres` and `redis`, so raw host execution of E2E tests will fail unless the env is rewritten for localhost access.
+  - The production API image includes runtime app files, not the full TS test runner workflow, so do not assume `tsx --test` can be executed inside the running container.
+  - For host-side backend E2E runs, use `docker-compose.test.yml` to expose Postgres and Redis on `127.0.0.1` only, and preload `apps/api/scripts/e2e-env-setup.ts` so `DATABASE_URL` and `REDIS_URL` are rewritten to localhost.
+  - Preferred local command for host-side backend E2E runs is `node --env-file=../../.env --import tsx --import ./scripts/e2e-env-setup.ts --test ...` from `apps/api`.
+  - If Docker-backed Postgres and Redis are not running and reachable, backend E2E verification is not possible in that environment; `bunx tsc --noEmit` is the verification ceiling until infra is available.
 
 ## 11) Research-First Rule When Unsure
 

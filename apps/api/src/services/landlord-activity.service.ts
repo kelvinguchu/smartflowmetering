@@ -65,11 +65,9 @@ async function listLandlordPurchaseActivity(
 
   const rows = await db
     .select({
-      meterId: meters.id,
       meterNumber: meters.meterNumber,
       meterStatus: meters.status,
       meterType: meters.meterType,
-      motherMeterId: motherMeters.id,
       motherMeterNumber: motherMeters.motherMeterNumber,
       motherMeterType: motherMeters.type,
       mpesaReceiptNumber: transactions.mpesaReceiptNumber,
@@ -100,13 +98,11 @@ async function listLandlordPurchaseActivity(
       kplcReceiptNumber: null,
       kplcToken: null,
       meter: {
-        id: row.meterId,
         meterNumber: row.meterNumber,
         meterType: row.meterType,
         status: row.meterStatus,
       },
       motherMeter: {
-        id: row.motherMeterId,
         motherMeterNumber: row.motherMeterNumber,
         type: row.motherMeterType,
       },
@@ -151,7 +147,6 @@ async function listLandlordEventActivity(
       id: motherMeterEvents.id,
       kplcReceiptNumber: motherMeterEvents.kplcReceiptNumber,
       kplcToken: motherMeterEvents.kplcToken,
-      motherMeterId: motherMeters.id,
       motherMeterNumber: motherMeters.motherMeterNumber,
       motherMeterType: motherMeters.type,
       occurredAt: motherMeterEvents.createdAt,
@@ -170,7 +165,6 @@ async function listLandlordEventActivity(
     kplcToken: row.kplcToken,
     meter: null,
     motherMeter: {
-      id: row.motherMeterId,
       motherMeterNumber: row.motherMeterNumber,
       type: row.motherMeterType,
     },

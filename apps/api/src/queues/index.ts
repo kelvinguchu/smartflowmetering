@@ -18,10 +18,10 @@ import type {
 // ============================================================
 
 export const paymentProcessingQueue = createQueue(
-  QUEUE_NAMES.PAYMENT_PROCESSING
+  QUEUE_NAMES.PAYMENT_PROCESSING,
 );
 export const appNotificationDeliveryQueue = createQueue(
-  QUEUE_NAMES.APP_NOTIFICATION_DELIVERY
+  QUEUE_NAMES.APP_NOTIFICATION_DELIVERY,
 );
 export const tokenGenerationQueue = createQueue(QUEUE_NAMES.TOKEN_GENERATION);
 export const smsDeliveryQueue = createQueue(QUEUE_NAMES.SMS_DELIVERY);
@@ -30,50 +30,50 @@ export const smsDeliveryQueue = createQueue(QUEUE_NAMES.SMS_DELIVERY);
 // Workers (process jobs)
 // ============================================================
 
-let paymentWorker:
-  | Worker<PaymentJob, Awaited<ReturnType<typeof processPayment>>>
-  | null = null;
-let appNotificationWorker:
-  | Worker<
-      AppNotificationDeliveryJob,
-      Awaited<ReturnType<typeof processAppNotificationDelivery>>
-    >
-  | null = null;
-let tokenWorker:
-  | Worker<
-      TokenGenerationJob,
-      Awaited<ReturnType<typeof processTokenGeneration>>
-    >
-  | null = null;
-let smsWorker:
-  | Worker<SmsJob, Awaited<ReturnType<typeof processSmsDelivery>>>
-  | null = null;
+let paymentWorker: Worker<
+  PaymentJob,
+  Awaited<ReturnType<typeof processPayment>>
+> | null = null;
+let appNotificationWorker: Worker<
+  AppNotificationDeliveryJob,
+  Awaited<ReturnType<typeof processAppNotificationDelivery>>
+> | null = null;
+let tokenWorker: Worker<
+  TokenGenerationJob,
+  Awaited<ReturnType<typeof processTokenGeneration>>
+> | null = null;
+let smsWorker: Worker<
+  SmsJob,
+  Awaited<ReturnType<typeof processSmsDelivery>>
+> | null = null;
 
-export function startQueueWorkers(): void {
+export async function startQueueWorkers(): Promise<void> {
   if (paymentWorker && appNotificationWorker && tokenWorker && smsWorker) {
+    await Promise.all([
+      paymentWorker.waitUntilReady(),
+      appNotificationWorker.waitUntilReady(),
+      tokenWorker.waitUntilReady(),
+      smsWorker.waitUntilReady(),
+    ]);
     return;
   }
 
   paymentWorker = createWorker(
     QUEUE_NAMES.PAYMENT_PROCESSING,
     processPayment,
-    3
+    3,
   );
   appNotificationWorker = createWorker(
     QUEUE_NAMES.APP_NOTIFICATION_DELIVERY,
     processAppNotificationDelivery,
-    5
+    5,
   );
   tokenWorker = createWorker(
     QUEUE_NAMES.TOKEN_GENERATION,
     processTokenGeneration,
-    5
+    5,
   );
-  smsWorker = createWorker(
-    QUEUE_NAMES.SMS_DELIVERY,
-    processSmsDelivery,
-    10
-  );
+  smsWorker = createWorker(QUEUE_NAMES.SMS_DELIVERY, processSmsDelivery, 10);
 
   paymentWorker.on("completed", (job) => {
     console.log(`[Payment Worker] Completed: ${job.id}`);
@@ -86,7 +86,10 @@ export function startQueueWorkers(): void {
     console.log(`[App Notification Worker] Completed: ${job.id}`);
   });
   appNotificationWorker.on("failed", (job, error) => {
-    console.error(`[App Notification Worker] Failed: ${job?.id}`, error.message);
+    console.error(
+      `[App Notification Worker] Failed: ${job?.id}`,
+      error.message,
+    );
   });
 
   tokenWorker.on("completed", (job) => {
@@ -102,6 +105,13 @@ export function startQueueWorkers(): void {
   smsWorker.on("failed", (job, error) => {
     console.error(`[SMS Worker] Failed: ${job?.id}`, error.message);
   });
+
+  await Promise.all([
+    paymentWorker.waitUntilReady(),
+    appNotificationWorker.waitUntilReady(),
+    tokenWorker.waitUntilReady(),
+    smsWorker.waitUntilReady(),
+  ]);
 }
 
 // ============================================================
@@ -140,12 +150,13 @@ export async function getQueueHealth(): Promise<{
   token: { waiting: number; active: number; failed: number };
   sms: { waiting: number; active: number; failed: number };
 }> {
-  const [paymentCounts, appNotificationCounts, tokenCounts, smsCounts] = await Promise.all([
-    paymentProcessingQueue.getJobCounts("waiting", "active", "failed"),
-    appNotificationDeliveryQueue.getJobCounts("waiting", "active", "failed"),
-    tokenGenerationQueue.getJobCounts("waiting", "active", "failed"),
-    smsDeliveryQueue.getJobCounts("waiting", "active", "failed"),
-  ]);
+  const [paymentCounts, appNotificationCounts, tokenCounts, smsCounts] =
+    await Promise.all([
+      paymentProcessingQueue.getJobCounts("waiting", "active", "failed"),
+      appNotificationDeliveryQueue.getJobCounts("waiting", "active", "failed"),
+      tokenGenerationQueue.getJobCounts("waiting", "active", "failed"),
+      smsDeliveryQueue.getJobCounts("waiting", "active", "failed"),
+    ]);
 
   return {
     appNotifications: {

@@ -27,6 +27,64 @@ void describe("E2E: app notifications", () => {
     await teardownE2E();
   });
 
+  void it("requires support staff to scope app notification and device token reads", async () => {
+    const staffSession = await createAuthenticatedSession(app, "user");
+    const phoneNumber = uniqueKenyanPhoneNumber();
+    const token = "fcm-token-scope-abcdefghijklmnopqrstuvwxyz123456";
+
+    await db.insert(customerAppNotifications).values({
+      message: "Prompt body",
+      meterNumber: "METER-SCOPE-1",
+      phoneNumber,
+      referenceId: `prompt-${phoneNumber}`,
+      title: "Prompt title",
+      type: "buy_token_nudge",
+    });
+
+    await app.request("/api/app-notifications/device-tokens", {
+      method: "POST",
+      headers: staffSession.headers,
+      body: JSON.stringify({
+        phoneNumber,
+        platform: "android",
+        token,
+      }),
+    });
+
+    const broadNotificationsResponse = await app.request("/api/app-notifications", {
+      method: "GET",
+      headers: staffSession.headers,
+    });
+    assert.equal(broadNotificationsResponse.status, 403);
+
+    const scopedNotificationsResponse = await app.request(
+      `/api/app-notifications?phoneNumber=${phoneNumber}`,
+      {
+        method: "GET",
+        headers: staffSession.headers,
+      },
+    );
+    assert.equal(scopedNotificationsResponse.status, 200);
+
+    const broadDeviceTokensResponse = await app.request(
+      "/api/app-notifications/device-tokens",
+      {
+        method: "GET",
+        headers: staffSession.headers,
+      },
+    );
+    assert.equal(broadDeviceTokensResponse.status, 403);
+
+    const scopedDeviceTokensResponse = await app.request(
+      `/api/app-notifications/device-tokens?phoneNumber=${phoneNumber}`,
+      {
+        method: "GET",
+        headers: staffSession.headers,
+      },
+    );
+    assert.equal(scopedDeviceTokensResponse.status, 200);
+  });
+
   void it("allows staff to upsert, list, and deactivate customer device tokens", async () => {
     const staffSession = await createAuthenticatedSession(app, "user");
     const phoneNumber = uniqueKenyanPhoneNumber();
@@ -69,6 +127,57 @@ void describe("E2E: app notifications", () => {
       {
         method: "DELETE",
         headers: staffSession.headers,
+      },
+    );
+    assert.equal(deleteResponse.status, 403);
+
+    const mismatchedDeleteResponse = await app.request(
+      `/api/app-notifications/device-tokens/${createdBody.data.id}?phoneNumber=${uniqueKenyanPhoneNumber()}`,
+      {
+        method: "DELETE",
+        headers: staffSession.headers,
+      },
+    );
+    assert.equal(mismatchedDeleteResponse.status, 403);
+
+    const scopedDeleteResponse = await app.request(
+      `/api/app-notifications/device-tokens/${createdBody.data.id}?phoneNumber=${phoneNumber}`,
+      {
+        method: "DELETE",
+        headers: staffSession.headers,
+      },
+    );
+    assert.equal(scopedDeleteResponse.status, 200);
+    const deletedBody = (await scopedDeleteResponse.json()) as {
+      data: { status: string };
+    };
+    assert.equal(deletedBody.data.status, "inactive");
+  });
+
+  void it("allows admins to deactivate customer device tokens without customer scope", async () => {
+    const adminSession = await createAuthenticatedSession(app, "admin");
+    const phoneNumber = uniqueKenyanPhoneNumber();
+    const token = "fcm-token-admin-abcdefghijklmnopqrstuvwxyz123456";
+
+    const createResponse = await app.request("/api/app-notifications/device-tokens", {
+      method: "POST",
+      headers: adminSession.headers,
+      body: JSON.stringify({
+        phoneNumber,
+        platform: "android",
+        token,
+      }),
+    });
+    assert.equal(createResponse.status, 200);
+    const createdBody = (await createResponse.json()) as {
+      data: { id: string };
+    };
+
+    const deleteResponse = await app.request(
+      `/api/app-notifications/device-tokens/${createdBody.data.id}`,
+      {
+        method: "DELETE",
+        headers: adminSession.headers,
       },
     );
     assert.equal(deleteResponse.status, 200);
@@ -133,13 +242,31 @@ void describe("E2E: app notifications", () => {
         headers: staffSession.headers,
       },
     );
-    assert.equal(firstResponse.status, 200);
-    const firstBody = (await firstResponse.json()) as {
+    assert.equal(firstResponse.status, 403);
+
+    const mismatchedResponse = await app.request(
+      `/api/app-notifications/${notification.id}/requeue?phoneNumber=${uniqueKenyanPhoneNumber()}`,
+      {
+        method: "POST",
+        headers: staffSession.headers,
+      },
+    );
+    assert.equal(mismatchedResponse.status, 403);
+
+    const scopedFirstResponse = await app.request(
+      `/api/app-notifications/${notification.id}/requeue?phoneNumber=${phoneNumber}`,
+      {
+        method: "POST",
+        headers: staffSession.headers,
+      },
+    );
+    assert.equal(scopedFirstResponse.status, 200);
+    const firstBody = (await scopedFirstResponse.json()) as {
       data: { jobId: string };
     };
 
     const secondResponse = await app.request(
-      `/api/app-notifications/${notification.id}/requeue`,
+      `/api/app-notifications/${notification.id}/requeue?phoneNumber=${phoneNumber}`,
       {
         method: "POST",
         headers: staffSession.headers,
