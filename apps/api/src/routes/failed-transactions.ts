@@ -12,6 +12,7 @@ import {
   getFailedTransactionGuidance,
   validateFailedTransactionStatusUpdate,
 } from "../services/failed-transaction-policy.service";
+import { parseGomelongFailureDetails } from "../services/meter-providers/gomelong-failure-policy";
 import {
   failedTransactionIdParamSchema,
   failedTransactionListQuerySchema,
@@ -79,6 +80,10 @@ failedTransactionRoutes.get(
           guidance,
           id: row.id,
           meterNumberAttempted: row.meterNumberAttempted,
+          providerFailure:
+            row.failureReason === "manufacturer_error"
+              ? parseGomelongFailureDetails(row.failureDetails)
+              : null,
           payment: row.mpesaTransaction
             ? {
                 amount: row.mpesaTransaction.transAmount,

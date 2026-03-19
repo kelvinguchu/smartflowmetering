@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { createApp } from "../../src/app";
-import { createAuthenticatedSession, ensureTestMeterFixture, ensureInfraReady, teardownE2E, uniqueRef } from "./helpers";
+import {
+  createAuthenticatedSession,
+  ensureTestMeterFixture,
+  ensureInfraReady,
+  teardownE2E,
+  uniqueRef,
+} from "./helpers";
 
 const app = createApp();
 type JsonScalar = string | number | boolean | null;
@@ -65,7 +71,11 @@ void describe("E2E: API health and auth guards", () => {
   });
 
   void it("rejects unauthenticated access to detailed health endpoints", async () => {
-    const protectedHealthPaths = ["/api/health/detailed", "/api/health/queues", "/api/mpesa/health"];
+    const protectedHealthPaths = [
+      "/api/health/detailed",
+      "/api/health/queues",
+      "/api/mpesa/health",
+    ];
 
     for (const path of protectedHealthPaths) {
       const { response, body } = await getJson(path);
@@ -79,7 +89,7 @@ void describe("E2E: API health and auth guards", () => {
 
     const { response, body } = await getJson(
       "/api/health/detailed",
-      adminSession.headers
+      adminSession.headers,
     );
     assert.equal(response.status, 200);
     assert.ok(body.checks);
@@ -87,11 +97,17 @@ void describe("E2E: API health and auth guards", () => {
     assert.equal(checks.database.status, "ok");
     assert.equal(checks.queues.status, "ok");
 
-    const queueHealth = await getJson("/api/health/queues", adminSession.headers);
+    const queueHealth = await getJson(
+      "/api/health/queues",
+      adminSession.headers,
+    );
     assert.equal(queueHealth.response.status, 200);
     assert.equal(queueHealth.body.status, "ok");
 
-    const mpesaHealth = await getJson("/api/mpesa/health", adminSession.headers);
+    const mpesaHealth = await getJson(
+      "/api/mpesa/health",
+      adminSession.headers,
+    );
     assert.equal(mpesaHealth.response.status, 200);
     assert.equal(mpesaHealth.body.status, "ok");
   });
@@ -99,7 +115,11 @@ void describe("E2E: API health and auth guards", () => {
   void it("forbids non-admin staff from accessing admin diagnostics", async () => {
     const userSession = await createAuthenticatedSession(app, "user");
 
-    const protectedHealthPaths = ["/api/health/detailed", "/api/health/queues", "/api/mpesa/health"];
+    const protectedHealthPaths = [
+      "/api/health/detailed",
+      "/api/health/queues",
+      "/api/mpesa/health",
+    ];
 
     for (const path of protectedHealthPaths) {
       const { response, body } = await getJson(path, userSession.headers);
@@ -123,10 +143,16 @@ void describe("E2E: API health and auth guards", () => {
       data: { id: string };
     };
 
-    const listResponse = await getJson("/api/applications", userSession.headers);
+    const listResponse = await getJson(
+      "/api/applications",
+      userSession.headers,
+    );
     assert.equal(listResponse.response.status, 200);
     assert.ok(Array.isArray(listResponse.body.data));
-    const [supportListItem] = listResponse.body.data as Record<string, JsonValue>[];
+    const [supportListItem] = listResponse.body.data as Record<
+      string,
+      JsonValue
+    >[];
     assert.ok(supportListItem);
     assert.equal("idNumber" in supportListItem, false);
     assert.equal("kraPin" in supportListItem, false);
@@ -142,8 +168,14 @@ void describe("E2E: API health and auth guards", () => {
       userSession.headers,
     );
     assert.equal(detailResponse.response.status, 200);
-    assert.equal("idNumber" in (detailResponse.body.data as Record<string, JsonValue>), false);
-    assert.equal("kraPin" in (detailResponse.body.data as Record<string, JsonValue>), false);
+    assert.equal(
+      "idNumber" in (detailResponse.body.data as Record<string, JsonValue>),
+      false,
+    );
+    assert.equal(
+      "kraPin" in (detailResponse.body.data as Record<string, JsonValue>),
+      false,
+    );
 
     const approveResponse = await app.request(
       `/api/applications/${createdBody.data.id}/approve`,
@@ -169,7 +201,8 @@ void describe("E2E: API health and auth guards", () => {
     );
     assert.equal(adminDetailResponse.response.status, 200);
     assert.equal(
-      "idNumber" in (adminDetailResponse.body.data as Record<string, JsonValue>),
+      "idNumber" in
+        (adminDetailResponse.body.data as Record<string, JsonValue>),
       true,
     );
     assert.equal(
@@ -255,6 +288,41 @@ void describe("E2E: API health and auth guards", () => {
     assert.equal(lastStatus, 429);
   });
 
+  void it("scopes auth rate limiting per client IP", async () => {
+    const exhaustedHeaders = {
+      "Content-Type": "application/json",
+      "x-forwarded-for": "198.51.100.54",
+    };
+
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      await app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: exhaustedHeaders,
+        body: JSON.stringify({
+          email: "missing-user@example.com",
+          password: "bad-password",
+        }),
+      });
+    }
+
+    const isolatedClientResponse = await app.request(
+      "/api/auth/sign-in/email",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "198.51.100.55",
+        },
+        body: JSON.stringify({
+          email: "missing-user@example.com",
+          password: "bad-password",
+        }),
+      },
+    );
+
+    assert.notEqual(isolatedClientResponse.status, 429);
+  });
+
   void it("rejects unauthenticated access for protected route groups", async () => {
     const protectedCalls: {
       method: "GET" | "POST";
@@ -275,7 +343,9 @@ void describe("E2E: API health and auth guards", () => {
       {
         method: "POST",
         path: "/api/applications/00000000-0000-0000-0000-000000000000/approve",
-        payload: { tariffId: "00000000-0000-0000-0000-000000000000" } as JsonObject,
+        payload: {
+          tariffId: "00000000-0000-0000-0000-000000000000",
+        } as JsonObject,
       },
       {
         method: "POST",
@@ -316,14 +386,16 @@ void describe("E2E: API health and auth guards", () => {
     for (const call of protectedCalls) {
       const response = await app.request(call.path, {
         method: call.method,
-        headers: call.payload ? { "Content-Type": "application/json" } : undefined,
+        headers: call.payload
+          ? { "Content-Type": "application/json" }
+          : undefined,
         body: call.payload ? JSON.stringify(call.payload) : undefined,
       });
 
       assert.equal(
         response.status,
         401,
-        `Expected 401 for ${call.method} ${call.path}, got ${response.status}`
+        `Expected 401 for ${call.method} ${call.path}, got ${response.status}`,
       );
     }
   });

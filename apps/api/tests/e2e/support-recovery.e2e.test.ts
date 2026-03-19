@@ -2,8 +2,18 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { createApp } from "../../src/app";
 import { db } from "../../src/db";
-import { generatedTokens, smsLogs, transactions } from "../../src/db/schema";
+import {
+  failedTransactions,
+  generatedTokens,
+  mpesaTransactions,
+  smsLogs,
+  transactions,
+} from "../../src/db/schema";
 import { protectToken } from "../../src/lib/token-protection";
+import {
+  createGomelongProviderError,
+  formatGomelongFailureDetails,
+} from "../../src/services/meter-providers/gomelong-failure-policy";
 import {
   createAuthenticatedSession,
   ensureInfraReady,
@@ -243,6 +253,115 @@ void describe("E2E: support recovery", () => {
     assert.match(
       body.data.transactions[0].recoveryAssessment.summary,
       /no sms delivery attempt/i,
+    );
+  });
+
+  void it("surfaces classified provider failures in support recovery", async () => {
+    const fixture = await ensureTestMeterFixture("SUPPORT-METER-005");
+    const staffSession = await createAuthenticatedSession(app, "user");
+    const phoneNumber = uniqueKenyanPhoneNumber();
+    const [mpesaTransaction] = await db
+      .insert(mpesaTransactions)
+      .values({
+        billRefNumber: fixture.meterNumber,
+        businessShortCode: "174379",
+        msisdn: phoneNumber,
+        rawPayload: {},
+        transAmount: "220.00",
+        transId: uniqueRef("RCP"),
+        transTime: "20260318120000",
+        transactionType: "Pay Bill",
+      })
+      .returning();
+
+    const [transaction] = await db
+      .insert(transactions)
+      .values({
+        amountPaid: "220.00",
+        commissionAmount: "22.00",
+        meterId: fixture.meterId,
+        mpesaReceiptNumber: mpesaTransaction.transId,
+        mpesaTransactionId: mpesaTransaction.id,
+        netAmount: "198.00",
+        paymentMethod: "stk_push",
+        phoneNumber,
+        rateUsed: "25.0000",
+        status: "failed",
+        transactionId: uniqueRef("OHM-"),
+        unitsPurchased: "7.9200",
+      })
+      .returning();
+
+    await db.insert(failedTransactions).values({
+      amount: "220.00",
+      failureDetails: formatGomelongFailureDetails(
+        createGomelongProviderError({
+          code: 5002,
+          message: "temporary provider outage",
+        }),
+        { retriesExhausted: true },
+      ),
+      failureReason: "manufacturer_error",
+      meterNumberAttempted: fixture.meterNumber,
+      mpesaTransactionId: mpesaTransaction.id,
+      phoneNumber,
+      status: "pending_review",
+    });
+
+    const response = await app.request(
+      `/api/support-recovery?meterNumber=${fixture.meterNumber}`,
+      {
+        method: "GET",
+        headers: staffSession.headers,
+      },
+    );
+
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as {
+      data: {
+        transactions: {
+          id: string;
+          recoveryAssessment: {
+            caseId: string;
+            providerFailure: {
+              category: string | null;
+              disposition: string | null;
+              operatorAction: string | null;
+              retryable: boolean | null;
+              summary: string | null;
+            } | null;
+            recommendedAction: string;
+            summary: string;
+          };
+        }[];
+      };
+    };
+
+    assert.equal(body.data.transactions.length, 1);
+    assert.equal(body.data.transactions[0].id, transaction.id);
+    assert.equal(
+      body.data.transactions[0].recoveryAssessment.caseId,
+      "provider_failure_before_token",
+    );
+    assert.equal(
+      body.data.transactions[0].recoveryAssessment.providerFailure?.category,
+      "transient_provider_failure",
+    );
+    assert.equal(
+      body.data.transactions[0].recoveryAssessment.providerFailure?.disposition,
+      "retryable_retries_exhausted",
+    );
+    assert.equal(
+      body.data.transactions[0].recoveryAssessment.providerFailure?.retryable,
+      true,
+    );
+    assert.match(
+      body.data.transactions[0].recoveryAssessment.recommendedAction,
+      /retry token generation/i,
+    );
+    assert.match(
+      body.data.transactions[0].recoveryAssessment.summary,
+      /temporary|safe to retry/i,
     );
   });
 

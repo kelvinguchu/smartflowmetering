@@ -5,10 +5,11 @@ import {
   createGomelongProviderError,
   formatGomelongFailureDetails,
   getGomelongFailurePolicy,
+  parseGomelongFailureDetails,
 } from "../src/services/meter-providers/gomelong-failure-policy";
 
-void describe("gomelong failure policy", () => {
-  void it("marks transient provider outages as retryable", () => {
+describe("gomelong failure policy", () => {
+  it("marks transient provider outages as retryable", () => {
     const policy = classifyGomelongFailure({
       code: 9001,
       message: "provider unavailable",
@@ -18,7 +19,7 @@ void describe("gomelong failure policy", () => {
     assert.equal(policy.retryable, true);
   });
 
-  void it("marks invalid meter failures as non-retryable", () => {
+  it("marks invalid meter failures as non-retryable", () => {
     const policy = classifyGomelongFailure({
       code: 4004,
       message: "invalid meter number",
@@ -28,7 +29,7 @@ void describe("gomelong failure policy", () => {
     assert.equal(policy.retryable, false);
   });
 
-  void it("formats operator-facing failure details with retry disposition", () => {
+  it("formats operator-facing failure details with retry disposition", () => {
     const error = createGomelongProviderError({
       code: 5002,
       message: "temporary failure",
@@ -42,7 +43,30 @@ void describe("gomelong failure policy", () => {
     assert.match(details, /disposition=retryable_retries_exhausted/);
   });
 
-  void it("preserves policy metadata on structured provider errors", () => {
+  it("parses formatted failure details for operator workflows", () => {
+    const error = createGomelongProviderError({
+      code: 4004,
+      message: "invalid meter number",
+    });
+
+    const parsed = parseGomelongFailureDetails(
+      formatGomelongFailureDetails(error),
+    );
+
+    assert.deepEqual(parsed, {
+      category: "invalid_meter_or_contract",
+      code: 4004,
+      disposition: "non_retryable",
+      message: "invalid meter number",
+      operatorAction:
+        "Verify the provider-side meter contract, meter code, and activation state before retrying or refunding",
+      retryable: false,
+      summary:
+        "Provider rejected the meter or contract details and the same request should not be retried unchanged",
+    });
+  });
+
+  it("preserves policy metadata on structured provider errors", () => {
     const error = createGomelongProviderError({
       message: "Gomelong credentials are not configured: GOMELONG_USER_ID",
     });

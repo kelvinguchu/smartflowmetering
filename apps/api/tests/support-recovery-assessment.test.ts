@@ -6,6 +6,7 @@ describe("support recovery assessment", () => {
   it("returns structured closure guidance for manual recovery cases", () => {
     const providerFailure = buildSupportRecoveryAssessment({
       generatedTokens: [],
+      providerFailure: null,
       smsLogs: [],
       status: "failed",
     });
@@ -26,6 +27,7 @@ describe("support recovery assessment", () => {
 
     const smsFailed = buildSupportRecoveryAssessment({
       generatedTokens: [{ tokenType: "credit" }],
+      providerFailure: null,
       smsLogs: [
         { createdAt: new Date("2026-03-17T08:00:00.000Z"), status: "failed" },
       ],
@@ -46,6 +48,7 @@ describe("support recovery assessment", () => {
   it("returns no closure actions for in-flight or already-confirmed delivery", () => {
     const processing = buildSupportRecoveryAssessment({
       generatedTokens: [],
+      providerFailure: null,
       smsLogs: [],
       status: "processing",
     });
@@ -58,6 +61,7 @@ describe("support recovery assessment", () => {
 
     const delivered = buildSupportRecoveryAssessment({
       generatedTokens: [{ tokenType: "credit" }],
+      providerFailure: null,
       smsLogs: [
         {
           createdAt: new Date("2026-03-17T09:00:00.000Z"),

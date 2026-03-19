@@ -3,8 +3,10 @@ import { db } from "../db";
 import { smsLogs } from "../db/schema";
 import type {
   SmsProviderHealthBucket,
+  SmsProviderHealthSignal,
   SmsProviderHealthSummary,
 } from "./sms-provider-health.types";
+import { DEFAULT_SMS_PROVIDER_ALERT_THRESHOLDS } from "./sms-provider-alert-thresholds";
 
 interface ProviderStatsRow {
   attempted: number;
@@ -20,7 +22,7 @@ export async function getSmsProviderHealthSummary(
   const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000);
   const [providerRows, textsmsPendingDlr] = await Promise.all([
     loadProviderStats(windowStart),
-    loadTextSmsPendingDlrCount(windowStart),
+    loadTextSmsPendingDlrMetrics(windowStart),
   ]);
 
   const hostpinnacle = toBucket(
@@ -31,6 +33,22 @@ export async function getSmsProviderHealthSummary(
   );
 
   const totalAttempted = hostpinnacle.attempted + textsmsBase.attempted;
+  const oldestPendingDlrCreatedAt = toOptionalDate(
+    textsmsPendingDlr.oldestCreatedAt,
+  );
+  const fallbackUsageRate =
+    totalAttempted === 0
+      ? 0
+      : roundPercentage((textsmsBase.attempted / totalAttempted) * 100);
+  const oldestPendingDlrAgeMinutes =
+    oldestPendingDlrCreatedAt === null
+      ? null
+      : Math.max(
+          0,
+          Math.round(
+            (Date.now() - oldestPendingDlrCreatedAt.getTime()) / (60 * 1000),
+          ),
+        );
 
   return {
     generatedAt: new Date().toISOString(),
@@ -41,27 +59,36 @@ export async function getSmsProviderHealthSummary(
       pending: hostpinnacle.pending + textsmsBase.pending,
       total: totalAttempted,
     },
+    signals: {
+      hostpinnacle: buildHostpinnacleSignal(hostpinnacle),
+      textsmsDlrBacklog: buildTextSmsDlrSignal(
+        textsmsPendingDlr.count,
+        oldestPendingDlrAgeMinutes,
+      ),
+      textsmsFallback: buildTextSmsFallbackSignal(
+        fallbackUsageRate,
+        totalAttempted,
+      ),
+    },
     textsms: {
       ...textsmsBase,
-      fallbackUsageRate:
-        totalAttempted === 0
-          ? 0
-          : roundPercentage((textsmsBase.attempted / totalAttempted) * 100),
-      pendingDlrSync: textsmsPendingDlr,
+      fallbackUsageRate,
+      oldestPendingDlrAgeMinutes,
+      pendingDlrSync: textsmsPendingDlr.count,
     },
     windowHours,
   };
 }
 
-async function loadProviderStats(windowStart: Date): Promise<ProviderStatsRow[]> {
+async function loadProviderStats(
+  windowStart: Date,
+): Promise<ProviderStatsRow[]> {
   return db
     .select({
       attempted: sql<number>`count(*)::int`,
-      delivered:
-        sql<number>`count(*) filter (where ${smsLogs.status} = 'delivered')::int`,
+      delivered: sql<number>`count(*) filter (where ${smsLogs.status} = 'delivered')::int`,
       failed: sql<number>`count(*) filter (where ${smsLogs.status} = 'failed')::int`,
-      pending:
-        sql<number>`count(*) filter (where ${smsLogs.status} in ('queued', 'sent'))::int`,
+      pending: sql<number>`count(*) filter (where ${smsLogs.status} in ('queued', 'sent'))::int`,
       provider: smsLogs.provider,
     })
     .from(smsLogs)
@@ -69,10 +96,14 @@ async function loadProviderStats(windowStart: Date): Promise<ProviderStatsRow[]>
     .groupBy(smsLogs.provider);
 }
 
-async function loadTextSmsPendingDlrCount(windowStart: Date): Promise<number> {
+async function loadTextSmsPendingDlrMetrics(windowStart: Date): Promise<{
+  count: number;
+  oldestCreatedAt: Date | string | null;
+}> {
   const [row] = await db
     .select({
       count: sql<number>`count(*)::int`,
+      oldestCreatedAt: sql<Date | null>`min(${smsLogs.createdAt})`,
     })
     .from(smsLogs)
     .where(
@@ -81,11 +112,17 @@ async function loadTextSmsPendingDlrCount(windowStart: Date): Promise<number> {
         sql`${smsLogs.provider} = 'textsms'`,
         sql`${smsLogs.status} = 'sent'`,
         isNull(smsLogs.providerDeliveredAt),
-        or(isNull(smsLogs.providerStatus), sql`${smsLogs.providerStatus} <> 'Delivered'`),
+        or(
+          isNull(smsLogs.providerStatus),
+          sql`${smsLogs.providerStatus} <> 'Delivered'`,
+        ),
       ),
     );
 
-  return row.count;
+  return {
+    count: row.count,
+    oldestCreatedAt: row.oldestCreatedAt,
+  };
 }
 
 function toBucket(row: ProviderStatsRow | null): SmsProviderHealthBucket {
@@ -104,11 +141,103 @@ function toBucket(row: ProviderStatsRow | null): SmsProviderHealthBucket {
     delivered: row.delivered,
     failed: row.failed,
     failureRate:
-      row.attempted === 0 ? 0 : roundPercentage((row.failed / row.attempted) * 100),
+      row.attempted === 0
+        ? 0
+        : roundPercentage((row.failed / row.attempted) * 100),
     pending: row.pending,
   };
 }
 
 function roundPercentage(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function toOptionalDate(value: Date | string | null): Date | null {
+  if (value === null) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function buildHostpinnacleSignal(
+  bucket: SmsProviderHealthBucket,
+): SmsProviderHealthSignal {
+  if (
+    bucket.failed >= DEFAULT_SMS_PROVIDER_ALERT_THRESHOLDS.minFailedCount &&
+    bucket.failureRate >=
+      DEFAULT_SMS_PROVIDER_ALERT_THRESHOLDS.hostpinnacleFailureRatePercent
+  ) {
+    return {
+      level: "critical",
+      recommendedAction:
+        "Treat HostPinnacle as degraded, review recent provider errors, and confirm TextSMS fallback is carrying delivery load.",
+      summary:
+        "HostPinnacle failure volume is above the outage threshold for the current review window.",
+    };
+  }
+
+  return {
+    level: "healthy",
+    recommendedAction: null,
+    summary: "HostPinnacle failure volume is below the outage threshold.",
+  };
+}
+
+function buildTextSmsFallbackSignal(
+  fallbackUsageRate: number,
+  totalAttempted: number,
+): SmsProviderHealthSignal {
+  if (
+    totalAttempted > 0 &&
+    fallbackUsageRate >=
+      DEFAULT_SMS_PROVIDER_ALERT_THRESHOLDS.textsmsFallbackUsageRatePercent
+  ) {
+    return {
+      level: "warning",
+      recommendedAction:
+        "Review why HostPinnacle traffic is spilling to TextSMS and confirm fallback remains intentional rather than permanent routing drift.",
+      summary: "TextSMS is handling an elevated share of recent SMS traffic.",
+    };
+  }
+
+  return {
+    level: "healthy",
+    recommendedAction: null,
+    summary: "TextSMS fallback usage is within the normal operating range.",
+  };
+}
+
+function buildTextSmsDlrSignal(
+  pendingDlrSync: number,
+  oldestPendingDlrAgeMinutes: number | null,
+): SmsProviderHealthSignal {
+  if (
+    pendingDlrSync >=
+    DEFAULT_SMS_PROVIDER_ALERT_THRESHOLDS.textsmsPendingDlrThreshold
+  ) {
+    const ageDetail =
+      oldestPendingDlrAgeMinutes === null
+        ? ""
+        : ` Oldest pending delivery report is ${oldestPendingDlrAgeMinutes} minute(s) old.`;
+
+    return {
+      level: "warning",
+      recommendedAction:
+        "Run or inspect TextSMS delivery-report sync before retrying customer delivery, then clear or document the backlog.",
+      summary: `TextSMS delivery-report backlog is above the review threshold.${ageDetail}`,
+    };
+  }
+
+  return {
+    level: "healthy",
+    recommendedAction: null,
+    summary:
+      "TextSMS delivery-report backlog is within the normal review threshold.",
+  };
 }

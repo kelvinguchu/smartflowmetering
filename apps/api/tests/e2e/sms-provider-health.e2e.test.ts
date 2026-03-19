@@ -77,8 +77,26 @@ void describe("E2E: sms provider health", () => {
           delivered: number;
           failed: number;
           fallbackUsageRate: number;
+          oldestPendingDlrAgeMinutes: number | null;
           pending: number;
           pendingDlrSync: number;
+        };
+        signals: {
+          hostpinnacle: {
+            level: string;
+            recommendedAction: string | null;
+            summary: string;
+          };
+          textsmsDlrBacklog: {
+            level: string;
+            recommendedAction: string | null;
+            summary: string;
+          };
+          textsmsFallback: {
+            level: string;
+            recommendedAction: string | null;
+            summary: string;
+          };
         };
         windowHours: number;
       };
@@ -92,5 +110,9 @@ void describe("E2E: sms provider health", () => {
     assert.equal(body.data.textsms.attempted, 1);
     assert.equal(body.data.textsms.pendingDlrSync, 1);
     assert.equal(body.data.textsms.fallbackUsageRate, 33.33);
+    assert.equal(body.data.signals.hostpinnacle.level, "healthy");
+    assert.equal(body.data.signals.textsmsFallback.level, "warning");
+    assert.equal(body.data.signals.textsmsDlrBacklog.level, "healthy");
+    assert.ok(body.data.textsms.oldestPendingDlrAgeMinutes !== null);
   });
 });

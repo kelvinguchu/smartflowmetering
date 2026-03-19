@@ -10,11 +10,10 @@ const NODE_ENV = (process.env.NODE_ENV ?? "development") as
 
 const isProduction = NODE_ENV === "production";
 const MPESA_ENVIRONMENT = normalizeMpesaEnvironment(
-  process.env.MPESA_ENVIRONMENT
+  process.env.MPESA_ENVIRONMENT,
 );
 const MPESA_CALLBACK_URL =
-  process.env.MPESA_CALLBACK_URL?.trim() ??
-  "https://your-domain.com/api/mpesa";
+  process.env.MPESA_CALLBACK_URL?.trim() ?? "https://your-domain.com/api/mpesa";
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 const REDIS_URL = process.env.REDIS_URL ?? "";
 const FIREBASE_SERVICE_ACCOUNT_PATH =
@@ -22,7 +21,7 @@ const FIREBASE_SERVICE_ACCOUNT_PATH =
   "./smart-flow-metering-firebase-adminsdk-fbsvc-f853c036bd.json";
 const TEXTSMS_PASS_TYPE = process.env.TEXTSMS_PASS_TYPE?.trim();
 const MPESA_CALLBACK_TOKEN_TRANSPORT = normalizeCallbackTokenTransport(
-  process.env.MPESA_CALLBACK_TOKEN_TRANSPORT
+  process.env.MPESA_CALLBACK_TOKEN_TRANSPORT,
 );
 
 // Always required env vars
@@ -55,7 +54,7 @@ if (isProduction) {
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variables for production: ${missing.join(", ")}\n` +
-        `These must be set before running in production mode.`
+        `These must be set before running in production mode.`,
     );
   }
 }
@@ -84,7 +83,7 @@ export const env = {
     process.env.MPESA_TRANSACTION_STATUS_COMMAND_ID ?? "TransactionStatusQuery",
   MPESA_IDENTIFIER_TYPE: Number.parseInt(
     process.env.MPESA_IDENTIFIER_TYPE ?? "4",
-    10
+    10,
   ),
   MPESA_SIGNATURE_SECRET: process.env.MPESA_SIGNATURE_SECRET ?? "",
   MPESA_SIGNATURE_HEADER: (
@@ -99,23 +98,19 @@ export const env = {
     .toLowerCase(),
   MPESA_SIGNATURE_MAX_AGE_SECONDS: parsePositiveInteger(
     process.env.MPESA_SIGNATURE_MAX_AGE_SECONDS,
-    300
+    300,
   ),
   MPESA_REQUIRE_SIGNATURE: parseBoolean(
     process.env.MPESA_REQUIRE_SIGNATURE,
-    isProduction && Boolean(process.env.MPESA_SIGNATURE_SECRET)
+    isProduction && Boolean(process.env.MPESA_SIGNATURE_SECRET),
   ),
 
   // STS Meter Provider (Gomelong)
   GOMELONG_API_URL: process.env.GOMELONG_API_URL ?? "https://sts.gomelong.top",
   GOMELONG_USER_ID: process.env.GOMELONG_USER_ID ?? "",
   GOMELONG_PASSWORD: process.env.GOMELONG_PASSWORD ?? "",
-  GOMELONG_VENDING_TYPE: Number.parseInt(
-    process.env.GOMELONG_VENDING_TYPE ?? "1",
-    10
-  ) === 0
-    ? 0
-    : 1,
+  GOMELONG_VENDING_TYPE:
+    Number.parseInt(process.env.GOMELONG_VENDING_TYPE ?? "1", 10) === 0 ? 0 : 1,
 
   // SMS Provider - Hostpinnacle
   HOSTPINNACLE_API_URL: process.env.HOSTPINNACLE_API_URL ?? "",
@@ -146,8 +141,10 @@ export const env = {
   // Application
   NODE_ENV,
   PORT: Number.parseInt(process.env.PORT ?? "3000", 10),
-  CORS_ORIGINS: (process.env.CORS_ORIGINS ??
-    "http://localhost:3000,http://localhost:3001,https://smartmetering.africa,https://www.smartmetering.africa")
+  CORS_ORIGINS: (
+    process.env.CORS_ORIGINS ??
+    "http://localhost:3000,http://localhost:3001,https://smartmetering.africa,https://www.smartmetering.africa"
+  )
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
@@ -159,7 +156,10 @@ export const env = {
   // Firebase / FCM
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ?? "",
   FIREBASE_SERVICE_ACCOUNT_PATH,
-  FCM_ENABLED: parseBoolean(process.env.FCM_ENABLED, Boolean(FIREBASE_SERVICE_ACCOUNT_PATH)),
+  FCM_ENABLED: parseBoolean(
+    process.env.FCM_ENABLED,
+    Boolean(FIREBASE_SERVICE_ACCOUNT_PATH),
+  ),
   FCM_DRY_RUN: parseBoolean(process.env.FCM_DRY_RUN, false),
 
   // Business Rules
@@ -167,52 +167,56 @@ export const env = {
   MIN_TRANSACTION_AMOUNT: 30, // KES 30 minimum
   ALERT_AUTOMATION_ENABLED: parseBoolean(
     process.env.ALERT_AUTOMATION_ENABLED,
-    false
+    false,
   ),
   ALERT_AUTOMATION_INTERVAL_SECONDS: parsePositiveInteger(
     process.env.ALERT_AUTOMATION_INTERVAL_SECONDS,
-    900
+    900,
   ),
   ALERT_TIMEZONE: process.env.ALERT_TIMEZONE?.trim() ?? "Africa/Nairobi",
   LOW_BALANCE_ALERT_DEDUPE_HOURS: parsePositiveInteger(
     process.env.LOW_BALANCE_ALERT_DEDUPE_HOURS,
-    12
+    12,
   ),
   POSTPAID_REMINDER_DEDUPE_HOURS: parsePositiveInteger(
     process.env.POSTPAID_REMINDER_DEDUPE_HOURS,
-    24
+    24,
   ),
   POSTPAID_REMINDER_DAYS_AFTER_PAYMENT: parsePositiveInteger(
     process.env.POSTPAID_REMINDER_DAYS_AFTER_PAYMENT,
-    13
+    13,
+  ),
+  SMS_PROVIDER_ALERT_AUTOMATION_ENABLED: parseBoolean(
+    process.env.SMS_PROVIDER_ALERT_AUTOMATION_ENABLED,
+    false,
   ),
   LANDLORD_DAILY_USAGE_SMS_ENABLED: parseBoolean(
     process.env.LANDLORD_DAILY_USAGE_SMS_ENABLED,
-    isProduction
+    isProduction,
   ),
   LANDLORD_DAILY_USAGE_SMS_HOUR: parseHour(
     process.env.LANDLORD_DAILY_USAGE_SMS_HOUR,
-    20
+    20,
   ),
   CUSTOMER_PROMPTS_ENABLED: parseBoolean(
     process.env.CUSTOMER_PROMPTS_ENABLED,
-    false
+    false,
   ),
   CUSTOMER_PROMPTS_MAX_PER_RUN: parsePositiveInteger(
     process.env.CUSTOMER_PROMPTS_MAX_PER_RUN,
-    25
+    25,
   ),
   FAILED_PURCHASE_PROMPT_DEDUPE_HOURS: parsePositiveInteger(
     process.env.FAILED_PURCHASE_PROMPT_DEDUPE_HOURS,
-    24
+    24,
   ),
   BUY_TOKEN_NUDGE_STALE_DAYS: parsePositiveInteger(
     process.env.BUY_TOKEN_NUDGE_STALE_DAYS,
-    7
+    7,
   ),
   BUY_TOKEN_NUDGE_DEDUPE_HOURS: parsePositiveInteger(
     process.env.BUY_TOKEN_NUDGE_DEDUPE_HOURS,
-    24
+    24,
   ),
 
   // Safaricom M-Pesa IP ranges for callback validation
@@ -226,14 +230,14 @@ export const env = {
 export type Env = typeof env;
 
 function normalizeMpesaEnvironment(
-  value: string | undefined
+  value: string | undefined,
 ): "sandbox" | "production" {
   return value?.toLowerCase() === "production" ? "production" : "sandbox";
 }
 
 function parsePositiveInteger(
   value: string | undefined,
-  fallback: number
+  fallback: number,
 ): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;

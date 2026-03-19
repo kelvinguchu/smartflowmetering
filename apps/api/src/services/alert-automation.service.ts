@@ -5,6 +5,7 @@ import {
   queueLowBalanceNotifications,
   queuePostpaidReminderNotifications,
 } from "./mother-meter-alerts.service";
+import { runSmsProviderAlerts } from "./sms-provider-alerts.service";
 
 let automationTimer: NodeJS.Timeout | null = null;
 let cycleRunning = false;
@@ -40,15 +41,19 @@ async function runAlertAutomationCycle(): Promise<void> {
   cycleRunning = true;
 
   try {
-    const [lowBalanceResult, postpaidReminderResult] = await Promise.all([
-      queueLowBalanceNotifications({
-        dedupeWindowHours: env.LOW_BALANCE_ALERT_DEDUPE_HOURS,
-      }),
-      queuePostpaidReminderNotifications({
-        dedupeWindowHours: env.POSTPAID_REMINDER_DEDUPE_HOURS,
-        daysAfterLastPayment: env.POSTPAID_REMINDER_DAYS_AFTER_PAYMENT,
-      }),
-    ]);
+    const [lowBalanceResult, postpaidReminderResult, smsProviderAlertResult] =
+      await Promise.all([
+        queueLowBalanceNotifications({
+          dedupeWindowHours: env.LOW_BALANCE_ALERT_DEDUPE_HOURS,
+        }),
+        queuePostpaidReminderNotifications({
+          dedupeWindowHours: env.POSTPAID_REMINDER_DEDUPE_HOURS,
+          daysAfterLastPayment: env.POSTPAID_REMINDER_DAYS_AFTER_PAYMENT,
+        }),
+        env.SMS_PROVIDER_ALERT_AUTOMATION_ENABLED
+          ? runSmsProviderAlerts({})
+          : Promise.resolve(null),
+      ]);
 
     let dailyUsageResult: Awaited<
       ReturnType<typeof queueDailyLandlordUsageSummarySms>
@@ -78,6 +83,7 @@ async function runAlertAutomationCycle(): Promise<void> {
       lowBalance: lowBalanceResult,
       postpaidReminders: postpaidReminderResult,
       dailyUsageSms: dailyUsageResult,
+      smsProviderAlerts: smsProviderAlertResult,
     });
   } catch (error) {
     console.error("[Alerts Automation] Cycle failed:", error);

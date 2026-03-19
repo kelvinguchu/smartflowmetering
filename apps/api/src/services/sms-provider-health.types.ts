@@ -6,6 +6,12 @@ export interface SmsProviderHealthBucket {
   pending: number;
 }
 
+export interface SmsProviderHealthSignal {
+  level: "healthy" | "warning" | "critical";
+  recommendedAction: string | null;
+  summary: string;
+}
+
 export interface SmsProviderHealthSummary {
   generatedAt: string;
   hostpinnacle: SmsProviderHealthBucket;
@@ -15,8 +21,14 @@ export interface SmsProviderHealthSummary {
     pending: number;
     total: number;
   };
+  signals: {
+    hostpinnacle: SmsProviderHealthSignal;
+    textsmsDlrBacklog: SmsProviderHealthSignal;
+    textsmsFallback: SmsProviderHealthSignal;
+  };
   textsms: SmsProviderHealthBucket & {
     fallbackUsageRate: number;
+    oldestPendingDlrAgeMinutes: number | null;
     pendingDlrSync: number;
   };
   windowHours: number;

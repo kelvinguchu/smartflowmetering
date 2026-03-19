@@ -183,12 +183,17 @@ What is still needed:
 
 What is still needed:
 
-- classify retryable vs non-retryable Gomelong errors
-- document retry/backoff policy clearly
-- ensure staff can distinguish:
+- keep the skipped dedicated Gomelong E2E in view until the local queue/env race is fixed
+- add any further dynamic verification against real provider-like retries only after the local test race is stable
+
+Already completed in the current tree:
+
+- Gomelong errors are now classified into retryable vs non-retryable policy buckets
+- failure details persist operator-facing category, retry disposition, code, and action guidance
+- failed-transaction and support-recovery workflows now expose parsed provider-failure context so staff can distinguish:
   - transient provider failure
   - invalid meter/provider-side contract failure
-  - delayed token vs no token
+  - success-without-token / no usable token response
 
 Note:
 
@@ -200,21 +205,29 @@ Major bug fixed, but operations work remains.
 
 What is still needed:
 
-- dedupe/cooldown for repeated SMS provider outage alerts
-- clearer operator-facing visibility into which provider was used and why
-- DLR sync backlog/review policy
-- final review of fallback behavior under provider degradation
+- final review of fallback behavior under provider degradation under live-like conditions
+
+Already completed in the current tree:
+
+- repeated SMS provider outage alerts are deduped and regression-covered
+- alert automation can now run SMS provider outage checks on schedule when enabled
+- provider health now exposes operator signals for HostPinnacle degradation, TextSMS fallback spike, and DLR backlog state
+- provider health now exposes oldest pending TextSMS DLR age to support backlog review decisions
 
 ## 3.6 Security Verification Pass
 
 What is still needed:
 
-- re-run the backend against `apps/api/SECURITY_REVIEW.md`
-- dynamic testing for:
-  - brute-force/auth abuse
-  - callback abuse
-  - authorization regression
-- review sensitive provider auth patterns and exposure points
+- extend dynamic security testing when new auth, callback, or privileged route surfaces are added
+- resolve or formally accept the remaining provider credential transport risk called out for Gomelong query-string credentials
+
+Already completed in the current tree:
+
+- `apps/api/SECURITY_REVIEW.md` has been re-aligned so stale broken-access findings are marked as remediated rather than still-open
+- dynamic regression coverage now exists for:
+  - brute-force/auth abuse on `/api/auth/sign-in/email`, including per-client-IP throttling isolation
+  - callback abuse on M-Pesa validation/callback source guards, including signature rejection, wrong token transport, and invalid source IP rejection
+  - authorization regression on admin diagnostics and other protected backend route groups
 
 ## P2
 

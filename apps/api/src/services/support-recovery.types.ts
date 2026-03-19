@@ -32,6 +32,15 @@ export interface SupportRecoveryAssessment {
     | "token_generated_no_sms";
   closurePrecondition: string;
   manualInterventionRequired: boolean;
+  providerFailure: {
+    category: string | null;
+    code: number | null;
+    disposition: string | null;
+    message: string | null;
+    operatorAction: string | null;
+    retryable: boolean | null;
+    summary: string | null;
+  } | null;
   recommendedAction: string;
   recommendedClosureStatus: Exclude<
     FailedTransactionStatus,

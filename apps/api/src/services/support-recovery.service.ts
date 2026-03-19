@@ -1,6 +1,12 @@
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "../db";
-import { generatedTokens, meters, smsLogs, transactions } from "../db/schema";
+import {
+  failedTransactions,
+  generatedTokens,
+  meters,
+  smsLogs,
+  transactions,
+} from "../db/schema";
 import {
   isAllowedKenyanPhoneNumber,
   normalizeKenyanPhoneNumber,
@@ -8,6 +14,7 @@ import {
 import { revealToken } from "../lib/token-protection";
 import { maskToken, redactTokensInText } from "../lib/token-redaction";
 import type { SupportRecoveryQuery } from "../validators/support-recovery";
+import { parseGomelongFailureDetails } from "./meter-providers/gomelong-failure-policy";
 import { buildSupportRecoveryAssessment } from "./support-recovery-assessment.service";
 import type {
   SupportRecoveryMeterSummary,
@@ -30,29 +37,32 @@ export async function findSupportRecovery(
 ): Promise<SupportRecoveryResult> {
   const criteria = normalizeCriteria(query);
   const directMeter = (await findMeter(criteria.meterNumber)) ?? null;
-  if (criteria.meterNumber && !directMeter) {
+  if (criteria.meterNumber && directMeter === null) {
     return emptySupportRecovery(criteria);
   }
 
-  const transactionRows = await findTransactions(
-    criteria,
-    directMeter === null ? undefined : directMeter.id,
-  );
-  const resolvedMeterId =
-    directMeter === null ? transactionRows[0]?.meter.id : directMeter.id;
-  const meterSummary =
-    directMeter !== null
-      ? toMeterSummary(directMeter)
-      : transactionRows.length > 0
-        ? toMeterSummary(transactionRows[0].meter)
-        : null;
+  const directMeterId = directMeter?.id;
+
+  const transactionRows = await findTransactions(criteria, directMeterId);
+  const failedTransactionByMpesaId =
+    await findFailedTransactionsByMpesaId(transactionRows);
+  const resolvedMeterId = directMeterId ?? transactionRows[0]?.meter.id;
+  let meterSummary: SupportRecoveryMeterSummary | null = null;
+  if (directMeter !== null) {
+    meterSummary = toMeterSummary(directMeter);
+  } else if (transactionRows.length > 0) {
+    meterSummary = toMeterSummary(transactionRows[0].meter);
+  }
 
   return {
     meter: meterSummary,
     recentAdminTokens: options.includeAdminTokens
       ? await findRecentAdminTokens(resolvedMeterId)
       : [],
-    recentSmsLogs: await findRecentSmsLogs(criteria.phoneNumber, transactionRows),
+    recentSmsLogs: await findRecentSmsLogs(
+      criteria.phoneNumber,
+      transactionRows,
+    ),
     search: criteria,
     transactions: transactionRows.map((transaction) => ({
       amountPaid: transaction.amountPaid,
@@ -70,6 +80,12 @@ export async function findSupportRecovery(
       phoneNumber: transaction.phoneNumber,
       recoveryAssessment: buildSupportRecoveryAssessment({
         generatedTokens: transaction.generatedTokens,
+        providerFailure: parseGomelongFailureDetails(
+          transaction.mpesaTransactionId
+            ? (failedTransactionByMpesaId.get(transaction.mpesaTransactionId)
+                ?.failureDetails ?? null)
+            : null,
+        ),
         smsLogs: transaction.smsLogs,
         status: transaction.status,
       }),
@@ -113,20 +129,22 @@ async function findTransactions(
     exactFilters.push(eq(transactions.transactionId, criteria.transactionId));
   }
   if (criteria.mpesaReceiptNumber) {
-    exactFilters.push(eq(transactions.mpesaReceiptNumber, criteria.mpesaReceiptNumber));
+    exactFilters.push(
+      eq(transactions.mpesaReceiptNumber, criteria.mpesaReceiptNumber),
+    );
   }
   if (meterId) {
     exactFilters.push(eq(transactions.meterId, meterId));
   }
 
-  const where =
-    criteria.q && exactFilters.length > 0
-      ? or(...exactFilters)
-      : exactFilters.length === 0
-        ? undefined
-        : exactFilters.length === 1
-          ? exactFilters[0]
-          : and(...exactFilters);
+  let where;
+  if (criteria.q && exactFilters.length > 0) {
+    where = or(...exactFilters);
+  } else if (exactFilters.length === 1) {
+    where = exactFilters[0];
+  } else if (exactFilters.length > 1) {
+    where = and(...exactFilters);
+  }
 
   if (!where) {
     return [];
@@ -161,9 +179,57 @@ async function findTransactions(
         },
       },
     },
+    columns: {
+      amountPaid: true,
+      completedAt: true,
+      createdAt: true,
+      id: true,
+      meterId: true,
+      mpesaReceiptNumber: true,
+      mpesaTransactionId: true,
+      phoneNumber: true,
+      status: true,
+      transactionId: true,
+      unitsPurchased: true,
+    },
     orderBy: [desc(transactions.createdAt)],
     limit: 10,
   });
+}
+
+async function findFailedTransactionsByMpesaId(
+  transactionRows: Awaited<ReturnType<typeof findTransactions>>,
+) {
+  const mpesaTransactionIds = transactionRows
+    .map((transaction) => transaction.mpesaTransactionId)
+    .filter((value): value is string => Boolean(value));
+  if (mpesaTransactionIds.length === 0) {
+    return new Map<
+      string,
+      { failureDetails: string | null; failureReason: string }
+    >();
+  }
+
+  const rows = await db.query.failedTransactions.findMany({
+    where: inArray(failedTransactions.mpesaTransactionId, mpesaTransactionIds),
+    columns: {
+      failureDetails: true,
+      failureReason: true,
+      mpesaTransactionId: true,
+    },
+    orderBy: [desc(failedTransactions.createdAt)],
+  });
+
+  return rows.reduce((map, row) => {
+    if (!map.has(row.mpesaTransactionId)) {
+      map.set(row.mpesaTransactionId, {
+        failureDetails: row.failureDetails,
+        failureReason: row.failureReason,
+      });
+    }
+
+    return map;
+  }, new Map<string, { failureDetails: string | null; failureReason: string }>());
 }
 
 async function findRecentAdminTokens(meterId: string | undefined) {
@@ -191,10 +257,12 @@ async function findRecentSmsLogs(
   searchPhoneNumber: string | undefined,
   transactionRows: Awaited<ReturnType<typeof findTransactions>>,
 ) {
-  const phoneNumbers = [...new Set([
-    ...(searchPhoneNumber ? [searchPhoneNumber] : []),
-    ...transactionRows.map((transaction) => transaction.phoneNumber),
-  ])];
+  const phoneNumbers = [
+    ...new Set([
+      ...(searchPhoneNumber ? [searchPhoneNumber] : []),
+      ...transactionRows.map((transaction) => transaction.phoneNumber),
+    ]),
+  ];
   if (phoneNumbers.length === 0) {
     return [];
   }
@@ -223,7 +291,9 @@ async function findRecentSmsLogs(
   }));
 }
 
-function normalizeCriteria(query: SupportRecoveryQuery): SupportRecoverySearchCriteria {
+function normalizeCriteria(
+  query: SupportRecoveryQuery,
+): SupportRecoverySearchCriteria {
   const q = query.q?.trim();
   return {
     meterNumber: query.meterNumber?.trim() ?? q,
@@ -234,7 +304,9 @@ function normalizeCriteria(query: SupportRecoveryQuery): SupportRecoverySearchCr
   };
 }
 
-function normalizePhoneNumber(phoneNumber: string | undefined): string | undefined {
+function normalizePhoneNumber(
+  phoneNumber: string | undefined,
+): string | undefined {
   if (!phoneNumber) {
     return undefined;
   }

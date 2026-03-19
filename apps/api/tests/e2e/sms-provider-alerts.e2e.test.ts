@@ -51,20 +51,23 @@ void describe("E2E: sms provider alerts", () => {
       },
     ]);
 
-    const response = await app.request("/api/notifications/run-sms-provider-alerts", {
-      method: "POST",
-      headers: {
-        ...adminSession.headers,
-        "Content-Type": "application/json",
+    const response = await app.request(
+      "/api/notifications/run-sms-provider-alerts",
+      {
+        method: "POST",
+        headers: {
+          ...adminSession.headers,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          hostpinnacleFailureRatePercent: 50,
+          minFailedCount: 2,
+          textsmsFallbackUsageRatePercent: 20,
+          textsmsPendingDlrThreshold: 1,
+          windowHours: 24,
+        }),
       },
-      body: JSON.stringify({
-        hostpinnacleFailureRatePercent: 50,
-        minFailedCount: 2,
-        textsmsFallbackUsageRatePercent: 20,
-        textsmsPendingDlrThreshold: 1,
-        windowHours: 24,
-      }),
-    });
+    );
 
     assert.equal(response.status, 200);
     const body = (await response.json()) as {
@@ -74,6 +77,33 @@ void describe("E2E: sms provider alerts", () => {
 
     assert.equal(body.createdCount, 3);
     assert.equal(body.created.length, 3);
+
+    const secondResponse = await app.request(
+      "/api/notifications/run-sms-provider-alerts",
+      {
+        method: "POST",
+        headers: {
+          ...adminSession.headers,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          hostpinnacleFailureRatePercent: 50,
+          minFailedCount: 2,
+          textsmsFallbackUsageRatePercent: 20,
+          textsmsPendingDlrThreshold: 1,
+          windowHours: 24,
+        }),
+      },
+    );
+
+    assert.equal(secondResponse.status, 200);
+    const secondBody = (await secondResponse.json()) as {
+      created: string[];
+      createdCount: number;
+    };
+
+    assert.equal(secondBody.createdCount, 0);
+    assert.equal(secondBody.created.length, 0);
 
     const notifications = await db.query.adminNotifications.findMany({
       orderBy: (table, { asc }) => [asc(table.createdAt)],

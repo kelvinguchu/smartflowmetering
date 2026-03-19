@@ -3,15 +3,7 @@ import {
   hasRecentAdminNotification,
 } from "./admin-notifications.service";
 import { getSmsProviderHealthSummary } from "./sms-provider-health.service";
-
-const DEFAULTS = {
-  dedupeWindowHours: 6,
-  hostpinnacleFailureRatePercent: 40,
-  minFailedCount: 5,
-  textsmsFallbackUsageRatePercent: 20,
-  textsmsPendingDlrThreshold: 10,
-  windowHours: 1,
-} as const;
+import { resolveSmsProviderAlertThresholds } from "./sms-provider-alert-thresholds";
 
 export interface RunSmsProviderAlertsInput {
   dedupeWindowHours?: number;
@@ -23,19 +15,7 @@ export interface RunSmsProviderAlertsInput {
 }
 
 export async function runSmsProviderAlerts(input: RunSmsProviderAlertsInput) {
-  const resolved = {
-    dedupeWindowHours: input.dedupeWindowHours ?? DEFAULTS.dedupeWindowHours,
-    hostpinnacleFailureRatePercent:
-      input.hostpinnacleFailureRatePercent ??
-      DEFAULTS.hostpinnacleFailureRatePercent,
-    minFailedCount: input.minFailedCount ?? DEFAULTS.minFailedCount,
-    textsmsFallbackUsageRatePercent:
-      input.textsmsFallbackUsageRatePercent ??
-      DEFAULTS.textsmsFallbackUsageRatePercent,
-    textsmsPendingDlrThreshold:
-      input.textsmsPendingDlrThreshold ?? DEFAULTS.textsmsPendingDlrThreshold,
-    windowHours: input.windowHours ?? DEFAULTS.windowHours,
-  };
+  const resolved = resolveSmsProviderAlertThresholds(input);
 
   const summary = await getSmsProviderHealthSummary(resolved.windowHours);
   const created: string[] = [];
@@ -73,7 +53,10 @@ export async function runSmsProviderAlerts(input: RunSmsProviderAlertsInput) {
     }
   }
 
-  if (summary.textsms.fallbackUsageRate >= resolved.textsmsFallbackUsageRatePercent) {
+  if (
+    summary.textsms.fallbackUsageRate >=
+    resolved.textsmsFallbackUsageRatePercent
+  ) {
     const entityId = `textsms-fallback-window-${resolved.windowHours}`;
     const exists = await hasRecentAdminNotification({
       type: "sms_provider_outage",

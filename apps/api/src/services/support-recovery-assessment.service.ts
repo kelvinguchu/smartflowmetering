@@ -1,9 +1,11 @@
 import type { SupportRecoveryAssessment } from "./support-recovery.types";
+import type { ParsedGomelongFailureDetails } from "./meter-providers/gomelong-failure-policy";
 
 interface SupportRecoveryAssessmentInput {
   generatedTokens: {
     tokenType: string;
   }[];
+  providerFailure: ParsedGomelongFailureDetails | null;
   smsLogs: {
     createdAt: Date;
     status: string;
@@ -28,6 +30,7 @@ export function buildSupportRecoveryAssessment(
       closurePrecondition:
         "Do not close or promise manual recovery while payment processing is still in flight",
       manualInterventionRequired: false,
+      providerFailure: null,
       recommendedAction:
         "Wait for the payment pipeline to finish or inspect queue and callback health before manual recovery",
       recommendedClosureStatus: null,
@@ -38,6 +41,8 @@ export function buildSupportRecoveryAssessment(
   }
 
   if (input.status === "failed") {
+    const providerFailure = input.providerFailure;
+
     return {
       allowedResolutionActions: [
         "provider_issue_reviewed_for_retry_or_refund",
@@ -48,11 +53,14 @@ export function buildSupportRecoveryAssessment(
       closurePrecondition:
         "Close only after provider failure review confirms retry, refund, or abandonment and that outcome is documented",
       manualInterventionRequired: true,
+      providerFailure,
       recommendedAction:
+        providerFailure?.operatorAction ??
         "Check provider and callback failure context before retrying, refunding, or closing the case",
       recommendedClosureStatus: "resolved",
       resolutionRequired: true,
       summary:
+        providerFailure?.summary ??
         "Payment failed before a recoverable token delivery path was established",
     };
   }
@@ -69,6 +77,7 @@ export function buildSupportRecoveryAssessment(
       closurePrecondition:
         "Close only after token generation and provider reconciliation have been reviewed and the final customer outcome is documented",
       manualInterventionRequired: true,
+      providerFailure: input.providerFailure,
       recommendedAction:
         "Verify token generation and provider reconciliation before promising delivery or closing the case",
       recommendedClosureStatus: "resolved",
@@ -90,6 +99,7 @@ export function buildSupportRecoveryAssessment(
       closurePrecondition:
         "Do not close until the customer has a usable token or a documented fallback outcome",
       manualInterventionRequired: true,
+      providerFailure: null,
       recommendedAction:
         "Queue token delivery or use an alternate recovery channel because no SMS delivery attempt was recorded",
       recommendedClosureStatus: "resolved",
@@ -105,6 +115,7 @@ export function buildSupportRecoveryAssessment(
       closurePrecondition:
         "No manual closure path is needed unless the customer still cannot use the delivered token",
       manualInterventionRequired: false,
+      providerFailure: null,
       recommendedAction:
         "Confirm the customer entered the delivered token correctly before any resend or refund action",
       recommendedClosureStatus: null,
@@ -120,6 +131,7 @@ export function buildSupportRecoveryAssessment(
       closurePrecondition:
         "Do not close while delivery confirmation is still pending with the provider",
       manualInterventionRequired: false,
+      providerFailure: null,
       recommendedAction:
         "Wait for delivery confirmation or sync the provider status before triggering another resend",
       recommendedClosureStatus: null,
@@ -138,6 +150,7 @@ export function buildSupportRecoveryAssessment(
     closurePrecondition:
       "Do not close until the customer has a usable token through resend, alternate delivery, refund, or documented abandonment",
     manualInterventionRequired: true,
+    providerFailure: null,
     recommendedAction:
       "Resend the token or use an alternate recovery path before closing the successful payment case",
     recommendedClosureStatus: "resolved",
