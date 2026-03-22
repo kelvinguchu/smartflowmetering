@@ -39,3 +39,5 @@ yarn-error.log*
 
 # Database backups (contain sensitive data)
 backups/
+
+pos_for_a_metering_company

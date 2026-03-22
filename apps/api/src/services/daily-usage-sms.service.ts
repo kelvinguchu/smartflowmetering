@@ -15,8 +15,8 @@ import { smsDeliveryQueue } from "../queues";
 import type {
   LandlordDailyUsageSummary,
   MotherMeterUsageSummary,
-} from "./landlord-daily-usage-summary.types";
-import { queueDailyLandlordUsageSummaryAppNotifications } from "./landlord-notification-producer.service";
+} from "./landlord/landlord-daily-usage-summary.types";
+import { queueDailyLandlordUsageSummaryAppNotifications } from "./landlord/landlord-notification-producer.service";
 
 interface DailyUsageSmsOptions {
   targetDate?: string;
@@ -231,3 +231,5 @@ async function hasDailySummarySms(input: {
 
   return Boolean(existing);
 }
+
+

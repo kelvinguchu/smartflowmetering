@@ -10,7 +10,7 @@ import {
   ensureAdminRouteAccess,
   isAdminStaffUser,
 } from "../lib/staff-route-access";
-import { queueTenantNotificationsForMeter } from "../services/tenant-notification-producer.service";
+import { queueTenantNotificationsForMeter } from "../services/tenant/tenant-notification-producer.service";
 import {
   createMeterSchema,
   meterQuerySchema,
@@ -270,3 +270,4 @@ async function queueMeterStatusNotification(
     type: "meter_status_alert",
   });
 }
+

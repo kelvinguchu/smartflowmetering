@@ -1,4 +1,4 @@
-import type { CustomerPromptCandidate } from "../services/customer-prompts.types";
+import type { CustomerPromptCandidate } from "../services/customer/customer-prompts.types";
 
 export function formatCustomerPromptContent(candidate: CustomerPromptCandidate) {
   if (candidate.promptType === "failed_purchase_follow_up") {
@@ -13,3 +13,4 @@ export function formatCustomerPromptContent(candidate: CustomerPromptCandidate) 
     title: "Buy token reminder",
   };
 }
+

@@ -12,7 +12,7 @@ import {
   markCustomerAppNotificationSent,
   recordCustomerAppNotificationAttempt,
   recordCustomerAppNotificationRetryableFailure,
-} from "../../services/app-notification-state.service";
+} from "../../services/customer/app-notification-state.service";
 import type { AppNotificationDeliveryJob } from "../types";
 
 export async function processAppNotificationDelivery(
@@ -162,3 +162,4 @@ async function handleRetryableFailure(
 
   await recordCustomerAppNotificationRetryableFailure(notificationId, input);
 }
+

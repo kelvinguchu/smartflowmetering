@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildSupportRecoveryAssessment } from "../src/services/support-recovery-assessment.service";
+import { buildSupportRecoveryAssessment } from "../src/services/support/support-recovery-assessment.service";
 
 describe("support recovery assessment", () => {
   it("returns structured closure guidance for manual recovery cases", () => {
@@ -78,3 +78,4 @@ describe("support recovery assessment", () => {
     assert.equal(delivered.allowedResolutionActions.length, 0);
   });
 });
+

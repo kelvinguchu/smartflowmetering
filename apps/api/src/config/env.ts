@@ -23,6 +23,13 @@ const TEXTSMS_PASS_TYPE = process.env.TEXTSMS_PASS_TYPE?.trim();
 const MPESA_CALLBACK_TOKEN_TRANSPORT = normalizeCallbackTokenTransport(
   process.env.MPESA_CALLBACK_TOKEN_TRANSPORT,
 );
+const GOMELONG_API_URL = normalizeGomelongApiUrl(
+  process.env.GOMELONG_API_URL ?? "https://sts.gomelong.top",
+);
+const GOMELONG_ALLOW_QUERY_CREDENTIALS = parseBoolean(
+  process.env.GOMELONG_ALLOW_QUERY_CREDENTIALS,
+  !isProduction,
+);
 
 // Always required env vars
 const alwaysRequired = ["DATABASE_URL", "REDIS_URL"] as const;
@@ -106,7 +113,8 @@ export const env = {
   ),
 
   // STS Meter Provider (Gomelong)
-  GOMELONG_API_URL: process.env.GOMELONG_API_URL ?? "https://sts.gomelong.top",
+  GOMELONG_API_URL,
+  GOMELONG_ALLOW_QUERY_CREDENTIALS,
   GOMELONG_USER_ID: process.env.GOMELONG_USER_ID ?? "",
   GOMELONG_PASSWORD: process.env.GOMELONG_PASSWORD ?? "",
   GOMELONG_VENDING_TYPE:
@@ -229,6 +237,18 @@ export const env = {
 
 export type Env = typeof env;
 
+if (
+  isProduction &&
+  !GOMELONG_ALLOW_QUERY_CREDENTIALS &&
+  process.env.GOMELONG_USER_ID &&
+  process.env.GOMELONG_PASSWORD &&
+  !isLocalDevelopmentHost(new URL(GOMELONG_API_URL).hostname)
+) {
+  throw new Error(
+    "Gomelong query-string credential transport is disabled by default in production. Set GOMELONG_ALLOW_QUERY_CREDENTIALS=true only if you explicitly accept the upstream provider risk.",
+  );
+}
+
 function normalizeMpesaEnvironment(
   value: string | undefined,
 ): "sandbox" | "production" {
@@ -266,4 +286,33 @@ function parseHour(value: string | undefined, fallback: number): number {
     return fallback;
   }
   return parsed;
+}
+
+function normalizeGomelongApiUrl(value: string): string {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("GOMELONG_API_URL must be a valid absolute URL");
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new Error("GOMELONG_API_URL must not embed credentials in the URL");
+  }
+
+  if (
+    parsed.protocol !== "https:" &&
+    !isLocalDevelopmentHost(parsed.hostname)
+  ) {
+    throw new Error(
+      "GOMELONG_API_URL must use HTTPS unless it targets localhost or 127.0.0.1 for local testing",
+    );
+  }
+
+  return parsed.toString();
+}
+
+function isLocalDevelopmentHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1";
 }

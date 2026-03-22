@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
-import { getLandlordAccessByUserId } from "../services/landlord-access.service";
-import type { LandlordAccessSummary } from "../services/landlord-access.types";
+import { getLandlordAccessByUserId } from "../services/landlord/landlord-access.service";
+import type { LandlordAccessSummary } from "../services/landlord/landlord-access.types";
 import { auth } from "./auth";
 import type { AppBindings } from "./auth-middleware";
 
@@ -35,3 +35,5 @@ export const requireLandlordAccess = createMiddleware<LandlordAppBindings>(
     await next();
   },
 );
+
+

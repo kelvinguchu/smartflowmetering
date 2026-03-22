@@ -9,6 +9,7 @@ import {
   resetE2EState,
   teardownE2E,
 } from "./helpers";
+import { getLatestTenantAccessIdForMeter } from "./tenant-access-test-helpers";
 
 const app = createApp();
 
@@ -39,24 +40,20 @@ void describe("E2E: tenant access", () => {
       data: {
         accessToken: string;
         tenantAccess: {
-          id: string;
           meter: {
-            meterId: string;
             meterNumber: string;
-            motherMeterId: string;
-            propertyId: string;
+            meterType: string;
+            motherMeterNumber: string;
+            propertyName: string;
           };
         };
       };
     };
     assert.match(body.data.accessToken, /^[a-f0-9]{64}$/);
-    assert.equal(body.data.tenantAccess.meter.meterId, fixture.meterId);
     assert.equal(body.data.tenantAccess.meter.meterNumber, fixture.meterNumber);
-    assert.equal(
-      body.data.tenantAccess.meter.motherMeterId,
-      fixture.motherMeterId,
-    );
-    assert.equal(body.data.tenantAccess.meter.propertyId, fixture.propertyId);
+    assert.equal(body.data.tenantAccess.meter.motherMeterNumber, fixture.motherMeterNumber);
+    assert.ok(body.data.tenantAccess.meter.propertyName.length > 0);
+    assert.equal(Object.prototype.hasOwnProperty.call(body.data.tenantAccess, "id"), false);
   });
 
   void it("allows a tenant access token to load context and register a device token", async () => {
@@ -72,7 +69,6 @@ void describe("E2E: tenant access", () => {
     const bootstrapBody = (await bootstrapResponse.json()) as {
       data: {
         accessToken: string;
-        tenantAccess: { id: string };
       };
     };
     const headers = {
@@ -85,6 +81,18 @@ void describe("E2E: tenant access", () => {
       headers,
     });
     assert.equal(meResponse.status, 200);
+    const meBody = (await meResponse.json()) as {
+      data: {
+        id?: string;
+        meter: {
+          meterNumber: string;
+          motherMeterNumber: string;
+        };
+      };
+    };
+    assert.equal(meBody.data.meter.meterNumber, fixture.meterNumber);
+    assert.equal(meBody.data.meter.motherMeterNumber, fixture.motherMeterNumber);
+    assert.equal(Object.prototype.hasOwnProperty.call(meBody.data, "id"), false);
 
     const token = "tenant-fcm-token-abcdefghijklmnopqrstuvwxyz123456";
     const deviceResponse = await app.request(
@@ -100,10 +108,15 @@ void describe("E2E: tenant access", () => {
     );
     assert.equal(deviceResponse.status, 200);
     const deviceBody = (await deviceResponse.json()) as {
-      data: { tenantAccessId: string | null; token: string };
+      data: { platform: string; status: string; tenantAccessId?: string | null; token?: string };
     };
-    assert.equal(deviceBody.data.tenantAccessId, bootstrapBody.data.tenantAccess.id);
-    assert.equal(deviceBody.data.token, token);
+    assert.equal(deviceBody.data.platform, "android");
+    assert.equal(deviceBody.data.status, "active");
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(deviceBody.data, "tenantAccessId"),
+      false,
+    );
+    assert.equal(Object.prototype.hasOwnProperty.call(deviceBody.data, "token"), false);
   });
 
   void it("marks a tenant-scoped app notification as read", async () => {
@@ -119,9 +132,9 @@ void describe("E2E: tenant access", () => {
     const bootstrapBody = (await bootstrapResponse.json()) as {
       data: {
         accessToken: string;
-        tenantAccess: { id: string };
       };
     };
+    const tenantAccessId = await getLatestTenantAccessIdForMeter(fixture.meterId);
 
     const [notification] = await db
       .insert(customerAppNotifications)
@@ -129,7 +142,7 @@ void describe("E2E: tenant access", () => {
         message: "Your meter usage summary is ready",
         meterNumber: fixture.meterNumber,
         referenceId: `tenant-${fixture.meterNumber}`,
-        tenantAccessId: bootstrapBody.data.tenantAccess.id,
+        tenantAccessId,
         title: "Usage update",
         type: "buy_token_nudge",
       })
@@ -147,10 +160,11 @@ void describe("E2E: tenant access", () => {
 
     assert.equal(response.status, 200);
     const body = (await response.json()) as {
-      data: { readAt: string | null; status: string };
+      data: { readAt: string | null; status: string; tenantAccessId?: string | null };
     };
     assert.equal(body.data.status, "read");
     assert.ok(body.data.readAt);
+    assert.equal(Object.prototype.hasOwnProperty.call(body.data, "tenantAccessId"), false);
   });
 
   void it("lists only the notifications that belong to the authenticated tenant access", async () => {
@@ -175,18 +189,18 @@ void describe("E2E: tenant access", () => {
     );
 
     const firstBootstrapBody = (await firstBootstrapResponse.json()) as {
-      data: { accessToken: string; tenantAccess: { id: string } };
+      data: { accessToken: string };
     };
-    const secondBootstrapBody = (await secondBootstrapResponse.json()) as {
-      data: { tenantAccess: { id: string } };
-    };
+    await secondBootstrapResponse.json();
+    const firstTenantAccessId = await getLatestTenantAccessIdForMeter(firstFixture.meterId);
+    const secondTenantAccessId = await getLatestTenantAccessIdForMeter(secondFixture.meterId);
 
     await db.insert(customerAppNotifications).values([
       {
         message: "First tenant pending message",
         meterNumber: firstFixture.meterNumber,
         referenceId: `tenant-${firstFixture.meterNumber}-1`,
-        tenantAccessId: firstBootstrapBody.data.tenantAccess.id,
+        tenantAccessId: firstTenantAccessId,
         title: "First tenant",
         type: "buy_token_nudge",
       },
@@ -196,7 +210,7 @@ void describe("E2E: tenant access", () => {
         readAt: new Date(),
         referenceId: `tenant-${firstFixture.meterNumber}-2`,
         status: "read",
-        tenantAccessId: firstBootstrapBody.data.tenantAccess.id,
+        tenantAccessId: firstTenantAccessId,
         title: "First tenant read",
         type: "token_delivery_available",
       },
@@ -204,7 +218,7 @@ void describe("E2E: tenant access", () => {
         message: "Second tenant message",
         meterNumber: secondFixture.meterNumber,
         referenceId: `tenant-${secondFixture.meterNumber}-1`,
-        tenantAccessId: secondBootstrapBody.data.tenantAccess.id,
+        tenantAccessId: secondTenantAccessId,
         title: "Second tenant",
         type: "buy_token_nudge",
       },
@@ -223,7 +237,7 @@ void describe("E2E: tenant access", () => {
     assert.equal(response.status, 200);
     const body = (await response.json()) as {
       count: number;
-      data: { message: string; status: string; tenantAccessId: string | null }[];
+      data: { message: string; status: string; tenantAccessId?: string | null }[];
       pagination: {
         hasMore: boolean;
         limit: number | null;
@@ -240,8 +254,8 @@ void describe("E2E: tenant access", () => {
     assert.equal(body.data[0]?.message, "First tenant read message");
     assert.equal(body.data[0]?.status, "read");
     assert.equal(
-      body.data[0]?.tenantAccessId,
-      firstBootstrapBody.data.tenantAccess.id,
+      Object.prototype.hasOwnProperty.call(body.data[0] ?? {}, "tenantAccessId"),
+      false,
     );
   });
 });

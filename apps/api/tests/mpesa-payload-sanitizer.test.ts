@@ -16,7 +16,7 @@ describe("sanitizeMpesaPayload", () => {
     }) as {
       MSISDN: string;
       FirstName: string;
-      CallbackMetadata: { Item: Array<{ Name: string; Value: string | number }> };
+      CallbackMetadata: { Item: { Name: string; Value: string | number }[] };
     };
 
     assert.equal(sanitized.MSISDN, "********5678");

@@ -9,7 +9,7 @@ import {
   transactions,
 } from "../../src/db/schema";
 import { queueDailyLandlordUsageSummarySms } from "../../src/services/daily-usage-sms.service";
-import { queueLandlordSubMeterPurchaseNotification } from "../../src/services/landlord-notification-producer.service";
+import { queueLandlordSubMeterPurchaseNotification } from "../../src/services/landlord/landlord-notification-producer.service";
 import {
   queueLowBalanceNotifications,
   queuePostpaidReminderNotifications,
@@ -200,3 +200,4 @@ async function insertCompletedTransaction(input: {
     unitsPurchased: input.unitsPurchased,
   });
 }
+

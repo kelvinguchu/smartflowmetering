@@ -12,7 +12,7 @@ import { revealToken } from "../lib/token-protection";
 import { redactTokensInText } from "../lib/token-redaction";
 import { smsDeliveryQueue } from "../queues";
 import { toTransactionDetail, toTransactionListItem } from "../services/transaction-response.service";
-import { formatTokenSms } from "../services/sms.service";
+import { formatTokenSms } from "../services/sms/sms.service";
 import { type TransactionQuery, resendTokenSchema, transactionQuerySchema } from "../validators/transactions";
 
 const idParamSchema = z.object({
@@ -285,3 +285,4 @@ function resolveResendPhoneNumber(input: {
 
   return input.transactionPhoneNumber;
 }
+

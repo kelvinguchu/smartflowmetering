@@ -95,7 +95,14 @@ describe("E2E: Reconciliation and recovery admin actions", () => {
     );
     const listBody = (await listResponse.json()) as {
       count: number;
-      data: Array<{ id: string; status: string }>;
+      data: Array<{
+        id: string;
+        latestReview?: {
+          resolutionAction: string | null;
+        } | null;
+        reviewHistoryCount?: number;
+        status: string;
+      }>;
     };
 
     assert.equal(listResponse.status, 200);
@@ -116,10 +123,16 @@ describe("E2E: Reconciliation and recovery admin actions", () => {
             summary: string;
           };
           id: string;
+          latestReview?: {
+            resolutionAction: string | null;
+          } | null;
+          reviewHistoryCount?: number;
           status: string;
         }
       | undefined;
     assert.ok(listedFailure);
+    assert.equal(listedFailure?.reviewHistoryCount, 0);
+    assert.equal(listedFailure?.latestReview ?? null, null);
     assert.equal(
       listedFailure?.guidance?.caseId,
       "invalid_meter_confirmation_required",
@@ -183,7 +196,12 @@ describe("E2E: Reconciliation and recovery admin actions", () => {
     );
     const updateBody = (await updateResponse.json()) as {
       data: {
+        latestReview: {
+          newStatus: string | null;
+          resolutionAction: string | null;
+        } | null;
         status: string;
+        reviewHistoryCount: number;
         resolutionNotes: string;
         resolvedAt: string | null;
       };
@@ -196,6 +214,12 @@ describe("E2E: Reconciliation and recovery admin actions", () => {
       "Reviewed and closed after customer support follow-up",
     );
     assert.ok(updateBody.data.resolvedAt);
+    assert.equal(updateBody.data.reviewHistoryCount, 1);
+    assert.equal(
+      updateBody.data.latestReview?.resolutionAction,
+      "customer_confirmed_correct_meter_for_retry",
+    );
+    assert.equal(updateBody.data.latestReview?.newStatus, "resolved");
   });
 
   it("supports reconciliation endpoint and resend/recovery flows", async () => {

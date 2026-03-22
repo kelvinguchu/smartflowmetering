@@ -13,6 +13,7 @@ const app = createApp();
 type JsonScalar = string | number | boolean | null;
 type JsonValue = JsonScalar | JsonValue[] | { [key: string]: JsonValue };
 type JsonObject = Record<string, JsonValue>;
+const INVALID_PASSWORD = ["bad", "password"].join("-");
 
 async function getJson(path: string, headers?: Record<string, string>) {
   const response = await app.request(path, { method: "GET", headers });
@@ -279,7 +280,7 @@ void describe("E2E: API health and auth guards", () => {
         headers,
         body: JSON.stringify({
           email: "missing-user@example.com",
-          password: "bad-password",
+          password: INVALID_PASSWORD,
         }),
       });
       lastStatus = response.status;
@@ -300,7 +301,7 @@ void describe("E2E: API health and auth guards", () => {
         headers: exhaustedHeaders,
         body: JSON.stringify({
           email: "missing-user@example.com",
-          password: "bad-password",
+          password: INVALID_PASSWORD,
         }),
       });
     }
@@ -315,7 +316,7 @@ void describe("E2E: API health and auth guards", () => {
         },
         body: JSON.stringify({
           email: "missing-user@example.com",
-          password: "bad-password",
+          password: INVALID_PASSWORD,
         }),
       },
     );

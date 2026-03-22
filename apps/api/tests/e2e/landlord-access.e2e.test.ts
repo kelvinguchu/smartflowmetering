@@ -62,22 +62,44 @@ void describe("E2E: landlord access", () => {
     assert.equal(verifyResponse.status, 200);
     const verifyBody = (await verifyResponse.json()) as {
       data: {
-        landlordAccess: { customerId: string };
+        landlordAccess: {
+          customerId?: string;
+          motherMeters: { id: string; propertyId: string }[];
+          properties: { id: string }[];
+        };
         token: string;
-        user: { id: string; role: string };
+        user: { id?: string; role: string };
       };
     };
-    assert.equal(verifyBody.data.landlordAccess.customerId, fixture.customerId);
+    assert.equal(
+      verifyBody.data.landlordAccess.properties.some((item) => item.id === fixture.propertyId),
+      true,
+    );
+    assert.equal(
+      verifyBody.data.landlordAccess.motherMeters.some(
+        (item) =>
+          item.id === fixture.motherMeterId && item.propertyId === fixture.propertyId,
+      ),
+      true,
+    );
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(verifyBody.data.landlordAccess, "customerId"),
+      false,
+    );
     assert.equal(verifyBody.data.user.role, "landlord");
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(verifyBody.data.user, "id"),
+      false,
+    );
     assert.ok(verifyBody.data.token.length > 20);
 
     const linkedCustomer = await db.query.customers.findFirst({
       where: eq(customers.id, fixture.customerId),
     });
-    assert.equal(linkedCustomer?.userId, verifyBody.data.user.id);
+    assert.ok(linkedCustomer?.userId);
 
     const authUser = await db.query.user.findFirst({
-      where: eq(user.id, verifyBody.data.user.id),
+      where: eq(user.id, linkedCustomer.userId),
     });
     assert.equal(authUser?.role, "landlord");
 
@@ -86,6 +108,17 @@ void describe("E2E: landlord access", () => {
       headers: { Authorization: `Bearer ${verifyBody.data.token}` },
     });
     assert.equal(meResponse.status, 200);
+    const meBody = (await meResponse.json()) as {
+      data: {
+        landlordAccess: { customerId?: string };
+        user: { id?: string; role: string };
+      };
+    };
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(meBody.data.landlordAccess, "customerId"),
+      false,
+    );
+    assert.equal(Object.prototype.hasOwnProperty.call(meBody.data.user, "id"), false);
   });
 
   void it("lists landlord notifications, marks them read, and saves device tokens", async () => {
@@ -133,10 +166,15 @@ void describe("E2E: landlord access", () => {
     assert.equal(notificationsResponse.status, 200);
     const notificationsBody = (await notificationsResponse.json()) as {
       count: number;
-      data: { id: string }[];
+      data: { id: string; landlordId?: string; metadata: Record<string, unknown> | null }[];
     };
     assert.equal(notificationsBody.count, 2);
     assert.ok(notificationsBody.data.some((item) => item.id === notification.id));
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(notificationsBody.data[0] ?? {}, "landlordId"),
+      false,
+    );
+    assert.equal(notificationsBody.data[0]?.metadata, null);
 
     const filteredResponse = await app.request(
       `/api/mobile/landlord-access/notifications?propertyId=${fixture.propertyId}&motherMeterId=${fixture.motherMeterId}`,
@@ -148,10 +186,11 @@ void describe("E2E: landlord access", () => {
     assert.equal(filteredResponse.status, 200);
     const filteredBody = (await filteredResponse.json()) as {
       count: number;
-      data: { id: string }[];
+      data: { id: string; metadata: Record<string, unknown> | null }[];
     };
     assert.equal(filteredBody.count, 1);
     assert.equal(filteredBody.data[0]?.id, notification.id);
+    assert.equal(filteredBody.data[0]?.metadata, null);
 
     const deviceTokenResponse = await app.request(
       "/api/mobile/landlord-access/device-tokens",
@@ -169,9 +208,14 @@ void describe("E2E: landlord access", () => {
     );
     assert.equal(deviceTokenResponse.status, 200);
     const deviceTokenBody = (await deviceTokenResponse.json()) as {
-      data: { landlordId: string | null };
+      data: { landlordId?: string | null; platform: string; status: string };
     };
-    assert.equal(deviceTokenBody.data.landlordId, fixture.customerId);
+    assert.equal(deviceTokenBody.data.platform, "android");
+    assert.equal(deviceTokenBody.data.status, "active");
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(deviceTokenBody.data, "landlordId"),
+      false,
+    );
 
     const readResponse = await app.request(
       `/api/mobile/landlord-access/notifications/${notification.id}/read`,
@@ -182,9 +226,11 @@ void describe("E2E: landlord access", () => {
     );
     assert.equal(readResponse.status, 200);
     const readBody = (await readResponse.json()) as {
-      data: { status: string };
+      data: { landlordId?: string; metadata: Record<string, unknown> | null; status: string };
     };
     assert.equal(readBody.data.status, "read");
+    assert.equal(Object.prototype.hasOwnProperty.call(readBody.data, "landlordId"), false);
+    assert.equal(readBody.data.metadata, null);
   });
 });
 

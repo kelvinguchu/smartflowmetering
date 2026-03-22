@@ -1,4 +1,4 @@
-import type { LandlordDailyUsageSummary } from "../services/landlord-daily-usage-summary.types";
+import type { LandlordDailyUsageSummary } from "../services/landlord/landlord-daily-usage-summary.types";
 
 export function formatLandlordDailyUsageAppNotification(input: {
   summary: LandlordDailyUsageSummary;
@@ -62,3 +62,4 @@ export function formatLandlordMotherMeterEventAppNotification(input: {
     title: "Mother meter event recorded",
   };
 }
+

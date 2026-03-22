@@ -11,6 +11,7 @@ import {
   teardownE2E,
   uniqueRef,
 } from "./helpers";
+import { getLatestTenantAccessIdForMeter } from "./tenant-access-test-helpers";
 
 const app = createApp();
 
@@ -132,9 +133,9 @@ void describe("E2E: tenant history", () => {
     const bootstrapBody = (await bootstrapResponse.json()) as {
       data: {
         accessToken: string;
-        tenantAccess: { id: string };
       };
     };
+    const tenantAccessId = await getLatestTenantAccessIdForMeter(fixture.meterId);
 
     await db.insert(customerAppNotifications).values([
       {
@@ -142,7 +143,7 @@ void describe("E2E: tenant history", () => {
         meterNumber: fixture.meterNumber,
         referenceId: completedTx.transactionId,
         status: "sent",
-        tenantAccessId: bootstrapBody.data.tenantAccess.id,
+        tenantAccessId,
         title: "Token available",
         type: "token_delivery_available",
       },
@@ -152,7 +153,7 @@ void describe("E2E: tenant history", () => {
         readAt: new Date("2026-03-16T10:00:00.000Z"),
         referenceId: acknowledgedTx.transactionId,
         status: "read",
-        tenantAccessId: bootstrapBody.data.tenantAccess.id,
+        tenantAccessId,
         title: "Token acknowledged",
         type: "token_delivery_available",
       },

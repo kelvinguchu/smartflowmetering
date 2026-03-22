@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import type { SmsResult } from "../src/services/sms.types";
+import type { SmsResult } from "../src/services/sms/sms.types";
 
 const originalFetch = globalThis.fetch;
 const envKeys = [
@@ -42,7 +42,7 @@ function applySmsTestEnv() {
 
 async function loadSmsModule() {
   const moduleUrl = new URL(
-    `../src/services/sms.service.ts?cacheBust=${Date.now()}-${Math.random()}`,
+    `../src/services/sms/sms.service.ts?cacheBust=${Date.now()}-${Math.random()}`,
     import.meta.url,
   );
   return import(moduleUrl.href) as Promise<{
@@ -148,3 +148,5 @@ void describe("sendSms fallback order", () => {
     ]);
   });
 });
+
+

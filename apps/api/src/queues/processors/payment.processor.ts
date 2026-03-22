@@ -16,8 +16,8 @@ import {
 import { calculateTransaction, meetsMinimumAmount } from "../../lib/money";
 import { sanitizeMpesaPayload } from "../../lib/mpesa-payload-sanitizer";
 import { generateTransactionId } from "../../lib/utils";
-import { queueLandlordSubMeterPurchaseNotification } from "../../services/landlord-notification-producer.service";
-import { queueTenantNotificationsForMeter } from "../../services/tenant-notification-producer.service";
+import { queueLandlordSubMeterPurchaseNotification } from "../../services/landlord/landlord-notification-producer.service";
+import { queueTenantNotificationsForMeter } from "../../services/tenant/tenant-notification-producer.service";
 import { tokenGenerationQueue } from "../index";
 import type { PaymentJob, PaymentProcessingJob, MpesaRawCallbackJob } from "../types";
 
@@ -298,3 +298,5 @@ async function createFailedTransaction(
     status: "pending_review",
   });
 }
+
+

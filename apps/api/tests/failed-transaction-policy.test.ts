@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   getFailedTransactionGuidance,
+  getFailedTransactionWorkflowGuidance,
   validateFailedTransactionStatusUpdate,
-} from "../src/services/failed-transaction-policy.service";
+} from "../src/services/support/failed-transaction-policy.service";
 
 void describe("failed transaction policy", () => {
   void it("requires resolution notes when closing a failed transaction", () => {
@@ -124,4 +125,57 @@ void describe("failed transaction policy", () => {
 
     assert.equal(invalidAction.ok, false);
   });
+
+  void it("adapts manufacturer guidance when Gomelong retries are exhausted", () => {
+    const guidance = getFailedTransactionWorkflowGuidance({
+      failureReason: "manufacturer_error",
+      providerFailure: {
+        category: "transient_provider_failure",
+        code: 5002,
+        disposition: "retryable_retries_exhausted",
+        message: "temporary provider outage",
+        operatorAction:
+          "Retry token generation while the outage is transient, then escalate or refund only if retries are exhausted",
+        retryable: true,
+        summary:
+          "Provider failure looks temporary and is safe to retry with backoff",
+      },
+    });
+
+    assert.equal(
+      guidance.providerRetryDisposition,
+      "retryable_retries_exhausted",
+    );
+    assert.equal(guidance.shouldRetrySameRequest, true);
+    assert.match(guidance.recommendedAction, /retry token generation/i);
+    assert.match(guidance.summary, /safe to retry with backoff/i);
+    assert.match(guidance.closurePrecondition, /retry path is exhausted/i);
+  });
+
+  void it("marks non-retryable Gomelong contract failures as do-not-retry guidance", () => {
+    const guidance = getFailedTransactionWorkflowGuidance({
+      failureReason: "manufacturer_error",
+      providerFailure: {
+        category: "invalid_meter_or_contract",
+        code: 4004,
+        disposition: "non_retryable",
+        message: "invalid meter number",
+        operatorAction:
+          "Verify the provider-side meter contract, meter code, and activation state before retrying or refunding",
+        retryable: false,
+        summary:
+          "Provider rejected the meter or contract details and the same request should not be retried unchanged",
+      },
+    });
+
+    assert.equal(guidance.providerRetryDisposition, "non_retryable");
+    assert.equal(guidance.shouldRetrySameRequest, false);
+    assert.match(guidance.recommendedAction, /contract|activation state/i);
+    assert.match(guidance.summary, /should not be retried unchanged/i);
+    assert.match(
+      guidance.closurePrecondition,
+      /Do not retry the same provider request unchanged/i,
+    );
+  });
 });
+

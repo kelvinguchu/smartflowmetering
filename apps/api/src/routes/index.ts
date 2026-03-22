@@ -5,19 +5,31 @@ export { tariffRoutes } from "./tariffs";
 export { transactionRoutes } from "./transactions";
 export { healthRoutes } from "./health";
 export { smsRoutes } from "./sms";
-export { smsRecoveryRoutes } from "./sms-recovery";
-export { smsWebhookRoutes } from "./sms-webhooks";
+export { smsRecoveryRoutes } from "./sms/recovery";
+export { smsWebhookRoutes } from "./sms/webhooks";
 export { gomelongRoutes } from "./meter-providers/gomelong";
 export { applicationRoutes } from "./applications";
 export { motherMeterRoutes } from "./mother-meters";
 export { notificationRoutes } from "./notifications";
-export { failedTransactionRoutes } from "./failed-transactions";
-export { adminTokenRoutes } from "./admin-tokens";
-export { appNotificationRoutes } from "./app-notifications";
-export { auditLogRoutes } from "./audit-logs";
-export { authSecurityRoutes } from "./auth-security";
-export { customerPromptRoutes } from "./customer-prompts";
-export { landlordAccessRoutes } from "./landlord-access";
-export { supportRecoveryRoutes } from "./support-recovery";
-export { tenantAccessRoutes } from "./tenant-access";
-export { userManagementRoutes } from "./users";
+export { failedTransactionRoutes } from "./support/failed-transactions";
+export { adminTokenRoutes } from "./admin/tokens";
+export { appNotificationRoutes } from "./customer/app-notifications";
+export { auditLogRoutes } from "./admin/audit-logs";
+export { authSecurityRoutes } from "./admin/auth-security";
+export { customerPromptRoutes } from "./customer/prompts";
+export { landlordAccessRoutes } from "./landlord/access";
+export { supportRecoveryRoutes } from "./support/recovery";
+export { tenantAccessRoutes } from "./tenant/access";
+export { userManagementRoutes } from "./admin/users";
+
+
+
+
+
+
+
+
+
+
+
+

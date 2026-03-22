@@ -1,11 +1,11 @@
 import { env } from "../config";
-import { queueCustomerPrompts } from "./customer-prompts.service";
+import { queueCustomerPrompts } from "./customer/customer-prompts.service";
 import { queueDailyLandlordUsageSummarySms } from "./daily-usage-sms.service";
 import {
   queueLowBalanceNotifications,
   queuePostpaidReminderNotifications,
 } from "./mother-meter-alerts.service";
-import { runSmsProviderAlerts } from "./sms-provider-alerts.service";
+import { runSmsProviderAlerts } from "./sms/sms-provider-alerts.service";
 
 let automationTimer: NodeJS.Timeout | null = null;
 let cycleRunning = false;
@@ -113,3 +113,5 @@ function getHourInTimezone(date: Date, timezone: string): number {
   }
   return parsed;
 }
+
+

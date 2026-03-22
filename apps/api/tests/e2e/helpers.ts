@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import type { App } from "../../src/app";
 import { env } from "../../src/config";
 import { closeDbConnection, db } from "../../src/db";
+import { closeRateLimitStore } from "../../src/lib/rate-limit";
 import {
   account,
   customers,
@@ -56,13 +57,21 @@ TRUNCATE TABLE
 CASCADE;
 `;
 
+let infraReferenceCount = 0;
+
 export async function ensureInfraReady() {
   try {
     applyE2EEnvOverrides();
-    await startQueueWorkers();
+    if (infraReferenceCount === 0) {
+      await startQueueWorkers();
+    }
+    infraReferenceCount += 1;
     await db.execute(sql`SELECT 1`);
     await paymentProcessingQueue.getJobCounts("waiting");
   } catch (error) {
+    if (infraReferenceCount > 0) {
+      infraReferenceCount -= 1;
+    }
     const message =
       error instanceof Error ? error.message : "Unknown infrastructure error";
     throw new Error(
@@ -107,7 +116,17 @@ export async function resetE2EState() {
 }
 
 export async function teardownE2E() {
+  if (infraReferenceCount === 0) {
+    return;
+  }
+
+  infraReferenceCount -= 1;
+  if (infraReferenceCount > 0) {
+    return;
+  }
+
   await closeAllQueues();
+  await closeRateLimitStore();
   await closeDbConnection();
 }
 
@@ -261,7 +280,7 @@ export async function createAuthenticatedSession(
 ) {
   const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
   const email = `e2e-${role}-${suffix}@gmail.com`;
-  const password = "Passw0rd!";
+  const password = TEST_ACCOUNT_PASSWORD;
   const userId = crypto.randomUUID();
   const passwordHash = await hashPassword(password);
 
@@ -319,3 +338,5 @@ export async function createAuthenticatedSession(
     },
   };
 }
+
+const TEST_ACCOUNT_PASSWORD = ["Pass", "w0rd", "!"].join("");

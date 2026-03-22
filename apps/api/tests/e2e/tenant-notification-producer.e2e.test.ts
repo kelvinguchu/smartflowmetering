@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { createApp } from "../../src/app";
 import { db } from "../../src/db";
-import { queueTenantNotificationsForMeter } from "../../src/services/tenant-notification-producer.service";
+import { queueTenantNotificationsForMeter } from "../../src/services/tenant/tenant-notification-producer.service";
 import {
   createAuthenticatedSession,
   ensureInfraReady,
@@ -10,6 +10,7 @@ import {
   resetE2EState,
   teardownE2E,
 } from "./helpers";
+import { getLatestTenantAccessIdForMeter } from "./tenant-access-test-helpers";
 
 const app = createApp();
 
@@ -28,7 +29,7 @@ void describe("E2E: tenant notification producer", () => {
 
   void it("creates token purchase recorded notifications for active tenant accesses", async () => {
     const fixture = await ensureTestMeterFixture("TENANT-PRODUCER-001");
-    await bootstrapTenantAccess(fixture.meterNumber);
+    await bootstrapTenantAccess(fixture.meterNumber, fixture.meterId);
 
     const result = await queueTenantNotificationsForMeter({
       amountPaid: "120.00",
@@ -51,7 +52,7 @@ void describe("E2E: tenant notification producer", () => {
 
   void it("does not duplicate tenant notifications for the same reference and type", async () => {
     const fixture = await ensureTestMeterFixture("TENANT-PRODUCER-002");
-    await bootstrapTenantAccess(fixture.meterNumber);
+    await bootstrapTenantAccess(fixture.meterNumber, fixture.meterId);
 
     await queueTenantNotificationsForMeter({
       meterId: fixture.meterId,
@@ -80,7 +81,7 @@ void describe("E2E: tenant notification producer", () => {
 
   void it("creates a meter status alert when staff suspend a meter", async () => {
     const fixture = await ensureTestMeterFixture("TENANT-PRODUCER-003");
-    await bootstrapTenantAccess(fixture.meterNumber);
+    await bootstrapTenantAccess(fixture.meterNumber, fixture.meterId);
     const adminSession = await createAuthenticatedSession(app, "admin");
 
     const response = await app.request(`/api/meters/${fixture.meterId}/suspend`, {
@@ -98,7 +99,10 @@ void describe("E2E: tenant notification producer", () => {
   });
 });
 
-async function bootstrapTenantAccess(meterNumber: string): Promise<void> {
+async function bootstrapTenantAccess(
+  meterNumber: string,
+  meterId: string,
+): Promise<void> {
   const response = await app.request("/api/mobile/tenant-access/bootstrap", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -106,11 +110,14 @@ async function bootstrapTenantAccess(meterNumber: string): Promise<void> {
   });
   assert.equal(response.status, 200);
   const body = (await response.json()) as {
-    data: { tenantAccess: { id: string } };
+    data: { tenantAccess?: { id?: string } };
   };
+  assert.equal(Object.prototype.hasOwnProperty.call(body.data.tenantAccess ?? {}, "id"), false);
+  const tenantAccessId = await getLatestTenantAccessIdForMeter(meterId);
   const access = await db.query.tenantAppAccesses.findFirst({
-    where: (table, { eq }) => eq(table.id, body.data.tenantAccess.id),
+    where: (table, { eq }) => eq(table.id, tenantAccessId),
     columns: { id: true },
   });
   assert.ok(access);
 }
+

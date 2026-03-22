@@ -6,7 +6,6 @@ import { env } from "../../src/config";
 import {
   ensureInfraReady,
   ensureTestMeterFixture,
-  resetE2EState,
   teardownE2E,
   uniqueRef,
 } from "./helpers";
@@ -61,12 +60,10 @@ describe("E2E: M-Pesa signature validation", () => {
 
   before(async () => {
     await ensureInfraReady();
+    await ensureTestMeterFixture("TEST-METER-SIGN");
   });
 
-  beforeEach(async () => {
-    await resetE2EState();
-    await ensureTestMeterFixture("TEST-METER-SIGN");
-
+  beforeEach(() => {
     Object.assign(env as MutableEnv, {
       MPESA_ALLOWED_IPS: [],
       MPESA_CALLBACK_TOKEN: "",

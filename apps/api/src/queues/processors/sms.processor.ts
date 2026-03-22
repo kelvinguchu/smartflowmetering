@@ -4,8 +4,8 @@ import { db } from "../../db";
 import { smsLogs, transactions } from "../../db/schema";
 import { maskPhoneForLog } from "../../lib/log-redaction";
 import { redactTokensInText } from "../../lib/token-redaction";
-import { formatTokenSms, sendSms } from "../../services/sms.service";
-import { syncTextSmsDeliveryStatus } from "../../services/textsms-dlr.service";
+import { formatTokenSms, sendSms } from "../../services/sms/sms.service";
+import { syncTextSmsDeliveryStatus } from "../../services/sms/textsms-dlr.service";
 import { createQueue, QUEUE_NAMES } from "../connection";
 import { isDlrSyncJob, isNotificationJob, isResendJob } from "../sms-guards";
 import { finalizeSmsProcessResult, type SmsProcessResult } from "./sms-result";
@@ -258,3 +258,5 @@ async function scheduleTextSmsDlrSync(data: SmsDlrSyncJob) {
 function resolveSmsProvider(provider: Awaited<ReturnType<typeof sendSms>>["provider"]) {
   return provider ?? "hostpinnacle";
 }
+
+

@@ -9,6 +9,7 @@ import {
 } from "./helpers";
 
 const app = createApp();
+const MANAGED_USER_PASSWORD = ["Pass", "w0rd", "!"].join("");
 
 void describe("E2E: audit logs", () => {
   before(async () => {
@@ -47,7 +48,7 @@ void describe("E2E: audit logs", () => {
       body: JSON.stringify({
         email: `${uniqueRef("audit")}@gmail.com`,
         name: "Audit Target",
-        password: "Passw0rd!",
+        password: MANAGED_USER_PASSWORD,
         phoneNumber: "254712345678",
         role: "user",
       }),

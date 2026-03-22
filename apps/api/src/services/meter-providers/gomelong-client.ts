@@ -45,7 +45,10 @@ export async function gomelongGet(
   query: Record<string, QueryValue>,
 ) {
   assertGomelongConfigured();
-  return gomelongRequest(path, { method: "GET", query });
+  return gomelongRequest(path, {
+    method: "GET",
+    query: withGomelongCredentials(query),
+  });
 }
 
 export async function gomelongPostForm(
@@ -77,6 +80,16 @@ export async function gomelongPostJson(
     body: JSON.stringify(body),
     headers: { "Content-Type": "application/json" },
   });
+}
+
+export function withGomelongCredentials<T extends Record<string, QueryValue>>(
+  payload: T,
+): T & { UserId: string; Password: string } {
+  return {
+    ...payload,
+    UserId: env.GOMELONG_USER_ID,
+    Password: env.GOMELONG_PASSWORD,
+  };
 }
 
 async function gomelongRequest<T = unknown>(

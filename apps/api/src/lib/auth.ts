@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, bearer, phoneNumber, twoFactor } from "better-auth/plugins";
 import { env } from "../config";
 import { db } from "../db";
-import { sendSms } from "../services/sms.service";
+import { sendSms } from "../services/sms/sms.service";
 import { shouldDisablePublicSignUp } from "./auth-config";
 import {
   buildLandlordTempEmail,
@@ -157,3 +157,4 @@ function getTwoFactorUserPhoneNumber(
 ): string | null {
   return typeof user.phoneNumber === "string" ? user.phoneNumber : null;
 }
+

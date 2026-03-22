@@ -258,6 +258,7 @@ void describe("E2E: support recovery", () => {
 
   void it("surfaces classified provider failures in support recovery", async () => {
     const fixture = await ensureTestMeterFixture("SUPPORT-METER-005");
+    const adminSession = await createAuthenticatedSession(app, "admin");
     const staffSession = await createAuthenticatedSession(app, "user");
     const phoneNumber = uniqueKenyanPhoneNumber();
     const [mpesaTransaction] = await db
@@ -292,21 +293,38 @@ void describe("E2E: support recovery", () => {
       })
       .returning();
 
-    await db.insert(failedTransactions).values({
-      amount: "220.00",
-      failureDetails: formatGomelongFailureDetails(
-        createGomelongProviderError({
-          code: 5002,
-          message: "temporary provider outage",
+    const [failedTransaction] = await db
+      .insert(failedTransactions)
+      .values({
+        amount: "220.00",
+        failureDetails: formatGomelongFailureDetails(
+          createGomelongProviderError({
+            code: 5002,
+            message: "temporary provider outage",
+          }),
+          { retriesExhausted: true },
+        ),
+        failureReason: "manufacturer_error",
+        meterNumberAttempted: fixture.meterNumber,
+        mpesaTransactionId: mpesaTransaction.id,
+        phoneNumber,
+        status: "pending_review",
+      })
+      .returning({ id: failedTransactions.id });
+
+    const closeResponse = await app.request(
+      `/api/failed-transactions/${failedTransaction.id}/status`,
+      {
+        method: "PATCH",
+        headers: adminSession.headers,
+        body: JSON.stringify({
+          resolutionAction: "provider_issue_reviewed_for_retry_or_refund",
+          resolutionNotes: "Reviewed provider outage and queued retry guidance",
+          status: "resolved",
         }),
-        { retriesExhausted: true },
-      ),
-      failureReason: "manufacturer_error",
-      meterNumberAttempted: fixture.meterNumber,
-      mpesaTransactionId: mpesaTransaction.id,
-      phoneNumber,
-      status: "pending_review",
-    });
+      },
+    );
+    assert.equal(closeResponse.status, 200);
 
     const response = await app.request(
       `/api/support-recovery?meterNumber=${fixture.meterNumber}`,
@@ -320,6 +338,15 @@ void describe("E2E: support recovery", () => {
     const body = (await response.json()) as {
       data: {
         transactions: {
+          failedTransactionReview: {
+            id: string;
+            latestReview: {
+              newStatus: string | null;
+              resolutionAction: string | null;
+            } | null;
+            reviewHistoryCount: number;
+            status: string;
+          } | null;
           id: string;
           recoveryAssessment: {
             caseId: string;
@@ -339,6 +366,28 @@ void describe("E2E: support recovery", () => {
 
     assert.equal(body.data.transactions.length, 1);
     assert.equal(body.data.transactions[0].id, transaction.id);
+    assert.equal(
+      body.data.transactions[0].failedTransactionReview?.id,
+      failedTransaction.id,
+    );
+    assert.equal(
+      body.data.transactions[0].failedTransactionReview?.status,
+      "resolved",
+    );
+    assert.equal(
+      body.data.transactions[0].failedTransactionReview?.reviewHistoryCount,
+      1,
+    );
+    assert.equal(
+      body.data.transactions[0].failedTransactionReview?.latestReview
+        ?.resolutionAction,
+      "provider_issue_reviewed_for_retry_or_refund",
+    );
+    assert.equal(
+      body.data.transactions[0].failedTransactionReview?.latestReview
+        ?.newStatus,
+      "resolved",
+    );
     assert.equal(
       body.data.transactions[0].recoveryAssessment.caseId,
       "provider_failure_before_token",

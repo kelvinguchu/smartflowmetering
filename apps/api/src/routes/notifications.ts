@@ -6,13 +6,13 @@ import {
   listAdminNotifications,
   markAdminNotificationRead,
   markAllAdminNotificationsRead,
-} from "../services/admin-notifications.service";
+} from "../services/admin/admin-notifications.service";
 import {
   queueDailyLandlordUsageSummarySms,
   queueLowBalanceNotifications,
   queuePostpaidReminderNotifications,
 } from "../services/mother-meter-alerts.service";
-import { runSmsProviderAlerts } from "../services/sms-provider-alerts.service";
+import { runSmsProviderAlerts } from "../services/sms/sms-provider-alerts.service";
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
@@ -109,3 +109,5 @@ notificationRoutes.post(
     });
   }
 );
+
+

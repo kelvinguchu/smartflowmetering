@@ -17,6 +17,7 @@ import {
   teardownE2E,
   uniqueRef,
 } from "./helpers";
+import { getLatestTenantAccessIdForMeter } from "./tenant-access-test-helpers";
 
 const app = createApp();
 
@@ -44,8 +45,9 @@ void describe("E2E: tenant exceptional state", () => {
       },
     );
     const bootstrapBody = (await bootstrapResponse.json()) as {
-      data: { accessToken: string; tenantAccess: { id: string } };
+      data: { accessToken: string };
     };
+    const tenantAccessId = await getLatestTenantAccessIdForMeter(fixture.meterId);
 
     const statusChangedAt = new Date(Date.now() - 4 * 60 * 60 * 1000);
     await db
@@ -151,7 +153,7 @@ void describe("E2E: tenant exceptional state", () => {
         meterNumber: fixture.meterNumber,
         referenceId: availableTransaction.transactionId,
         status: "sent",
-        tenantAccessId: bootstrapBody.data.tenantAccess.id,
+        tenantAccessId,
         title: "Token ready",
         type: "token_delivery_available",
       },
@@ -161,7 +163,7 @@ void describe("E2E: tenant exceptional state", () => {
         readAt: new Date(Date.now() - 120 * 60 * 1000),
         referenceId: readTransaction.transactionId,
         status: "read",
-        tenantAccessId: bootstrapBody.data.tenantAccess.id,
+        tenantAccessId,
         title: "Token already seen",
         type: "token_delivery_available",
       },
@@ -188,13 +190,14 @@ void describe("E2E: tenant exceptional state", () => {
         transactionId?: string;
         type: string;
       }[];
-      meter: { meterNumber: string; status: string };
+      meter: { id?: string; meterNumber: string; status: string };
       summary: { count: number; criticalCount: number; warningCount: number };
       thresholds: { pendingTokenMinutes: number; unacknowledgedTokenMinutes: number };
     };
 
     assert.equal(body.meter.meterNumber, fixture.meterNumber);
     assert.equal(body.meter.status, "suspended");
+    assert.equal(Object.prototype.hasOwnProperty.call(body.meter, "id"), false);
     assert.equal(body.summary.count, 3);
     assert.equal(body.summary.criticalCount, 1);
     assert.equal(body.summary.warningCount, 2);

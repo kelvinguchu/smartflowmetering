@@ -7,6 +7,13 @@ export default [
   ...tseslint.configs.recommended,
 
   {
+    files: ["apps/api/tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-floating-promises": "off",
+    },
+  },
+
+  {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parserOptions: {

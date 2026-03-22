@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import type { RedisOptions } from "ioredis";
+import { parseRedisUrl } from "./redis-url";
 
 export type RateLimitBucket = {
   count: number;
@@ -10,7 +11,7 @@ export interface RateLimitStore {
   increment(
     key: string,
     durationMs: number,
-    now: number
+    now: number,
   ): Promise<RateLimitBucket>;
 }
 
@@ -20,7 +21,7 @@ export class MemoryRateLimitStore implements RateLimitStore {
   async increment(
     key: string,
     durationMs: number,
-    now: number
+    now: number,
   ): Promise<RateLimitBucket> {
     const existing = this.buckets.get(key);
     const bucket =
@@ -48,17 +49,20 @@ class RedisRateLimitStore implements RateLimitStore {
   async increment(
     key: string,
     durationMs: number,
-    now: number
+    now: number,
   ): Promise<RateLimitBucket> {
     const result = await this.redis.eval(
       RATE_LIMIT_SCRIPT,
       1,
       key,
-      String(durationMs)
+      String(durationMs),
     );
     const [countRaw, ttlRaw] = Array.isArray(result) ? result : [1, durationMs];
     const count = Number.parseInt(String(countRaw), 10) || 0;
-    const ttlMs = Math.max(0, Number.parseInt(String(ttlRaw), 10) || durationMs);
+    const ttlMs = Math.max(
+      0,
+      Number.parseInt(String(ttlRaw), 10) || durationMs,
+    );
 
     return {
       count,
@@ -70,19 +74,22 @@ class RedisRateLimitStore implements RateLimitStore {
 export function createRateLimitStore(redisUrl: string): {
   store: RateLimitStore;
   memoryStore: MemoryRateLimitStore;
+  close: () => Promise<void>;
 } {
   const memoryStore = new MemoryRateLimitStore();
-  const redisStore = new RedisRateLimitStore(
-    new Redis({
-      ...parseRedisUrl(redisUrl),
-      enableOfflineQueue: false,
-      maxRetriesPerRequest: 1,
-    })
-  );
+  const redis = new Redis({
+    ...(parseRedisUrl(redisUrl) as RedisOptions),
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: 1,
+  });
+  const redisStore = new RedisRateLimitStore(redis);
 
   let fallbackUntil = 0;
 
   return {
+    close: async () => {
+      await redis.quit();
+    },
     memoryStore,
     store: {
       async increment(key, durationMs, now) {
@@ -96,7 +103,7 @@ export function createRateLimitStore(redisUrl: string): {
           fallbackUntil = now + 60_000;
           console.error(
             "[Rate Limit] Redis unavailable, falling back to in-memory buckets for 60s",
-            error
+            error,
           );
           return memoryStore.increment(key, durationMs, now);
         }
@@ -113,13 +120,3 @@ end
 local ttl = redis.call('PTTL', KEYS[1])
 return { current, ttl }
 `;
-
-function parseRedisUrl(url: string): RedisOptions {
-  const parsed = new URL(url);
-  return {
-    host: parsed.hostname,
-    port: Number.parseInt(parsed.port, 10) || 6379,
-    password: parsed.password || undefined,
-    username: parsed.username || undefined,
-  };
-}

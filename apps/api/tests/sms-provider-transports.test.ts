@@ -25,7 +25,7 @@ describe("sendViaHostpinnacle", () => {
     );
     mock.method(globalThis, "fetch", async () => response);
 
-    const { sendViaHostpinnacle } = await import("../src/services/sms-provider-transports");
+    const { sendViaHostpinnacle } = await import("../src/services/sms/sms-provider-transports");
     const result = await sendViaHostpinnacle("254793841389", "hello");
 
     assert.equal(result.success, true);
@@ -33,3 +33,4 @@ describe("sendViaHostpinnacle", () => {
     assert.equal(result.providerReference, "2472728740707582315");
   });
 });
+

@@ -191,7 +191,7 @@ export function formatGomelongFailureDetails(
 export function parseGomelongFailureDetails(
   details: string | null | undefined,
 ): ParsedGomelongFailureDetails | null {
-  if (!details || !details.includes("Gomelong failure")) {
+  if (!details?.includes("Gomelong failure")) {
     return null;
   }
 

@@ -1,10 +1,10 @@
 import {
   createAdminNotification,
   hasRecentAdminNotification,
-} from "./admin-notifications.service";
+} from "./admin/admin-notifications.service";
 import {
   queueLandlordLowBalanceAppNotification,
-} from "./landlord-notification-producer.service";
+} from "./landlord/landlord-notification-producer.service";
 import {
   listMotherMeterLowBalanceAlerts,
   listPostpaidPaymentReminders,
@@ -178,3 +178,5 @@ function limitItems<T>(items: T[], maxItems?: number): T[] {
   }
   return items.slice(0, maxItems);
 }
+
+

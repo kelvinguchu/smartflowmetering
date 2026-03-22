@@ -6,8 +6,8 @@ import { motherMeterEvents, motherMeters } from "../db/schema";
 import type { AppBindings } from "../lib/auth-middleware";
 import { requirePermission } from "../lib/auth-middleware";
 import { ensureAdminRouteAccess } from "../lib/staff-route-access";
-import { extractClientIp, writeAuditLog } from "../services/audit-log.service";
-import { queueLandlordMotherMeterEventAppNotification } from "../services/landlord-notification-producer.service";
+import { extractClientIp, writeAuditLog } from "../services/admin/audit-log.service";
+import { queueLandlordMotherMeterEventAppNotification } from "../services/landlord/landlord-notification-producer.service";
 import {
   computeMotherMeterBalance,
   computeMotherMeterReconciliation,
@@ -221,3 +221,5 @@ function toNumber(value: string | null | undefined): number {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
+
+

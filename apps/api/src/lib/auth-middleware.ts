@@ -2,7 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { auth } from "./auth";
 import { hasPermission, isStaffRole } from "./rbac";
 import type { StaffPermission } from "./rbac";
-import type { TenantAccessSummary } from "../services/tenant-access.types";
+import type { TenantAccessSummary } from "../services/tenant/tenant-access.types";
 
 type SessionResult = Awaited<ReturnType<typeof auth.api.getSession>>;
 
@@ -150,3 +150,4 @@ export function requirePermission(permission: StaffPermission) {
     await next();
   });
 }
+

@@ -2,13 +2,14 @@
 
 Review date: 2026-03-11
 
-Status: Not approved yet
+Status: Approved with accepted upstream exception
 
 Scope:
 
 - Static review of `apps/api/src`
-- No dynamic testing yet
-- No load testing yet
+- Targeted dynamic security verification is in place for auth brute-force throttling, M-Pesa callback abuse guards, and post-hardening authorization regression
+- Targeted local performance verification completed on 2026-03-22 for the batched mother-meter low-balance and postpaid-reminder paths
+- No production-scale load test yet
 - Includes remediation progress from the first hardening pass in the current working tree
 
 Reference sources:
@@ -45,17 +46,32 @@ Implemented in the current working tree:
 - Runtime request/worker/payment logs now redact query strings, phone numbers, meter numbers, transaction references, and STS tokens instead of printing them verbatim.
 - Sensitive outbound provider calls now use a hardened fetch wrapper that disables caching, suppresses referrers, and rejects redirects.
 - Admin token operations now have a dedicated workflow surface with admin-only access, audit logging, protected token storage, and optional SMS delivery instead of requiring direct raw provider usage.
+- Landlord and tenant mobile responses now omit unnecessary internal owner/access IDs and raw notification/device-token ownership fields; the current customer/mobile payload-minimization pass is complete for the routes in this working tree.
 
-Still open:
+Residual risk and follow-up:
 
-- Dynamic security verification is now in place for auth brute-force throttling, M-Pesa callback abuse guards, and post-hardening authorization regression; extend it further only as new sensitive entry points are added.
-- Gomelong credential transport remains open where the upstream provider requires query-string credentials.
-- Ongoing payload-minimization review should continue as new staff/customer surfaces are added, but the previously identified broad transaction/meter/mother-meter exposure issues were remediated in later hardening passes.
+- Gomelong still requires query-string credentials on several upstream endpoints; this is now treated as an accepted upstream-provider exception with compensating controls in the repo instead of an unresolved implementation task.
+- Broader production-scale load testing is still advisable before large-scale rollout, but the specific mother-meter alert/reminder paths that previously used N+1 queries now have direct local performance verification.
+- Payload-minimization review should be repeated when new staff/customer response surfaces are added, not because the previously identified mobile payload leaks remain open.
+
+Current mitigation for the remaining Gomelong transport risk:
+
+- the provider contract still requires query-string credentials for several read/vend GET endpoints
+- the API now fails closed if `GOMELONG_API_URL` uses non-local plain HTTP, so credentials are not sent to remote hosts without TLS
+- localhost and `127.0.0.1` HTTP remain allowed only for local mock-provider and E2E scenarios
+- embedded credentials in `GOMELONG_API_URL` are rejected at config load to avoid accidental duplication or URL logging drift
 
 Status update 2026-03-18:
 
-- Findings 1, 2, 3, 4, 5, 6, 7, 8, 9, and 11 below are remediated in the current working tree and are preserved as historical record.
+- Findings 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, and 16 below are remediated in the current working tree and are preserved as historical record.
 - Finding 10 remains materially open because the upstream Gomelong integration still relies on query-string credentials.
+
+Status update 2026-03-22:
+
+- Finding 14 is now remediated with batched mother-meter balance and latest-bill-payment aggregation instead of per-meter follow-up queries.
+- Landlord and tenant mobile access, notification, device-token, daily-rollup, and tenant exceptional-state responses were tightened to remove unnecessary internal IDs and raw ownership fields.
+- A direct local performance probe over 12 seeded mother meters averaged 11.11 ms for low-balance alerts and 10.77 ms for postpaid reminders after the batching change.
+- Finding 10 remains only as an accepted upstream-provider exception with compensating controls, not as an unresolved repo-controlled task.
 
 ## Findings
 
@@ -262,6 +278,8 @@ Impact:
 
 ### 10. Medium - Gomelong credentials are sent in URL query parameters on multiple endpoints
 
+Status: Accepted upstream exception with compensating controls 2026-03-22
+
 OWASP mapping:
 
 - A02:2025 Cryptographic Failures
@@ -355,6 +373,8 @@ Impact:
 
 ### 14. Medium - Mother-meter analytics paths use N+1 query patterns
 
+Status: Remediated 2026-03-22
+
 Area:
 
 - Performance / scalability
@@ -426,11 +446,9 @@ Impact:
 
 Planned for later:
 
-- Dynamic security testing
-- Load testing
-- Callback abuse simulation
-- Auth brute-force testing
-- Authorization regression tests for staff-only routes
+- Production-scale load testing against representative traffic volume
+- Wider callback abuse simulation beyond the targeted regression coverage already in place
+- Re-run payload-minimization review when new staff/customer response surfaces are introduced
 
 ## Recommended Fix Order
 

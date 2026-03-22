@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   meters,
@@ -6,6 +6,10 @@ import {
   motherMeters,
   transactions,
 } from "../db/schema";
+import {
+  loadLatestBillPaymentDates,
+  loadMotherMeterBalanceTotals,
+} from "./mother-meter-analytics-bulk.service";
 
 interface ReconciliationOptions {
   motherMeterId: string;
@@ -57,32 +61,12 @@ export interface PostpaidPaymentReminder {
 }
 
 export async function computeMotherMeterBalance(motherMeterId: string) {
-  const [eventTotals] = await db
-    .select({
-      deposits:
-        sql<string>`coalesce(sum(case when ${motherMeterEvents.eventType} in ('initial_deposit', 'refill') then ${motherMeterEvents.amount}::numeric else 0 end), 0)`,
-      billPayments:
-        sql<string>`coalesce(sum(case when ${motherMeterEvents.eventType} = 'bill_payment' then ${motherMeterEvents.amount}::numeric else 0 end), 0)`,
-    })
-    .from(motherMeterEvents)
-    .where(eq(motherMeterEvents.motherMeterId, motherMeterId));
-
-  const [salesTotals] = await db
-    .select({
-      netSales: sql<string>`coalesce(sum(${transactions.netAmount}::numeric), 0)`,
-    })
-    .from(transactions)
-    .innerJoin(meters, eq(transactions.meterId, meters.id))
-    .where(
-      and(
-        eq(meters.motherMeterId, motherMeterId),
-        eq(transactions.status, "completed")
-      )
-    );
-
-  const deposits = toNumber(eventTotals.deposits);
-  const billPayments = toNumber(eventTotals.billPayments);
-  const netSales = toNumber(salesTotals.netSales);
+  const totals = (await loadMotherMeterBalanceTotals([motherMeterId])).get(
+    motherMeterId,
+  );
+  const deposits = totals?.deposits ?? 0;
+  const billPayments = totals?.billPayments ?? 0;
+  const netSales = totals?.netSales ?? 0;
   const estimatedBalance = deposits - billPayments - netSales;
 
   return {
@@ -181,25 +165,29 @@ export async function listMotherMeterLowBalanceAlerts(
     },
   });
 
-  const alerts = await Promise.all(
-    allMeters.map(async (meter) => {
-      const balance = await computeMotherMeterBalance(meter.id);
-      const lowBalanceThreshold = toNumber(meter.lowBalanceThreshold);
-
-      return {
-        motherMeterId: meter.id,
-        motherMeterNumber: meter.motherMeterNumber,
-        propertyId: meter.propertyId,
-        type: meter.type,
-        landlordId: meter.landlordId,
-        landlordName: meter.landlord.name,
-        landlordPhoneNumber: meter.landlord.phoneNumber,
-        estimatedBalance: balance.estimatedBalance,
-        lowBalanceThreshold,
-        isBelowThreshold: balance.estimatedBalance < lowBalanceThreshold,
-      };
-    })
+  const balanceTotals = await loadMotherMeterBalanceTotals(
+    allMeters.map((meter) => meter.id),
   );
+
+  const alerts = allMeters.map((meter) => {
+    const totals = balanceTotals.get(meter.id);
+    const estimatedBalance =
+      (totals?.deposits ?? 0) - (totals?.billPayments ?? 0) - (totals?.netSales ?? 0);
+    const lowBalanceThreshold = toNumber(meter.lowBalanceThreshold);
+
+    return {
+      motherMeterId: meter.id,
+      motherMeterNumber: meter.motherMeterNumber,
+      propertyId: meter.propertyId,
+      type: meter.type,
+      landlordId: meter.landlordId,
+      landlordName: meter.landlord.name,
+      landlordPhoneNumber: meter.landlord.phoneNumber,
+      estimatedBalance,
+      lowBalanceThreshold,
+      isBelowThreshold: estimatedBalance < lowBalanceThreshold,
+    };
+  });
 
   if (includeAboveThreshold) {
     return alerts;
@@ -245,42 +233,33 @@ export async function listPostpaidPaymentReminders(
     },
   });
 
-  const reminders = await Promise.all(
-    postpaidMeters.map(async (meter) => {
-      const lastBillPayment = await db.query.motherMeterEvents.findFirst({
-        where: and(
-          eq(motherMeterEvents.motherMeterId, meter.id),
-          eq(motherMeterEvents.eventType, "bill_payment")
-        ),
-        columns: {
-          createdAt: true,
-        },
-        orderBy: [desc(motherMeterEvents.createdAt)],
-      });
-
-      const lastBillPaymentAt = lastBillPayment?.createdAt ?? null;
-      const reminderDate = lastBillPaymentAt
-        ? addDays(lastBillPaymentAt, daysAfterLastPayment)
-        : null;
-      const daysSinceLastPayment = lastBillPaymentAt
-        ? Math.floor((now.getTime() - lastBillPaymentAt.getTime()) / 86_400_000)
-        : null;
-      const isReminderDue = reminderDate != null && now >= reminderDate;
-
-      return {
-        motherMeterId: meter.id,
-        motherMeterNumber: meter.motherMeterNumber,
-        propertyId: meter.propertyId,
-        landlordId: meter.landlordId,
-        landlordName: meter.landlord.name,
-        landlordPhoneNumber: meter.landlord.phoneNumber,
-        lastBillPaymentAt,
-        reminderDate,
-        daysSinceLastPayment,
-        isReminderDue,
-      };
-    })
+  const latestBillPaymentDates = await loadLatestBillPaymentDates(
+    postpaidMeters.map((meter) => meter.id),
   );
+
+  const reminders = postpaidMeters.map((meter) => {
+    const lastBillPaymentAt = latestBillPaymentDates.get(meter.id) ?? null;
+    const reminderDate = lastBillPaymentAt
+      ? addDays(lastBillPaymentAt, daysAfterLastPayment)
+      : null;
+    const daysSinceLastPayment = lastBillPaymentAt
+      ? Math.floor((now.getTime() - lastBillPaymentAt.getTime()) / 86_400_000)
+      : null;
+    const isReminderDue = reminderDate != null && now >= reminderDate;
+
+    return {
+      motherMeterId: meter.id,
+      motherMeterNumber: meter.motherMeterNumber,
+      propertyId: meter.propertyId,
+      landlordId: meter.landlordId,
+      landlordName: meter.landlord.name,
+      landlordPhoneNumber: meter.landlord.phoneNumber,
+      lastBillPaymentAt,
+      reminderDate,
+      daysSinceLastPayment,
+      isReminderDue,
+    };
+  });
 
   if (includeNotDue) {
     return reminders;

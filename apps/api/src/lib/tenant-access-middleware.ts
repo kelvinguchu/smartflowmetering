@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
-import { getTenantAccessByToken, touchTenantAccess } from "../services/tenant-access.service";
-import type { TenantAccessSummary } from "../services/tenant-access.types";
+import { getTenantAccessByToken, touchTenantAccess } from "../services/tenant/tenant-access.service";
+import type { TenantAccessSummary } from "../services/tenant/tenant-access.types";
 import type { AppBindings } from "./auth-middleware";
 
 export interface TenantAppBindings extends AppBindings {
@@ -51,3 +51,5 @@ function getBearerToken(header: string | undefined): string | null {
 
   return token.trim() || null;
 }
+
+

@@ -11,7 +11,11 @@ type RateLimitOptions = {
   message: string;
 };
 
-const { store: rateLimitStore, memoryStore } = createRateLimitStore(env.REDIS_URL);
+const {
+  close: closeRateLimitStoreConnection,
+  store: rateLimitStore,
+  memoryStore,
+} = createRateLimitStore(env.REDIS_URL);
 
 function clientIpFromHeaders(headers: Headers): string {
   const forwarded = headers.get("x-forwarded-for");
@@ -114,6 +118,10 @@ export const applicationRateLimit = createRateLimitMiddleware({
 });
 
 export const rateLimitMiddleware = globalRateLimit;
+
+export async function closeRateLimitStore(): Promise<void> {
+  await closeRateLimitStoreConnection();
+}
 
 setInterval(() => {
   memoryStore.pruneExpired(Date.now());

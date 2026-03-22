@@ -11,7 +11,7 @@ import { env } from "../../config";
 import { protectToken } from "../../lib/token-protection";
 import { maskToken } from "../../lib/token-redaction";
 import { maskMeterNumberForLog } from "../../lib/log-redaction";
-import { queueTenantNotificationsForMeter } from "../../services/tenant-notification-producer.service";
+import { queueTenantNotificationsForMeter } from "../../services/tenant/tenant-notification-producer.service";
 import { smsDeliveryQueue } from "../index";
 import type { TokenGenerationJob } from "../types";
 import {
@@ -300,3 +300,4 @@ async function createManufacturerFailedTransactionRecord(input: {
 function waitMs(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+

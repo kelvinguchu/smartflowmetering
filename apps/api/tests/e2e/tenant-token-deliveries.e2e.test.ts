@@ -16,6 +16,7 @@ import {
   teardownE2E,
   uniqueRef,
 } from "./helpers";
+import { getLatestTenantAccessIdForMeter } from "./tenant-access-test-helpers";
 
 const app = createApp();
 
@@ -251,14 +252,15 @@ void describe("E2E: tenant token deliveries", () => {
       },
     );
     const bootstrapBody = (await bootstrapResponse.json()) as {
-      data: { accessToken: string; tenantAccess: { id: string } };
+      data: { accessToken: string };
     };
+    const tenantAccessId = await getLatestTenantAccessIdForMeter(fixture.meterId);
 
     await db.insert(customerAppNotifications).values({
       message: "Your token is ready in the app.",
       meterNumber: fixture.meterNumber,
       referenceId: transaction.transactionId,
-      tenantAccessId: bootstrapBody.data.tenantAccess.id,
+      tenantAccessId,
       title: "Token ready",
       type: "token_delivery_available",
     });

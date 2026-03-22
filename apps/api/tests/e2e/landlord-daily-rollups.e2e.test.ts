@@ -109,6 +109,7 @@ void describe("E2E: landlord daily rollups", () => {
       data: {
         date: string;
         financialSnapshot: { prepaidEstimatedBalance: string | null };
+        motherMeter: { id?: string; motherMeterNumber: string };
         totals: {
           companyPaymentsToUtility: string;
           tenantPurchasesNetAmount: string;
@@ -122,6 +123,10 @@ void describe("E2E: landlord daily rollups", () => {
     assert.equal(motherMeterBody.data[1]?.totals.companyPaymentsToUtility, "120.00");
     assert.equal(motherMeterBody.data[2]?.totals.utilityFundingLoaded, "500.00");
     assert.equal(motherMeterBody.data[0]?.financialSnapshot.prepaidEstimatedBalance, "130.00");
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(motherMeterBody.data[0]?.motherMeter ?? {}, "id"),
+      false,
+    );
 
     const subMeterResponse = await app.request(
       `/api/mobile/landlord-access/sub-meters/${fixture.meterId}/daily-rollups`,
@@ -136,6 +141,7 @@ void describe("E2E: landlord daily rollups", () => {
       data: {
         cumulativeNetSales: string;
         date: string;
+        meter: { id?: string; meterNumber: string };
         totals: { purchaseCount: number; tenantPurchasesNetAmount: string };
       }[];
     };
@@ -144,6 +150,10 @@ void describe("E2E: landlord daily rollups", () => {
     assert.equal(subMeterBody.data[0]?.totals.purchaseCount, 1);
     assert.equal(subMeterBody.data[0]?.cumulativeNetSales, "250.00");
     assert.equal(subMeterBody.data[1]?.totals.tenantPurchasesNetAmount, "130.00");
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(subMeterBody.data[0]?.meter ?? {}, "id"),
+      false,
+    );
   });
 });
 
