@@ -7,11 +7,16 @@ import {
   smsLogs,
   transactions,
 } from "../db/schema";
-import { smsDeliveryQueue } from "../queues";
 import {
   getDateBoundsInTimezone,
   getPreviousDateInTimezone,
 } from "../lib/timezone-dates";
+import { smsDeliveryQueue } from "../queues";
+import type {
+  LandlordDailyUsageSummary,
+  MotherMeterUsageSummary,
+} from "./landlord/landlord-daily-usage-summary.types";
+import { queueDailyLandlordUsageSummaryAppNotifications } from "./landlord/landlord-notification-producer.service";
 
 interface DailyUsageSmsOptions {
   targetDate?: string;
@@ -20,6 +25,17 @@ interface DailyUsageSmsOptions {
 }
 
 const DAILY_USAGE_SMS_HEADER = "Smart Flow Metering Daily Purchase Summary";
+
+interface DailyUsageRow {
+  amountPaid: string;
+  landlordId: string;
+  landlordName: string;
+  motherMeterId: string;
+  motherMeterNumber: string;
+  phoneNumber: string;
+  subMeterNumber: string;
+  unitsPurchased: string;
+}
 
 export async function queueDailyLandlordUsageSummarySms(
   options: DailyUsageSmsOptions = {},
@@ -98,7 +114,15 @@ export async function queueDailyLandlordUsageSummarySms(
     }
   }
 
+  const appNotificationResult =
+    await queueDailyLandlordUsageSummaryAppNotifications({
+      summaries: selected,
+      targetDate,
+    });
+
   return {
+    appNotificationsCreated: appNotificationResult.created,
+    appNotificationsSkippedDuplicate: appNotificationResult.skippedDuplicate,
     targetDate,
     totalEligible: landlords.length,
     queued,
@@ -107,53 +131,24 @@ export async function queueDailyLandlordUsageSummarySms(
   };
 }
 
-interface LandlordBucket {
-  landlordId: string;
-  landlordName: string;
-  phoneNumber: string;
-  transactionCount: number;
-  amountTotal: number;
-  unitsTotal: number;
-  motherMeterBuckets: Map<
-    string,
-    {
-      motherMeterId: string;
-      motherMeterNumber: string;
-      transactionCount: number;
-      amountTotal: number;
-      unitsTotal: number;
-      subMeters: Set<string>;
-    }
-  >;
-}
-
 function groupTransactionsByLandlord(
-  rows: {
-    landlordId: string;
-    landlordName: string;
-    phoneNumber: string;
-    motherMeterId: string;
-    motherMeterNumber: string;
-    subMeterNumber: string;
-    amountPaid: string;
-    unitsPurchased: string;
-  }[],
-): Map<string, LandlordBucket> {
-  const grouped = new Map<string, LandlordBucket>();
+  rows: DailyUsageRow[],
+): Map<string, LandlordDailyUsageSummary> {
+  const grouped = new Map<string, LandlordDailyUsageSummary>();
 
   for (const row of rows) {
     const key = row.landlordId;
-    const current = grouped.get(key) ?? {
+    const current: LandlordDailyUsageSummary = grouped.get(key) ?? {
       landlordId: row.landlordId,
       landlordName: row.landlordName,
       phoneNumber: row.phoneNumber,
       transactionCount: 0,
       amountTotal: 0,
       unitsTotal: 0,
-      motherMeterBuckets: new Map(),
+      motherMeterBuckets: new Map<string, MotherMeterUsageSummary>(),
     };
 
-    const motherMeterBucket = current.motherMeterBuckets.get(
+    const motherMeterBucket: MotherMeterUsageSummary = current.motherMeterBuckets.get(
       row.motherMeterId,
     ) ?? {
       motherMeterId: row.motherMeterId,
@@ -179,7 +174,7 @@ function groupTransactionsByLandlord(
 }
 
 function buildDailyUsageMessageBody(
-  landlord: LandlordBucket,
+  landlord: LandlordDailyUsageSummary,
   targetDate: string,
 ): string {
   const motherMeterSections = Array.from(landlord.motherMeterBuckets.values())
@@ -210,7 +205,10 @@ function buildDailyUsageMessageBody(
 }
 
 function limitItems<T>(items: T[], maxItems?: number): T[] {
-  if (!maxItems || maxItems < 1) return items;
+  if (!maxItems || maxItems < 1) {
+    return items;
+  }
+
   return items.slice(0, maxItems);
 }
 
@@ -233,3 +231,5 @@ async function hasDailySummarySms(input: {
 
   return Boolean(existing);
 }
+
+

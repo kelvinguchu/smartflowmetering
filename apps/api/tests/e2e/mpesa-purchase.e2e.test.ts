@@ -9,6 +9,7 @@ import {
   mpesaTransactions,
   transactions,
 } from "../../src/db/schema";
+import { isProtectedToken, revealToken } from "../../src/lib/token-protection";
 import {
   ensureTestMeterFixture,
   ensureInfraReady,
@@ -143,7 +144,8 @@ describe("E2E: M-Pesa purchase lifecycle", () => {
       .limit(1);
 
     assert.ok(token);
-    assert.match(token.token, /^\d{20}$/);
+    assert.equal(isProtectedToken(token.token), true);
+    assert.match(revealToken(token.token), /^\d{20}$/);
   });
 
   it("keeps callback idempotent and does not create duplicate transactions", async () => {

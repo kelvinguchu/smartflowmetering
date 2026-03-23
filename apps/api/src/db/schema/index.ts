@@ -1,15 +1,18 @@
 import { relations } from "drizzle-orm";
-import { tariffs } from "./tariffs";
+import { customerAppNotifications } from "./customer-app-notifications";
+import { customerDeviceTokens } from "./customer-device-tokens";
 import { customers } from "./customers";
-import { properties } from "./properties";
-import { motherMeters } from "./mother-meters";
-import { motherMeterEvents } from "./mother-meter-events";
-import { meters } from "./meters";
-import { mpesaTransactions } from "./mpesa-transactions";
-import { transactions } from "./transactions";
 import { failedTransactions } from "./failed-transactions";
 import { generatedTokens } from "./generated-tokens";
+import { meters } from "./meters";
+import { motherMeterEvents } from "./mother-meter-events";
+import { motherMeters } from "./mother-meters";
+import { mpesaTransactions } from "./mpesa-transactions";
+import { properties } from "./properties";
 import { smsLogs } from "./sms-logs";
+import { tariffs } from "./tariffs";
+import { tenantAppAccesses } from "./tenant-app-accesses";
+import { transactions } from "./transactions";
 
 export {
   user,
@@ -31,6 +34,26 @@ export {
   type Customer,
   type NewCustomer,
 } from "./customers";
+export {
+  tenantAppAccesses,
+  tenantAppAccessStatusEnum,
+  type TenantAppAccess,
+  type NewTenantAppAccess,
+} from "./tenant-app-accesses";
+export {
+  customerDeviceTokens,
+  customerDevicePlatformEnum,
+  customerDeviceTokenStatusEnum,
+  type CustomerDeviceToken,
+  type NewCustomerDeviceToken,
+} from "./customer-device-tokens";
+export {
+  customerAppNotifications,
+  customerAppNotificationStatusEnum,
+  customerAppNotificationTypeEnum,
+  type CustomerAppNotification,
+  type NewCustomerAppNotification,
+} from "./customer-app-notifications";
 
 export { properties, type Property, type NewProperty } from "./properties";
 
@@ -190,6 +213,7 @@ export const metersRelations = relations(meters, ({ one, many }) => ({
   }),
   transactions: many(transactions),
   generatedTokens: many(generatedTokens),
+  tenantAccesses: many(tenantAppAccesses),
 }));
 
 // Transaction relations
@@ -251,3 +275,23 @@ export const smsLogsRelations = relations(smsLogs, ({ one }) => ({
     references: [transactions.id],
   }),
 }));
+
+export const customerAppNotificationsRelations = relations(
+  customerAppNotifications,
+  ({ one }) => ({
+    tenantAccess: one(tenantAppAccesses, {
+      fields: [customerAppNotifications.tenantAccessId],
+      references: [tenantAppAccesses.id],
+    }),
+  }),
+);
+
+export const customerDeviceTokensRelations = relations(
+  customerDeviceTokens,
+  ({ one }) => ({
+    tenantAccess: one(tenantAppAccesses, {
+      fields: [customerDeviceTokens.tenantAccessId],
+      references: [tenantAppAccesses.id],
+    }),
+  }),
+);

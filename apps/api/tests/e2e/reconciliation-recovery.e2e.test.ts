@@ -91,16 +91,95 @@ describe("E2E: Reconciliation and recovery admin actions", () => {
       {
         method: "GET",
         headers: adminSession.headers,
-      }
+      },
     );
     const listBody = (await listResponse.json()) as {
       count: number;
-      data: Array<{ id: string; status: string }>;
+      data: Array<{
+        id: string;
+        latestReview?: {
+          resolutionAction: string | null;
+        } | null;
+        reviewHistoryCount?: number;
+        status: string;
+      }>;
     };
 
     assert.equal(listResponse.status, 200);
     assert.ok(listBody.count >= 1);
     assert.ok(listBody.data.some((item) => item.id === failure.id));
+    const listedFailure = listBody.data.find(
+      (item) => item.id === failure.id,
+    ) as
+      | {
+          guidance?: {
+            allowedResolutionActions: string[];
+            caseId: string;
+            closurePrecondition: string;
+            manualInterventionRequired: boolean;
+            recommendedAction: string;
+            recommendedClosureStatus: string;
+            resolutionRequired: boolean;
+            summary: string;
+          };
+          id: string;
+          latestReview?: {
+            resolutionAction: string | null;
+          } | null;
+          reviewHistoryCount?: number;
+          status: string;
+        }
+      | undefined;
+    assert.ok(listedFailure);
+    assert.equal(listedFailure?.reviewHistoryCount, 0);
+    assert.equal(listedFailure?.latestReview ?? null, null);
+    assert.equal(
+      listedFailure?.guidance?.caseId,
+      "invalid_meter_confirmation_required",
+    );
+    assert.equal(listedFailure?.guidance?.manualInterventionRequired, true);
+    assert.equal(listedFailure?.guidance?.resolutionRequired, true);
+    assert.equal(listedFailure?.guidance?.recommendedClosureStatus, "resolved");
+    assert.ok(
+      listedFailure?.guidance?.allowedResolutionActions.includes(
+        "customer_confirmed_correct_meter_for_retry",
+      ),
+    );
+    assert.match(
+      listedFailure?.guidance?.summary ?? "",
+      /does not match a known meter/i,
+    );
+    assert.match(
+      listedFailure?.guidance?.closurePrecondition ?? "",
+      /correct meter number is confirmed|refunded or abandoned/i,
+    );
+    assert.ok(listedFailure?.guidance?.recommendedAction);
+
+    const invalidUpdateResponse = await app.request(
+      `/api/failed-transactions/${failure.id}/status`,
+      {
+        method: "PATCH",
+        headers: adminSession.headers,
+        body: JSON.stringify({
+          status: "resolved",
+        }),
+      },
+    );
+    assert.equal(invalidUpdateResponse.status, 400);
+
+    const invalidActionResponse = await app.request(
+      `/api/failed-transactions/${failure.id}/status`,
+      {
+        method: "PATCH",
+        headers: adminSession.headers,
+        body: JSON.stringify({
+          status: "resolved",
+          resolutionAction: "token_resent_or_delivered_via_alternate_channel",
+          resolutionNotes: "Used the wrong closure action for invalid meter",
+        }),
+      },
+    );
+    assert.equal(invalidActionResponse.status, 400);
 
     const updateResponse = await app.request(
       `/api/failed-transactions/${failure.id}/status`,
@@ -108,22 +187,39 @@ describe("E2E: Reconciliation and recovery admin actions", () => {
         method: "PATCH",
         headers: adminSession.headers,
         body: JSON.stringify({
+          resolutionAction: "customer_confirmed_correct_meter_for_retry",
           status: "resolved",
-          resolutionNotes: "Reviewed and closed after customer support follow-up",
+          resolutionNotes:
+            "Reviewed and closed after customer support follow-up",
         }),
-      }
+      },
     );
     const updateBody = (await updateResponse.json()) as {
-      data: { status: string; resolutionNotes: string; resolvedAt: string | null };
+      data: {
+        latestReview: {
+          newStatus: string | null;
+          resolutionAction: string | null;
+        } | null;
+        status: string;
+        reviewHistoryCount: number;
+        resolutionNotes: string;
+        resolvedAt: string | null;
+      };
     };
 
     assert.equal(updateResponse.status, 200);
     assert.equal(updateBody.data.status, "resolved");
     assert.equal(
       updateBody.data.resolutionNotes,
-      "Reviewed and closed after customer support follow-up"
+      "Reviewed and closed after customer support follow-up",
     );
     assert.ok(updateBody.data.resolvedAt);
+    assert.equal(updateBody.data.reviewHistoryCount, 1);
+    assert.equal(
+      updateBody.data.latestReview?.resolutionAction,
+      "customer_confirmed_correct_meter_for_retry",
+    );
+    assert.equal(updateBody.data.latestReview?.newStatus, "resolved");
   });
 
   it("supports reconciliation endpoint and resend/recovery flows", async () => {
@@ -166,13 +262,16 @@ describe("E2E: Reconciliation and recovery admin actions", () => {
     });
     assert.ok(tx);
 
-    const resendTokenResponse = await app.request("/api/transactions/resend-token", {
-      method: "POST",
-      headers: adminSession.headers,
-      body: JSON.stringify({
-        transactionId: tx.id,
-      }),
-    });
+    const resendTokenResponse = await app.request(
+      "/api/transactions/resend-token",
+      {
+        method: "POST",
+        headers: adminSession.headers,
+        body: JSON.stringify({
+          transactionId: tx.id,
+        }),
+      },
+    );
     const resendTokenBody = (await resendTokenResponse.json()) as {
       success: boolean;
       smsLogId: string;
@@ -187,7 +286,7 @@ describe("E2E: Reconciliation and recovery admin actions", () => {
       {
         method: "POST",
         headers: adminSession.headers,
-      }
+      },
     );
     assert.equal(smsResendResponse.status, 200);
 
@@ -204,7 +303,7 @@ describe("E2E: Reconciliation and recovery admin actions", () => {
       {
         method: "GET",
         headers: adminSession.headers,
-      }
+      },
     );
     const reconciliationBody = (await reconciliationResponse.json()) as {
       data?: {

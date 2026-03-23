@@ -1,14 +1,15 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { requireAdmin, type AppBindings } from "../lib/auth-middleware";
-import {
-  listMotherMeterLowBalanceAlerts,
-  listPostpaidPaymentReminders,
-} from "../services/mother-meter-analytics.service";
+import { Hono } from "hono";
+import type { AppBindings } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
 import {
   queueLowBalanceNotifications,
   queuePostpaidReminderNotifications,
 } from "../services/mother-meter-alerts.service";
+import {
+  listMotherMeterLowBalanceAlerts,
+  listPostpaidPaymentReminders,
+} from "../services/mother-meter-analytics.service";
 import {
   motherMeterLowBalanceNotifySchema,
   motherMeterLowBalanceQuerySchema,
@@ -20,7 +21,7 @@ export const motherMeterAlertRoutes = new Hono<AppBindings>();
 
 motherMeterAlertRoutes.get(
   "/low-balance",
-  requireAdmin,
+  requirePermission("mother_meter_alerts:manage"),
   zValidator("query", motherMeterLowBalanceQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
@@ -50,7 +51,7 @@ motherMeterAlertRoutes.get(
 
 motherMeterAlertRoutes.post(
   "/low-balance/notify",
-  requireAdmin,
+  requirePermission("mother_meter_alerts:manage"),
   zValidator("json", motherMeterLowBalanceNotifySchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -67,7 +68,7 @@ motherMeterAlertRoutes.post(
 
 motherMeterAlertRoutes.get(
   "/postpaid-reminders",
-  requireAdmin,
+  requirePermission("mother_meter_alerts:manage"),
   zValidator("query", postpaidReminderQuerySchema),
   async (c) => {
     const query = c.req.valid("query");
@@ -96,7 +97,7 @@ motherMeterAlertRoutes.get(
 
 motherMeterAlertRoutes.post(
   "/postpaid-reminders/notify",
-  requireAdmin,
+  requirePermission("mother_meter_alerts:manage"),
   zValidator("json", postpaidReminderNotifySchema),
   async (c) => {
     const body = c.req.valid("json");

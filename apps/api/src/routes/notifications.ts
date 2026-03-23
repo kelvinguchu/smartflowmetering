@@ -1,26 +1,29 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { requireAdmin, type AppBindings } from "../lib/auth-middleware";
+import { Hono } from "hono";
+import type { AppBindings } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
 import {
   listAdminNotifications,
   markAdminNotificationRead,
   markAllAdminNotificationsRead,
-} from "../services/admin-notifications.service";
+} from "../services/admin/admin-notifications.service";
 import {
   queueDailyLandlordUsageSummarySms,
   queueLowBalanceNotifications,
   queuePostpaidReminderNotifications,
 } from "../services/mother-meter-alerts.service";
+import { runSmsProviderAlerts } from "../services/sms/sms-provider-alerts.service";
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
   runAlertsBodySchema,
   runDailyUsageBodySchema,
+  runSmsProviderAlertsBodySchema,
 } from "../validators/notifications";
 
 export const notificationRoutes = new Hono<AppBindings>();
 
-notificationRoutes.use("*", requireAdmin);
+notificationRoutes.use("*", requirePermission("notifications:manage"));
 
 notificationRoutes.get(
   "/",
@@ -39,7 +42,7 @@ notificationRoutes.patch(
     const { id } = c.req.valid("param");
     const updated = await markAdminNotificationRead(id);
 
-    if (!updated) {
+    if (updated === null) {
       return c.json({ error: "Notification not found" }, 404);
     }
 
@@ -76,6 +79,20 @@ notificationRoutes.post(
 );
 
 notificationRoutes.post(
+  "/run-sms-provider-alerts",
+  zValidator("json", runSmsProviderAlertsBodySchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    const result = await runSmsProviderAlerts(body);
+
+    return c.json({
+      message: "SMS provider alert checks completed",
+      ...result,
+    });
+  },
+);
+
+notificationRoutes.post(
   "/run-daily-usage-sms",
   zValidator("json", runDailyUsageBodySchema),
   async (c) => {
@@ -92,3 +109,5 @@ notificationRoutes.post(
     });
   }
 );
+
+

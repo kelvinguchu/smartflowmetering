@@ -1,0 +1,4 @@
+ALTER TABLE "customer_app_notifications" ADD COLUMN "landlord_id" uuid;--> statement-breakpoint
+ALTER TABLE "customer_device_tokens" ADD COLUMN "landlord_id" uuid;--> statement-breakpoint
+ALTER TABLE "customer_app_notifications" ADD CONSTRAINT "customer_app_notifications_landlord_id_customers_id_fk" FOREIGN KEY ("landlord_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "customer_device_tokens" ADD CONSTRAINT "customer_device_tokens_landlord_id_customers_id_fk" FOREIGN KEY ("landlord_id") REFERENCES "public"."customers"("id") ON DELETE cascade ON UPDATE no action;

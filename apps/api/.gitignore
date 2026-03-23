@@ -41,3 +41,4 @@ yarn-error.log*
 **/*.log
 package-lock.json
 **/*.bun
+smart-flow-metering-firebase-adminsdk-fbsvc-f853c036bd.json

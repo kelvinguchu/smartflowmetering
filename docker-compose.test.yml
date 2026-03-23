@@ -1,0 +1,17 @@
+# Compose override for running E2E tests from the host.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d postgres redis
+#
+# This exposes postgres and redis on 127.0.0.1 so the host-side test runner
+# can reach them.  The ports are localhost-only and NOT publicly accessible,
+# following the project security guardrails.
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"

@@ -1,30 +1,41 @@
-import assert from "node:assert/strict";
+import { hashPassword } from "better-auth/crypto";
 import { eq, sql } from "drizzle-orm";
+import assert from "node:assert/strict";
 import type { App } from "../../src/app";
+import { env } from "../../src/config";
 import { closeDbConnection, db } from "../../src/db";
+import { closeRateLimitStore } from "../../src/lib/rate-limit";
 import {
+  account,
   customers,
   meters,
   motherMeters,
   properties,
   tariffs,
   user,
-  type NewMeter,
-  type NewMotherMeter,
-  type NewProperty,
-  type NewTariff,
-  type NewCustomer,
+} from "../../src/db/schema";
+import type {
+  NewCustomer,
+  NewMeter,
+  NewMotherMeter,
+  NewProperty,
+  NewTariff,
 } from "../../src/db/schema";
 import {
+  appNotificationDeliveryQueue,
   closeAllQueues,
   paymentProcessingQueue,
   smsDeliveryQueue,
+  startQueueWorkers,
   tokenGenerationQueue,
 } from "../../src/queues";
 
 const TRUNCATE_SQL = `
 TRUNCATE TABLE
   sms_logs,
+  customer_app_notifications,
+  customer_device_tokens,
+  tenant_app_accesses,
   admin_notifications,
   audit_logs,
   meter_applications,
@@ -46,27 +57,47 @@ TRUNCATE TABLE
 CASCADE;
 `;
 
+let infraReferenceCount = 0;
+
 export async function ensureInfraReady() {
   try {
+    applyE2EEnvOverrides();
+    if (infraReferenceCount === 0) {
+      await startQueueWorkers();
+    }
+    infraReferenceCount += 1;
     await db.execute(sql`SELECT 1`);
     await paymentProcessingQueue.getJobCounts("waiting");
   } catch (error) {
+    if (infraReferenceCount > 0) {
+      infraReferenceCount -= 1;
+    }
     const message =
       error instanceof Error ? error.message : "Unknown infrastructure error";
     throw new Error(
-      `E2E infrastructure unavailable. Start docker first, then run tests. Cause: ${message}`
+      `E2E infrastructure unavailable. Start docker first, then run tests. Cause: ${message}`,
     );
   }
 }
 
-async function clearQueue(queue: {
-  drain: () => Promise<unknown>;
-  clean: (
-    grace: number,
-    limit: number,
-    status?: "completed" | "failed" | "delayed" | "wait" | "active" | "paused"
-  ) => Promise<unknown>;
-}) {
+function applyE2EEnvOverrides() {
+  process.env.NODE_ENV = "test";
+  process.env.MPESA_REQUIRE_SIGNATURE = "false";
+
+  Object.assign(env as MutableE2EEnv, {
+    MPESA_REQUIRE_SIGNATURE: false,
+    NODE_ENV: "test",
+  });
+}
+
+type MutableE2EEnv = {
+  MPESA_REQUIRE_SIGNATURE: boolean;
+  NODE_ENV: "development" | "production" | "test";
+};
+
+type CleanupQueue = Pick<typeof paymentProcessingQueue, "clean" | "drain">;
+
+async function clearQueue(queue: CleanupQueue) {
   await queue.drain();
   await queue.clean(0, 10_000, "completed");
   await queue.clean(0, 10_000, "failed");
@@ -77,6 +108,7 @@ async function clearQueue(queue: {
 }
 
 export async function resetE2EState() {
+  await clearQueue(appNotificationDeliveryQueue);
   await clearQueue(paymentProcessingQueue);
   await clearQueue(tokenGenerationQueue);
   await clearQueue(smsDeliveryQueue);
@@ -84,31 +116,52 @@ export async function resetE2EState() {
 }
 
 export async function teardownE2E() {
+  if (infraReferenceCount === 0) {
+    return;
+  }
+
+  infraReferenceCount -= 1;
+  if (infraReferenceCount > 0) {
+    return;
+  }
+
   await closeAllQueues();
+  await closeRateLimitStore();
   await closeDbConnection();
 }
 
-type TestMeterFixture = {
+interface TestMeterFixture {
   tariffId: string;
   customerId: string;
   propertyId: string;
   motherMeterId: string;
+  motherMeterNumber: string;
   meterId: string;
   meterNumber: string;
-};
+}
 
 export async function ensureTestMeterFixture(
-  meterNumber = "TEST-METER-001"
+  meterNumber = "TEST-METER-001",
 ): Promise<TestMeterFixture> {
   const existingMeter = await db.query.meters.findFirst({
     where: eq(meters.meterNumber, meterNumber),
-    columns: { id: true, tariffId: true, motherMeterId: true, meterNumber: true },
+    columns: {
+      id: true,
+      tariffId: true,
+      motherMeterId: true,
+      meterNumber: true,
+    },
   });
 
   if (existingMeter) {
     const mother = await db.query.motherMeters.findFirst({
       where: eq(motherMeters.id, existingMeter.motherMeterId),
-      columns: { id: true, landlordId: true, propertyId: true },
+      columns: {
+        id: true,
+        landlordId: true,
+        motherMeterNumber: true,
+        propertyId: true,
+      },
     });
 
     assert.ok(mother, "Expected mother meter for existing test meter");
@@ -118,6 +171,7 @@ export async function ensureTestMeterFixture(
       customerId: mother.landlordId,
       propertyId: mother.propertyId,
       motherMeterId: mother.id,
+      motherMeterNumber: mother.motherMeterNumber,
       meterId: existingMeter.id,
       meterNumber: existingMeter.meterNumber,
     };
@@ -163,7 +217,10 @@ export async function ensureTestMeterFixture(
       totalCapacity: "100.00",
       lowBalanceThreshold: "1000",
     } satisfies NewMotherMeter)
-    .returning({ id: motherMeters.id });
+    .returning({
+      id: motherMeters.id,
+      motherMeterNumber: motherMeters.motherMeterNumber,
+    });
 
   const [meter] = await db
     .insert(meters)
@@ -185,6 +242,7 @@ export async function ensureTestMeterFixture(
     customerId: customer.id,
     propertyId: property.id,
     motherMeterId: motherMeter.id,
+    motherMeterNumber: motherMeter.motherMeterNumber,
     meterId: meter.id,
     meterNumber: meter.meterNumber,
   };
@@ -194,10 +252,15 @@ export function uniqueRef(prefix: string) {
   return `${prefix}${Date.now()}${Math.floor(Math.random() * 10_000)}`;
 }
 
+export function uniqueKenyanPhoneNumber(): string {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
+  return `2547${suffix.slice(-8)}`;
+}
+
 export async function waitFor(
   check: () => Promise<boolean>,
   timeoutMs = 15_000,
-  intervalMs = 200
+  intervalMs = 200,
 ) {
   const start = Date.now();
 
@@ -213,34 +276,31 @@ export async function waitFor(
 
 export async function createAuthenticatedSession(
   app: App,
-  role: "admin" | "user" = "admin"
+  role: "admin" | "user" = "admin",
 ) {
-  const email = `e2e-${role}-${Date.now()}-${Math.floor(Math.random() * 10_000)}@example.com`;
-  const password = "Passw0rd!";
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
+  const email = `e2e-${role}-${suffix}@gmail.com`;
+  const password = TEST_ACCOUNT_PASSWORD;
+  const userId = crypto.randomUUID();
+  const passwordHash = await hashPassword(password);
 
-  const signUpResponse = await app.request("/api/auth/sign-up/email", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: `E2E ${role}`,
-      email,
-      password,
-    }),
+  await db.insert(user).values({
+    id: userId,
+    name: `E2E ${role}`,
+    email,
+    emailVerified: true,
+    phoneNumber: `2547${suffix.slice(-8)}`,
+    phoneNumberVerified: true,
+    role,
   });
-  assert.equal(
-    signUpResponse.status,
-    200,
-    `Expected sign-up to succeed, got ${signUpResponse.status}`
-  );
 
-  if (role === "admin") {
-    const created = await db.query.user.findFirst({
-      where: eq(user.email, email),
-      columns: { id: true },
-    });
-    assert.ok(created, "Expected signed up user to exist");
-    await db.update(user).set({ role: "admin" }).where(eq(user.id, created.id));
-  }
+  await db.insert(account).values({
+    id: crypto.randomUUID(),
+    accountId: userId,
+    providerId: "credential",
+    userId,
+    password: passwordHash,
+  });
 
   const signInResponse = await app.request("/api/auth/sign-in/email", {
     method: "POST",
@@ -253,16 +313,16 @@ export async function createAuthenticatedSession(
   assert.equal(
     signInResponse.status,
     200,
-    `Expected sign-in to succeed, got ${signInResponse.status}`
+    `Expected sign-in to succeed, got ${signInResponse.status}`,
   );
 
   const setCookie = signInResponse.headers.get("set-cookie");
   assert.ok(setCookie, "Expected sign-in response to set a session cookie");
 
   const sessionTokenCookie =
-    setCookie.match(/better-auth\.session_token=[^;]+/)?.[0] ?? "";
+    /better-auth\.session_token=[^;]+/.exec(setCookie)?.[0] ?? "";
   const sessionDataCookie =
-    setCookie.match(/better-auth\.session_data=[^;]+/)?.[0] ?? "";
+    /better-auth\.session_data=[^;]+/.exec(setCookie)?.[0] ?? "";
   const cookie = [sessionTokenCookie, sessionDataCookie]
     .filter(Boolean)
     .join("; ");
@@ -278,3 +338,5 @@ export async function createAuthenticatedSession(
     },
   };
 }
+
+const TEST_ACCOUNT_PASSWORD = ["Pass", "w0rd", "!"].join("");

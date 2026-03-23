@@ -1,0 +1,1 @@
+ALTER TABLE "sms_logs" ADD COLUMN "provider_reference" text;

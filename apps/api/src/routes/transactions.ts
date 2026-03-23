@@ -1,67 +1,38 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { db } from "../db";
-import { transactions, meters, generatedTokens, smsLogs } from "../db/schema";
-import {
-  transactionQuerySchema,
-  resendTokenSchema,
-} from "../validators/transactions";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { generatedTokens, meters, smsLogs, transactions } from "../db/schema";
+import type { AppBindings } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
+import { ensureAdminRouteAccess, ensureSupportScopedTransactionSearch, isAdminStaffUser } from "../lib/staff-route-access";
+import { revealToken } from "../lib/token-protection";
+import { redactTokensInText } from "../lib/token-redaction";
 import { smsDeliveryQueue } from "../queues";
-import {
-  requireAuth,
-  requireAdmin,
-  type AppBindings,
-} from "../lib/auth-middleware";
+import { toTransactionDetail, toTransactionListItem } from "../services/transaction-response.service";
+import { formatTokenSms } from "../services/sms/sms.service";
+import { type TransactionQuery, resendTokenSchema, transactionQuerySchema } from "../validators/transactions";
 
 const idParamSchema = z.object({
   id: z.uuid(),
 });
 
-const transactionIdParamSchema = z.object({
-  transactionId: z.string(),
-});
+const transactionIdParamSchema = z.object({ transactionId: z.string() });
 
 export const transactionRoutes = new Hono<AppBindings>();
 
 transactionRoutes.get(
   "/",
-  requireAuth,
+  requirePermission("transactions:read"),
   zValidator("query", transactionQuerySchema),
   async (c) => {
+    const actor = c.get("user");
     const query = c.req.valid("query");
-    const conditions = [];
+    ensureSupportScopedTransactionSearch(actor, query);
 
-    if (query.meterId) {
-      conditions.push(eq(transactions.meterId, query.meterId));
-    }
-    if (query.phoneNumber) {
-      conditions.push(eq(transactions.phoneNumber, query.phoneNumber));
-    }
-    if (query.status) {
-      conditions.push(eq(transactions.status, query.status));
-    }
-    if (query.startDate) {
-      conditions.push(gte(transactions.createdAt, new Date(query.startDate)));
-    }
-    if (query.endDate) {
-      conditions.push(lte(transactions.createdAt, new Date(query.endDate)));
-    }
-
-    if (query.meterNumber) {
-      const meter = await db.query.meters.findFirst({
-        where: eq(meters.meterNumber, query.meterNumber),
-        columns: { id: true },
-      });
-
-      if (meter) {
-        conditions.push(eq(transactions.meterId, meter.id));
-      } else {
-        return c.json({ data: [], count: 0 });
-      }
-    }
-
+    const conditions = await buildTransactionFilters(query);
     const result = await db.query.transactions.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       with: {
@@ -73,19 +44,23 @@ transactionRoutes.get(
         },
       },
       orderBy: [desc(transactions.createdAt)],
-      limit: query.limit ?? 20,
+      limit: isAdminStaffUser(actor) ? (query.limit ?? 20) : Math.min(query.limit ?? 20, 20),
       offset: query.offset ?? 0,
     });
 
-    return c.json({ data: result, count: result.length });
-  }
+    return c.json({ count: result.length, data: result.map((transaction) =>
+      toTransactionListItem(transaction, { includeFinancialBreakdown: isAdminStaffUser(actor) }),
+    ) });
+  },
 );
 
 transactionRoutes.get(
   "/:id",
-  requireAuth,
+  requirePermission("transactions:read"),
   zValidator("param", idParamSchema),
   async (c) => {
+    ensureAdminRouteAccess(c.get("user"), "Direct transaction detail access");
+
     const { id } = c.req.valid("param");
     const transaction = await db.query.transactions.findFirst({
       where: eq(transactions.id, id),
@@ -98,8 +73,8 @@ transactionRoutes.get(
           },
         },
         generatedTokens: true,
-        smsLogs: true,
         mpesaTransaction: true,
+        smsLogs: true,
       },
     });
 
@@ -107,15 +82,17 @@ transactionRoutes.get(
       return c.json({ error: "Transaction not found" }, 404);
     }
 
-    return c.json({ data: transaction });
-  }
+    return c.json({ data: toTransactionDetail(transaction) });
+  },
 );
 
 transactionRoutes.get(
   "/reference/:transactionId",
-  requireAuth,
+  requirePermission("transactions:read"),
   zValidator("param", transactionIdParamSchema),
   async (c) => {
+    ensureAdminRouteAccess(c.get("user"), "Direct transaction detail access");
+
     const { transactionId } = c.req.valid("param");
     const transaction = await db.query.transactions.findFirst({
       where: eq(transactions.transactionId, transactionId),
@@ -133,15 +110,16 @@ transactionRoutes.get(
       return c.json({ error: "Transaction not found" }, 404);
     }
 
-    return c.json({ data: transaction });
-  }
+    return c.json({ data: toTransactionListItem(transaction, { includeFinancialBreakdown: true }) });
+  },
 );
 
 transactionRoutes.post(
   "/resend-token",
-  requireAuth,
+  requirePermission("transactions:resend_token"),
   zValidator("json", resendTokenSchema),
   async (c) => {
+    const actor = c.get("user");
     const body = c.req.valid("json");
     const transaction = await db.query.transactions.findFirst({
       where: eq(transactions.id, body.transactionId),
@@ -155,22 +133,18 @@ transactionRoutes.post(
     if (!transaction) {
       return c.json({ error: "Transaction not found" }, 404);
     }
-
     if (transaction.status !== "completed") {
       return c.json({ error: "Transaction not completed" }, 400);
     }
 
     const [token] = await db
-      .select({
-        token: generatedTokens.token,
-        value: generatedTokens.value,
-      })
+      .select({ token: generatedTokens.token, value: generatedTokens.value })
       .from(generatedTokens)
       .where(
         and(
           eq(generatedTokens.transactionId, transaction.id),
-          eq(generatedTokens.tokenType, "credit")
-        )
+          eq(generatedTokens.tokenType, "credit"),
+        ),
       )
       .orderBy(desc(generatedTokens.createdAt))
       .limit(1);
@@ -178,74 +152,137 @@ transactionRoutes.post(
     if (!token) {
       return c.json({ error: "No token found for this transaction" }, 400);
     }
-    const phoneNumber = body.phoneNumber ?? transaction.phoneNumber;
+
+    const phoneNumber = resolveResendPhoneNumber({
+      actor,
+      requestedPhoneNumber: body.phoneNumber,
+      transactionPhoneNumber: transaction.phoneNumber,
+    });
 
     await smsDeliveryQueue.add(
       "resend-sms",
       {
-        transactionId: transaction.id,
-        phoneNumber,
-        meterNumber: transaction.meter.meterNumber,
-        token: token.token,
-        units: token.value ?? "0",
         amount: transaction.amountPaid,
+        meterNumber: transaction.meter.meterNumber,
+        phoneNumber,
+        token: revealToken(token.token),
+        transactionId: transaction.id,
+        units: token.value ?? "0",
       },
       {
         jobId: `sms-resend-${transaction.id}-${Date.now()}`,
-      }
+      },
     );
 
     const [smsLog] = await db
       .insert(smsLogs)
       .values({
-        transactionId: transaction.id,
+        messageBody: redactTokensInText(
+          formatTokenSms({
+            amountPaid: transaction.amountPaid,
+            meterNumber: transaction.meter.meterNumber,
+            otherCharges: transaction.commissionAmount,
+            token: revealToken(token.token),
+            tokenAmount: transaction.netAmount,
+            transactionDate: transaction.completedAt ?? transaction.createdAt,
+            units: token.value ?? "0",
+          }),
+        ),
         phoneNumber,
-        messageBody: `Token resend for meter ${transaction.meter.meterNumber}: ${token.token}`,
         provider: "hostpinnacle",
         status: "queued",
+        transactionId: transaction.id,
       })
       .returning();
 
-    return c.json({
-      success: true,
-      message: "Token SMS queued for delivery",
-      smsLogId: smsLog.id,
-    });
-  }
+    return c.json({ message: "Token SMS queued for delivery", smsLogId: smsLog.id, success: true });
+  },
 );
 
-transactionRoutes.get("/stats/summary", requireAdmin, async (c) => {
-  const allTransactions = await db.query.transactions.findMany({
-    columns: { status: true, amountPaid: true, commissionAmount: true },
-  });
+transactionRoutes.get(
+  "/stats/summary",
+  requirePermission("transactions:summary"),
+  async (c) => {
+    const [stats] = await db
+      .select({
+        completed:
+          sql<number>`count(*) filter (where ${transactions.status} = 'completed')::int`,
+        failed:
+          sql<number>`count(*) filter (where ${transactions.status} = 'failed')::int`,
+        pending:
+          sql<number>`count(*) filter (where ${transactions.status} = 'pending')::int`,
+        processing:
+          sql<number>`count(*) filter (where ${transactions.status} = 'processing')::int`,
+        total: sql<number>`count(*)::int`,
+        totalAmount:
+          sql<string>`coalesce(sum(case when ${transactions.status} = 'completed' then ${transactions.amountPaid}::numeric else 0 end), 0)::text`,
+        totalCommission:
+          sql<string>`coalesce(sum(case when ${transactions.status} = 'completed' then ${transactions.commissionAmount}::numeric else 0 end), 0)::text`,
+      })
+      .from(transactions);
 
-  const stats = {
-    total: allTransactions.length,
-    pending: 0,
-    processing: 0,
-    completed: 0,
-    failed: 0,
-    totalAmount: 0,
-    totalCommission: 0,
-  };
+    return c.json({ data: stats });
+  },
+);
 
-  for (const tx of allTransactions) {
-    if (tx.status === "pending") stats.pending += 1;
-    if (tx.status === "processing") stats.processing += 1;
-    if (tx.status === "completed") stats.completed += 1;
-    if (tx.status === "failed") stats.failed += 1;
+async function buildTransactionFilters(query: TransactionQuery) {
+  const conditions = [];
 
-    if (tx.status === "completed") {
-      stats.totalAmount += Number.parseFloat(tx.amountPaid);
-      stats.totalCommission += Number.parseFloat(tx.commissionAmount);
-    }
+  if (query.transactionId) {
+    conditions.push(eq(transactions.transactionId, query.transactionId));
+  }
+  if (query.mpesaReceiptNumber) {
+    conditions.push(eq(transactions.mpesaReceiptNumber, query.mpesaReceiptNumber));
+  }
+  if (query.meterId) {
+    conditions.push(eq(transactions.meterId, query.meterId));
+  }
+  if (query.phoneNumber) {
+    conditions.push(eq(transactions.phoneNumber, query.phoneNumber));
+  }
+  if (query.status) {
+    conditions.push(eq(transactions.status, query.status));
+  }
+  if (query.startDate) {
+    conditions.push(gte(transactions.createdAt, new Date(query.startDate)));
+  }
+  if (query.endDate) {
+    conditions.push(lte(transactions.createdAt, new Date(query.endDate)));
+  }
+  if (!query.meterNumber) {
+    return conditions;
   }
 
-  return c.json({
-    data: {
-      ...stats,
-      totalAmount: stats.totalAmount.toFixed(2),
-      totalCommission: stats.totalCommission.toFixed(2),
-    },
+  const meter = await db.query.meters.findFirst({
+    where: eq(meters.meterNumber, query.meterNumber),
+    columns: { id: true },
   });
-});
+  if (!meter) {
+    return [sql`false`];
+  }
+
+  conditions.push(eq(transactions.meterId, meter.id));
+  return conditions;
+}
+
+function resolveResendPhoneNumber(input: {
+  actor: AppBindings["Variables"]["user"];
+  requestedPhoneNumber: string | undefined;
+  transactionPhoneNumber: string;
+}): string {
+  if (isAdminStaffUser(input.actor)) {
+    return input.requestedPhoneNumber ?? input.transactionPhoneNumber;
+  }
+  if (
+    input.requestedPhoneNumber &&
+    input.requestedPhoneNumber !== input.transactionPhoneNumber
+  ) {
+    throw new HTTPException(403, {
+      message:
+        "Forbidden: Support staff can only resend to the original transaction phone number",
+    });
+  }
+
+  return input.transactionPhoneNumber;
+}
+

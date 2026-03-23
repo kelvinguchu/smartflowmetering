@@ -6,7 +6,6 @@ import { env } from "../../src/config";
 import {
   ensureInfraReady,
   ensureTestMeterFixture,
-  resetE2EState,
   teardownE2E,
   uniqueRef,
 } from "./helpers";
@@ -25,14 +24,22 @@ const basePayload = {
 };
 
 type MutableEnv = {
+  MPESA_ALLOWED_IPS: string[];
+  MPESA_CALLBACK_TOKEN: string;
+  MPESA_CALLBACK_TOKEN_TRANSPORT: "header" | "query" | "query_or_header";
   MPESA_REQUIRE_SIGNATURE: boolean;
+  NODE_ENV: "development" | "production" | "test";
   MPESA_SIGNATURE_SECRET: string;
   MPESA_SIGNATURE_HEADER: string;
   MPESA_SIGNATURE_TIMESTAMP_HEADER: string;
   MPESA_SIGNATURE_MAX_AGE_SECONDS: number;
 };
 
-function signPayload(secret: string, timestamp: string, rawBody: string): string {
+function signPayload(
+  secret: string,
+  timestamp: string,
+  rawBody: string,
+): string {
   return createHmac("sha256", secret)
     .update(`${timestamp}.${rawBody}`)
     .digest("hex");
@@ -40,7 +47,11 @@ function signPayload(secret: string, timestamp: string, rawBody: string): string
 
 describe("E2E: M-Pesa signature validation", () => {
   const originalEnv = {
+    MPESA_ALLOWED_IPS: [...env.MPESA_ALLOWED_IPS],
+    MPESA_CALLBACK_TOKEN: env.MPESA_CALLBACK_TOKEN,
+    MPESA_CALLBACK_TOKEN_TRANSPORT: env.MPESA_CALLBACK_TOKEN_TRANSPORT,
     MPESA_REQUIRE_SIGNATURE: env.MPESA_REQUIRE_SIGNATURE,
+    NODE_ENV: env.NODE_ENV,
     MPESA_SIGNATURE_SECRET: env.MPESA_SIGNATURE_SECRET,
     MPESA_SIGNATURE_HEADER: env.MPESA_SIGNATURE_HEADER,
     MPESA_SIGNATURE_TIMESTAMP_HEADER: env.MPESA_SIGNATURE_TIMESTAMP_HEADER,
@@ -49,14 +60,16 @@ describe("E2E: M-Pesa signature validation", () => {
 
   before(async () => {
     await ensureInfraReady();
+    await ensureTestMeterFixture("TEST-METER-SIGN");
   });
 
-  beforeEach(async () => {
-    await resetE2EState();
-    await ensureTestMeterFixture("TEST-METER-SIGN");
-
+  beforeEach(() => {
     Object.assign(env as MutableEnv, {
+      MPESA_ALLOWED_IPS: [],
+      MPESA_CALLBACK_TOKEN: "",
+      MPESA_CALLBACK_TOKEN_TRANSPORT: "header",
       MPESA_REQUIRE_SIGNATURE: true,
+      NODE_ENV: "test",
       MPESA_SIGNATURE_SECRET: "e2e-signature-secret",
       MPESA_SIGNATURE_HEADER: "x-mpesa-signature",
       MPESA_SIGNATURE_TIMESTAMP_HEADER: "x-mpesa-timestamp",
@@ -80,7 +93,7 @@ describe("E2E: M-Pesa signature validation", () => {
     const signature = signPayload(
       env.MPESA_SIGNATURE_SECRET,
       timestamp,
-      rawBody
+      rawBody,
     );
 
     const response = await app.request("/api/mpesa/validation", {
@@ -131,11 +144,13 @@ describe("E2E: M-Pesa signature validation", () => {
       TransAmount: 100,
     };
     const rawBody = JSON.stringify(payload);
-    const staleTimestamp = Math.floor((Date.now() - 10 * 60 * 1000) / 1000).toString();
+    const staleTimestamp = Math.floor(
+      (Date.now() - 10 * 60 * 1000) / 1000,
+    ).toString();
     const signature = signPayload(
       env.MPESA_SIGNATURE_SECRET,
       staleTimestamp,
-      rawBody
+      rawBody,
     );
 
     const response = await app.request("/api/mpesa/validation", {
@@ -152,5 +167,103 @@ describe("E2E: M-Pesa signature validation", () => {
 
     assert.equal(response.status, 403);
     assert.equal(body.ResultCode, "C2B00016");
+  });
+
+  it("rejects callback requests that use the wrong callback token transport in production mode", async () => {
+    const payload = {
+      ...basePayload,
+      TransID: uniqueRef("SIG-TOKEN-"),
+      TransAmount: 100,
+    };
+    const rawBody = JSON.stringify(payload);
+
+    Object.assign(env as MutableEnv, {
+      MPESA_ALLOWED_IPS: ["196.201.214."],
+      MPESA_CALLBACK_TOKEN: "production-callback-token",
+      MPESA_CALLBACK_TOKEN_TRANSPORT: "header",
+      MPESA_REQUIRE_SIGNATURE: false,
+      NODE_ENV: "production",
+      MPESA_SIGNATURE_SECRET: "",
+    });
+
+    const response = await app.request(
+      "/api/mpesa/validation?callback_token=production-callback-token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "196.201.214.200",
+        },
+        body: rawBody,
+      },
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+
+    assert.equal(response.status, 403);
+    assert.equal(body.ResultCode, "C2B00016");
+  });
+
+  it("rejects callback requests from non-Safaricom source IPs in production mode", async () => {
+    const payload = {
+      ...basePayload,
+      TransID: uniqueRef("SIG-IP-"),
+      TransAmount: 100,
+    };
+    const rawBody = JSON.stringify(payload);
+
+    Object.assign(env as MutableEnv, {
+      MPESA_ALLOWED_IPS: ["196.201.214."],
+      MPESA_CALLBACK_TOKEN: "production-callback-token",
+      MPESA_CALLBACK_TOKEN_TRANSPORT: "header",
+      MPESA_REQUIRE_SIGNATURE: false,
+      NODE_ENV: "production",
+      MPESA_SIGNATURE_SECRET: "",
+    });
+
+    const response = await app.request("/api/mpesa/validation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-forwarded-for": "203.0.113.10",
+        "x-mpesa-callback-token": "production-callback-token",
+      },
+      body: rawBody,
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    assert.equal(response.status, 403);
+    assert.equal(body.ResultCode, "C2B00016");
+  });
+
+  it("accepts callback requests with a valid header token and Safaricom source IP in production mode", async () => {
+    const payload = {
+      ...basePayload,
+      TransID: uniqueRef("SIG-PROD-"),
+      TransAmount: 100,
+    };
+    const rawBody = JSON.stringify(payload);
+
+    Object.assign(env as MutableEnv, {
+      MPESA_ALLOWED_IPS: ["196.201.214."],
+      MPESA_CALLBACK_TOKEN: "production-callback-token",
+      MPESA_CALLBACK_TOKEN_TRANSPORT: "header",
+      MPESA_REQUIRE_SIGNATURE: false,
+      NODE_ENV: "production",
+      MPESA_SIGNATURE_SECRET: "",
+    });
+
+    const response = await app.request("/api/mpesa/validation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-forwarded-for": "196.201.214.200",
+        "x-mpesa-callback-token": "production-callback-token",
+      },
+      body: rawBody,
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    assert.equal(response.status, 200);
+    assert.equal(body.ResultCode, "0");
   });
 });

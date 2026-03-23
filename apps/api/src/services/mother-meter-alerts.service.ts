@@ -1,11 +1,14 @@
 import {
+  createAdminNotification,
+  hasRecentAdminNotification,
+} from "./admin/admin-notifications.service";
+import {
+  queueLandlordLowBalanceAppNotification,
+} from "./landlord/landlord-notification-producer.service";
+import {
   listMotherMeterLowBalanceAlerts,
   listPostpaidPaymentReminders,
 } from "./mother-meter-analytics.service";
-import {
-  createAdminNotification,
-  hasRecentAdminNotification,
-} from "./admin-notifications.service";
 
 export { queueDailyLandlordUsageSummarySms } from "./daily-usage-sms.service";
 
@@ -23,6 +26,8 @@ interface QueuePostpaidReminderOptions extends QueueNotificationOptions {
 }
 
 export interface QueueNotificationResult {
+  appNotificationsCreated: number;
+  appNotificationsSkippedDuplicate: number;
   totalEligible: number;
   queued: number;
   skippedDuplicate: number;
@@ -39,6 +44,8 @@ export async function queueLowBalanceNotifications(
   let queued = 0;
   let skippedDuplicate = 0;
   let failed = 0;
+  let appNotificationsCreated = 0;
+  let appNotificationsSkippedDuplicate = 0;
 
   for (const alert of selectedAlerts) {
     const isDuplicate = await hasRecentAdminNotification({
@@ -70,6 +77,12 @@ export async function queueLowBalanceNotifications(
         },
       });
       queued += 1;
+
+      if (alert.type === "prepaid") {
+        const appResult = await queueLandlordLowBalanceAppNotification(alert);
+        appNotificationsCreated += appResult.created;
+        appNotificationsSkippedDuplicate += appResult.skippedDuplicate;
+      }
     } catch (error) {
       failed += 1;
       console.error(
@@ -80,6 +93,8 @@ export async function queueLowBalanceNotifications(
   }
 
   return {
+    appNotificationsCreated,
+    appNotificationsSkippedDuplicate,
     totalEligible: alerts.length,
     queued,
     skippedDuplicate,
@@ -99,6 +114,8 @@ export async function queuePostpaidReminderNotifications(
   let queued = 0;
   let skippedDuplicate = 0;
   let failed = 0;
+  const appNotificationsCreated = 0;
+  const appNotificationsSkippedDuplicate = 0;
 
   for (const reminder of selectedReminders) {
     if (!reminder.lastBillPaymentAt || !reminder.reminderDate) {
@@ -135,6 +152,7 @@ export async function queuePostpaidReminderNotifications(
         },
       });
       queued += 1;
+
     } catch (error) {
       failed += 1;
       console.error(
@@ -145,6 +163,8 @@ export async function queuePostpaidReminderNotifications(
   }
 
   return {
+    appNotificationsCreated,
+    appNotificationsSkippedDuplicate,
     totalEligible: reminders.length,
     queued,
     skippedDuplicate,
@@ -153,6 +173,10 @@ export async function queuePostpaidReminderNotifications(
 }
 
 function limitItems<T>(items: T[], maxItems?: number): T[] {
-  if (!maxItems || maxItems < 1) return items;
+  if (!maxItems || maxItems < 1) {
+    return items;
+  }
   return items.slice(0, maxItems);
 }
+
+

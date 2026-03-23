@@ -1,4 +1,9 @@
 import { z } from "zod";
+import { isAllowedKenyanPhoneNumber } from "../lib/staff-contact";
+
+const applicationPhoneNumberSchema = z.string().refine(isAllowedKenyanPhoneNumber, {
+  message: "Phone number must be 0712345678 or 254712345678",
+});
 
 export const applicationStatusSchema = z.enum([
   "pending",
@@ -9,7 +14,7 @@ export const applicationStatusSchema = z.enum([
 export const createApplicationSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  phoneNumber: z.string().min(10).max(20),
+  phoneNumber: applicationPhoneNumberSchema,
   email: z.email(),
   idNumber: z.string().min(5),
   kraPin: z.string().min(5),
@@ -25,7 +30,7 @@ export const createApplicationSchema = z.object({
   suppliesOtherHouses: z.boolean().optional().default(false),
   billPayer: z.enum(["kplc", "landlord"]),
   technicianName: z.string().optional(),
-  technicianPhone: z.string().optional(),
+  technicianPhone: applicationPhoneNumberSchema.optional(),
   termsAccepted: z.literal(true),
 });
 

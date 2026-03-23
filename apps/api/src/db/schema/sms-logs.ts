@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -6,12 +7,12 @@ import {
   timestamp,
   pgEnum,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
 import { transactions } from "./transactions";
 
 // SMS provider enum
 export const smsProviderEnum = pgEnum("sms_provider", [
   "hostpinnacle",
+  "textsms",
 ]);
 
 // SMS status enum
@@ -31,7 +32,14 @@ export const smsLogs = pgTable("sms_logs", {
   messageBody: text("message_body").notNull(),
   provider: smsProviderEnum("provider").notNull(),
   status: smsStatusEnum("status").notNull().default("queued"),
+  providerStatus: text("provider_status"),
+  providerErrorCode: text("provider_error_code"),
   providerMessageId: text("provider_message_id"), // External ID from provider
+  providerReference: text("provider_reference"), // Fallback provider-side reference
+  providerReceivedAt: timestamp("provider_received_at", { withTimezone: true }),
+  providerDeliveredAt: timestamp("provider_delivered_at", {
+    withTimezone: true,
+  }),
   cost: numeric("cost", { precision: 8, scale: 4 }), // Provider cost
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

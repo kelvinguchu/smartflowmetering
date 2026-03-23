@@ -7,6 +7,7 @@ import {
   gomelongPostJson,
   type GomelongMeterType,
 } from "./gomelong-client";
+import { createGomelongProviderError } from "./gomelong-failure-policy";
 
 export {
   isGomelongConfigured,
@@ -34,8 +35,6 @@ export async function getChangeDecoderToken(request: {
   sgcId: string;
 }) {
   return gomelongGet("/api/Power/GetChangeDecoderToken", {
-    UserId: env.GOMELONG_USER_ID,
-    Password: env.GOMELONG_PASSWORD,
     MeterCode: request.meterCode,
     MeterType: request.meterType,
     SgcId: request.sgcId,
@@ -47,8 +46,6 @@ export async function getClearCreditToken(request: {
   meterType: GomelongMeterType;
 }) {
   return gomelongGet("/api/Power/GetClearCreditToken", {
-    UserId: env.GOMELONG_USER_ID,
-    Password: env.GOMELONG_PASSWORD,
     MeterCode: request.meterCode,
     MeterType: request.meterType,
   });
@@ -59,8 +56,6 @@ export async function getClearTamperSignToken(request: {
   meterType: GomelongMeterType;
 }) {
   return gomelongGet("/api/Power/GetClearTamperSignToken", {
-    UserId: env.GOMELONG_USER_ID,
-    Password: env.GOMELONG_PASSWORD,
     MeterCode: request.meterCode,
     MeterType: request.meterType,
   });
@@ -71,8 +66,6 @@ export async function getContractInfo(request: {
   meterType: GomelongMeterType;
 }) {
   return gomelongGet("/api/Power/GetContractInfo", {
-    UserId: env.GOMELONG_USER_ID,
-    Password: env.GOMELONG_PASSWORD,
     MeterType: request.meterType,
     MeterCode: request.meterCode,
   });
@@ -83,8 +76,6 @@ export async function getMaxPowerToken(request: {
   power: number;
 }) {
   return gomelongGet("/api/Power/GetMaxPowerToken", {
-    UserId: env.GOMELONG_USER_ID,
-    Password: env.GOMELONG_PASSWORD,
     MeterCode: request.meterCode,
     Power: request.power,
   });
@@ -94,8 +85,6 @@ export async function getVendingToken(request: GomelongVendingRequest) {
   const vendingType = request.vendingType ?? env.GOMELONG_VENDING_TYPE;
 
   return gomelongGet("/api/Power/GetVendingToken", {
-    UserId: env.GOMELONG_USER_ID,
-    Password: env.GOMELONG_PASSWORD,
     MeterType: request.meterType,
     MeterCode: request.meterCode,
     AmountOrQuantity: request.amountOrQuantity,
@@ -242,14 +231,18 @@ export async function vendTokenWithGomelong(
   const result = await getVendingToken(request);
   const code = result.code;
   if (code !== 0) {
-    throw new Error(
-      `Gomelong vend failed (${code}): ${result.message ?? "unknown error"}`,
-    );
+    throw createGomelongProviderError({
+      code,
+      message: result.message ?? `Gomelong vend failed (${code})`,
+    });
   }
 
   const token = extractToken(result.data);
   if (!token) {
-    throw new Error("Gomelong vend succeeded but no STS token was returned");
+    throw createGomelongProviderError({
+      code,
+      message: "Gomelong vend succeeded but no STS token was returned",
+    });
   }
 
   return token;

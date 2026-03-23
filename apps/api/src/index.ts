@@ -1,24 +1,49 @@
 import { serve } from "@hono/node-server";
 import { env } from "./config";
-import { closeAllQueues } from "./queues";
+import { closeAllQueues, startQueueWorkers } from "./queues";
 import { createApp } from "./app";
-import { startAlertAutomation, stopAlertAutomation } from "./services/alert-automation.service";
+import {
+  startAlertAutomation,
+  stopAlertAutomation,
+} from "./services/alert-automation.service";
+import {
+  resolveProcessRole,
+  shouldStartApiServer,
+  shouldStartBackgroundServices,
+} from "./runtime/process-role";
 
-const app = createApp();
+const processRole = resolveProcessRole(process.env.SFM_PROCESS_ROLE);
+const startApiServer = shouldStartApiServer(processRole);
+const startBackground = shouldStartBackgroundServices(processRole);
 
-const server = serve({
-  fetch: app.fetch,
-  port: env.PORT,
-});
+let server: ReturnType<typeof serve> | null = null;
 
-startAlertAutomation();
+if (startBackground) {
+  await startQueueWorkers();
+  startAlertAutomation();
+}
 
-console.log(`
+if (startApiServer) {
+  const app = createApp();
+  server = serve({
+    fetch: app.fetch,
+    port: env.PORT,
+  });
+
+  console.log(`
 Smart Flow Metering API is running!
 Environment: ${env.NODE_ENV}
+Role: ${processRole}
 Port: ${env.PORT}
 URL: http://localhost:${env.PORT}
 `);
+} else {
+  console.log(`
+Smart Flow Metering worker is running!
+Environment: ${env.NODE_ENV}
+Role: ${processRole}
+`);
+}
 
 const shutdown = async () => {
   console.log("\n[Shutdown] Received signal, closing gracefully...");
@@ -26,7 +51,7 @@ const shutdown = async () => {
     stopAlertAutomation();
     await closeAllQueues();
   } finally {
-    server.close();
+    server?.close();
     process.exit(0);
   }
 };

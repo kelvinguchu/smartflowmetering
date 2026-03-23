@@ -1,22 +1,16 @@
-import { Queue, Worker, type Job, type ConnectionOptions } from "bullmq";
+import type { ConnectionOptions, Job } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import { env } from "../config";
-
-// Parse Redis URL for BullMQ connection
-function parseRedisUrl(url: string): ConnectionOptions {
-  const parsed = new URL(url);
-  return {
-    host: parsed.hostname,
-    port: Number.parseInt(parsed.port, 10) || 6379,
-    password: parsed.password || undefined,
-    username: parsed.username || undefined,
-  };
-}
+import { parseRedisUrl } from "../lib/redis-url";
 
 // Redis connection config
-export const redisConnection: ConnectionOptions = parseRedisUrl(env.REDIS_URL);
+export const redisConnection = parseRedisUrl(
+  env.REDIS_URL,
+) as ConnectionOptions;
 
 // Queue names
 export const QUEUE_NAMES = {
+  APP_NOTIFICATION_DELIVERY: "app-notification-delivery",
   PAYMENT_PROCESSING: "payment-processing",
   SMS_DELIVERY: "sms-delivery",
   TOKEN_GENERATION: "token-generation",
@@ -47,12 +41,12 @@ export function createQueue(name: string): Queue {
 }
 
 // Create a worker factory
-export function createWorker<T>(
+export function createWorker<T, TResult>(
   name: string,
-  processor: (job: Job<T>) => Promise<unknown>,
-  concurrency: number = 5
-): Worker<T> {
-  return new Worker<T>(name, processor, {
+  processor: (job: Job<T>) => Promise<TResult>,
+  concurrency: number = 5,
+): Worker<T, TResult> {
+  return new Worker<T, TResult>(name, processor, {
     connection: redisConnection,
     concurrency,
   });

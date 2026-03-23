@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { db } from "../db";
-import { getQueueHealth } from "../queues";
+import { requirePermission } from "../lib/auth-middleware";
 import type { AppBindings } from "../lib/auth-middleware";
+import { getQueueHealth } from "../queues";
 
 /**
  * Health Check Routes
@@ -9,6 +10,13 @@ import type { AppBindings } from "../lib/auth-middleware";
  * Provides system health information
  */
 export const healthRoutes = new Hono<AppBindings>();
+
+interface HealthCheckResult {
+  status: "ok" | "error";
+  latency?: number;
+  error?: string;
+  data?: Awaited<ReturnType<typeof getQueueHealth>>;
+}
 
 healthRoutes.get("/", (c) =>
   c.json({
@@ -18,11 +26,11 @@ healthRoutes.get("/", (c) =>
   })
 );
 
+healthRoutes.use("/detailed", requirePermission("system:diagnostics:read"));
+healthRoutes.use("/queues", requirePermission("system:diagnostics:read"));
+
 healthRoutes.get("/detailed", async (c) => {
-  const checks: Record<
-    string,
-    { status: string; latency?: number; error?: string; data?: unknown }
-  > = {};
+  const checks: Record<string, HealthCheckResult> = {};
 
   const dbStart = Date.now();
   try {

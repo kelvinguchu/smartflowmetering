@@ -78,3 +78,56 @@ Before finishing a change, verify:
 - Input validation and auth are in place.
 - Type-check/build passes.
 - Security-sensitive logs are clean.
+
+## 9) Domain Ownership Model
+
+- The registered app-level user on the customer side is the landlord, not the tenant.
+- A landlord owns their mother meter and is the only customer-side actor we explicitly model as an app user.
+- Tenants do not own sub-meters in the system model.
+- The system does not maintain tenant accounts as authenticated customer users.
+- Tenant interaction is transactional only: we know tenants through token purchases and related payment/contact data, not through app ownership or account ownership of a sub-meter.
+- Do not design customer-auth flows, device-token ownership, or notification ownership around tenants owning sub-meters.
+- Customer-facing mobile/auth/device-token features must be modeled around the landlord and their mother-meter ownership unless the product requirements explicitly change.
+- Tenant app access is still allowed, but tenant onboarding is not ownership-based.
+- Tenant app onboarding should allow entry via sub-meter serial number so the tenant can access app functionality tied to that sub-meter.
+- This tenant access model does not make the tenant the owner of the sub-meter in the core system model.
+- Landlord onboarding is a separate flow and must be treated differently from tenant onboarding.
+- When designing app auth, notification delivery, or device-token registration, distinguish clearly between:
+  - landlord identity and mother-meter ownership
+  - tenant app access via sub-meter serial onboarding
+
+## 10) Docker Workflow Guardrails
+
+- Do not run Docker commands when the user has said Docker is broken or storage-constrained until the user explicitly confirms it is fixed.
+- Before rebuilding images, inspect likely impact first and avoid rebuilds unless code or image configuration actually changed.
+- Prefer one clean rebuild followed by all relevant checks, instead of repeated incremental rebuilds.
+- For diagnostics, benchmarks, migrations, and ad hoc commands that need the app service environment or Docker network access, prefer `docker compose exec <service> ...` against the existing service container instead of `docker run ...`.
+- Verify Compose-resolved environment values with `docker compose config --environment` before inventing workarounds for env loading or interpolation issues.
+- Do not start one-off containers from app images for routine debugging or benchmarking when the existing Compose service can run the command; avoid leaving stray containers that duplicate running services.
+- Do not copy test files or ad hoc assets into running containers as part of the normal workflow.
+- Do not use `docker compose up --force-recreate` unless image/config changes require container recreation.
+- Keep Docker build context small and respect `.dockerignore` to reduce cache invalidation and disk usage.
+- Treat Docker build cache as a real storage cost; repeated multi-stage Node builds can consume large disk space quickly.
+- When debugging Docker disk usage, prefer the official inspection/prune flow:
+  - `docker system df`
+  - `docker builder prune`
+  - `docker image prune`
+  - `docker system prune`
+- Prefer official Docker guidance for cache optimization, build context control, and cleanup behavior:
+  - https://docs.docker.com/build/cache/optimize/
+  - https://docs.docker.com/reference/cli/docker/system/df/
+  - https://docs.docker.com/reference/cli/docker/builder/prune/
+  - https://docs.docker.com/reference/cli/docker/image/prune/
+  - https://docs.docker.com/reference/cli/docker/system/prune/
+- Backend E2E constraint to remember:
+  - `apps/api` host-side `.env` uses Docker-internal hostnames like `postgres` and `redis`, so raw host execution of E2E tests will fail unless the env is rewritten for localhost access.
+  - The production API image includes runtime app files, not the full TS test runner workflow, so do not assume `tsx --test` can be executed inside the running container.
+  - For host-side backend E2E runs, use `docker-compose.test.yml` to expose Postgres and Redis on `127.0.0.1` only, and preload `apps/api/scripts/e2e-env-setup.ts` so `DATABASE_URL` and `REDIS_URL` are rewritten to localhost.
+  - Preferred local command for host-side backend E2E runs is `node --env-file=../../.env --import tsx --import ./scripts/e2e-env-setup.ts --test ...` from `apps/api`.
+  - If Docker-backed Postgres and Redis are not running and reachable, backend E2E verification is not possible in that environment; `bunx tsc --noEmit` is the verification ceiling until infra is available.
+
+## 11) Research-First Rule When Unsure
+
+- If the correct implementation path is unclear or something is puzzling, look it up on the web before guessing.
+- Prefer official documentation first, then high-quality primary sources for the specific tool, framework, or platform in use.
+- Do not improvise infrastructure, Docker, platform, or library workflows when the expected behavior can be verified from documentation.

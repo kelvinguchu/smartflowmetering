@@ -1,12 +1,12 @@
-import { pgTable, uuid, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import { pgTable, uuid, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
 
 // Customer type enum
 export const customerTypeEnum = pgEnum("customer_type", ["tenant", "landlord"]);
 
 export const customers = pgTable("customers", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull(), // FK to Better-Auth users table
+  userId: text("user_id").notNull(), // Better Auth user ids are text, not uuid
   phoneNumber: text("phone_number").notNull().unique(), // Primary identifier for M-Pesa
   name: text("name").notNull(),
   customerType: customerTypeEnum("customer_type").notNull(),

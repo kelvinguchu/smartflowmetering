@@ -1,6 +1,9 @@
-import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { requireAdmin, type AppBindings } from "../../lib/auth-middleware";
+import { Hono } from "hono";
+import type { Context } from "hono";
+import type { AppBindings } from "../../lib/auth-middleware";
+import { requirePermission } from "../../lib/auth-middleware";
+import type { GomelongResult } from "../../services/meter-providers/gomelong-client";
 import {
   addUseType,
   deleteUseType,
@@ -38,7 +41,7 @@ import {
 
 export const gomelongRoutes = new Hono<AppBindings>();
 
-gomelongRoutes.use("*", requireAdmin);
+gomelongRoutes.use("*", requirePermission("provider_ops:gomelong"));
 
 gomelongRoutes.get("/health", (c) =>
   c.json({
@@ -256,7 +259,7 @@ gomelongRoutes.post(
 
 function providerResponse(
   c: Context<AppBindings>,
-  result: { code: number; message: string | null; data: unknown; raw: unknown },
+  result: GomelongResult,
 ) {
   const ok = result.code === 0;
   return c.json(

@@ -1,15 +1,12 @@
-import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { and, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db";
 import { tariffs } from "../db/schema";
+import { requirePermission } from "../lib/auth-middleware";
+import type { AppBindings } from "../lib/auth-middleware";
 import { createTariffSchema, updateTariffSchema } from "../validators/tariffs";
-import { eq, isNull, and, or, gte, lte } from "drizzle-orm";
-import {
-  requireAuth,
-  requireAdmin,
-  type AppBindings,
-} from "../lib/auth-middleware";
 
 const idParamSchema = z.object({
   id: z.uuid(),
@@ -17,7 +14,7 @@ const idParamSchema = z.object({
 
 export const tariffRoutes = new Hono<AppBindings>();
 
-tariffRoutes.get("/", requireAuth, async (c) => {
+tariffRoutes.get("/", requirePermission("tariffs:read"), async (c) => {
   const now = new Date();
 
   const result = await db.query.tariffs.findMany({
@@ -31,7 +28,7 @@ tariffRoutes.get("/", requireAuth, async (c) => {
   return c.json({ data: result, count: result.length });
 });
 
-tariffRoutes.get("/all", requireAdmin, async (c) => {
+tariffRoutes.get("/all", requirePermission("tariffs:manage"), async (c) => {
   const result = await db.query.tariffs.findMany({
     orderBy: (currentTariffs, { desc }) => [desc(currentTariffs.createdAt)],
   });
@@ -41,7 +38,7 @@ tariffRoutes.get("/all", requireAdmin, async (c) => {
 
 tariffRoutes.get(
   "/:id",
-  requireAuth,
+  requirePermission("tariffs:read"),
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
@@ -59,7 +56,7 @@ tariffRoutes.get(
 
 tariffRoutes.post(
   "/",
-  requireAdmin,
+  requirePermission("tariffs:manage"),
   zValidator("json", createTariffSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -80,7 +77,7 @@ tariffRoutes.post(
 
 tariffRoutes.patch(
   "/:id",
-  requireAdmin,
+  requirePermission("tariffs:manage"),
   zValidator("param", idParamSchema),
   zValidator("json", updateTariffSchema),
   async (c) => {
@@ -97,9 +94,15 @@ tariffRoutes.patch(
 
     const updateData: Partial<typeof tariffs.$inferInsert> = {};
 
-    if (body.name) updateData.name = body.name;
-    if (body.ratePerKwh) updateData.ratePerKwh = body.ratePerKwh;
-    if (body.validTo) updateData.validTo = new Date(body.validTo);
+    if (body.name) {
+      updateData.name = body.name;
+    }
+    if (body.ratePerKwh) {
+      updateData.ratePerKwh = body.ratePerKwh;
+    }
+    if (body.validTo) {
+      updateData.validTo = new Date(body.validTo);
+    }
 
     const [updated] = await db
       .update(tariffs)
@@ -113,20 +116,21 @@ tariffRoutes.patch(
 
 tariffRoutes.post(
   "/:id/expire",
-  requireAdmin,
+  requirePermission("tariffs:manage"),
   zValidator("param", idParamSchema),
   async (c) => {
     const { id } = c.req.valid("param");
-    const [updated] = await db
+    const updatedTariffs = await db
       .update(tariffs)
       .set({ validTo: new Date() })
       .where(eq(tariffs.id, id))
       .returning();
 
-    if (!updated) {
+    if (updatedTariffs.length === 0) {
       return c.json({ error: "Tariff not found" }, 404);
     }
 
+    const updated = updatedTariffs[0];
     return c.json({ data: updated });
   }
 );

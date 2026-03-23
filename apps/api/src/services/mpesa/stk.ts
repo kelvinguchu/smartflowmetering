@@ -1,4 +1,6 @@
 import { env } from "../../config";
+import { fetchSensitiveWithTimeout } from "../../lib/fetch-sensitive-with-timeout";
+import { maskPhoneForLog } from "../../lib/log-redaction";
 import { getMpesaApiUrls } from "./constants";
 import { getAccessToken } from "./auth";
 import { generatePassword, generateTimestamp, getShortcode } from "./helpers";
@@ -9,6 +11,8 @@ import type {
   StkQueryResponse,
   StkQueryResult,
 } from "./types";
+
+const MPESA_REQUEST_TIMEOUT_MS = 15_000;
 
 export async function initiateStkPush(
   request: StkPushRequest
@@ -37,12 +41,13 @@ export async function initiateStkPush(
   };
 
   console.log(
-    `[M-Pesa STK] Initiating push to ${request.phoneNumber} for ${request.amount} KES`
+    `[M-Pesa STK] Initiating push to ${maskPhoneForLog(request.phoneNumber)} for ${request.amount} KES`
   );
 
   try {
-    const response = await fetch(urls.stkPush, {
+    const response = await fetchSensitiveWithTimeout(urls.stkPush, {
       method: "POST",
+      timeoutMs: MPESA_REQUEST_TIMEOUT_MS,
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
@@ -56,7 +61,11 @@ export async function initiateStkPush(
     };
 
     if (!response.ok || data.errorCode) {
-      console.error("[M-Pesa STK] Error:", data);
+      console.error("[M-Pesa STK] Error:", {
+        errorCode: data.errorCode,
+        responseCode: data.ResponseCode,
+        responseDescription: data.errorMessage ?? data.ResponseDescription,
+      });
       return {
         success: false,
         error: data.errorMessage ?? data.ResponseDescription ?? "Unknown error",
@@ -100,8 +109,9 @@ export async function queryStkPushStatus(
   };
 
   try {
-    const response = await fetch(urls.stkQuery, {
+    const response = await fetchSensitiveWithTimeout(urls.stkQuery, {
       method: "POST",
+      timeoutMs: MPESA_REQUEST_TIMEOUT_MS,
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",

@@ -3,7 +3,7 @@ import { pgTable, uuid, text, timestamp, jsonb } from "drizzle-orm/pg-core";
 // Audit logs for security & compliance - tracks all sensitive actions
 export const auditLogs = pgTable("audit_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull(), // FK to Better-Auth users table
+  userId: text("user_id").notNull(), // Better Auth user ids are text, not uuid
   action: text("action").notNull(), // e.g., 'update_tariff', 'generate_tamper_token', 'refill_mother_meter'
   entityType: text("entity_type").notNull(), // e.g., 'tariff', 'meter', 'mother_meter'
   entityId: text("entity_id").notNull(),

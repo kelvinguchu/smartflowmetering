@@ -1,10 +1,8 @@
 import { createMiddleware } from "hono/factory";
+import { randomUUID } from "node:crypto";
+import { env } from "../config";
 import type { AppBindings } from "./auth-middleware";
-
-type RateLimitBucket = {
-  count: number;
-  resetAt: number;
-};
+import { createRateLimitStore } from "./rate-limit-store";
 
 type RateLimitOptions = {
   max: number;
@@ -13,7 +11,11 @@ type RateLimitOptions = {
   message: string;
 };
 
-const rateLimitStore = new Map<string, RateLimitBucket>();
+const {
+  close: closeRateLimitStoreConnection,
+  store: rateLimitStore,
+  memoryStore,
+} = createRateLimitStore(env.REDIS_URL);
 
 function clientIpFromHeaders(headers: Headers): string {
   const forwarded = headers.get("x-forwarded-for");
@@ -31,6 +33,12 @@ function clientIpFromHeaders(headers: Headers): string {
     return cfIp.trim();
   }
 
+  // Tests often exercise auth flows in-process without proxy headers.
+  // Use a synthetic per-request key so suites do not accidentally share a bucket.
+  if (env.NODE_ENV === "test") {
+    return `test-${randomUUID()}`;
+  }
+
   return "unknown";
 }
 
@@ -38,15 +46,7 @@ function createRateLimitMiddleware(options: RateLimitOptions) {
   return createMiddleware<AppBindings>(async (c, next) => {
     const now = Date.now();
     const key = `${options.prefix}:${clientIpFromHeaders(c.req.raw.headers)}`;
-
-    const existing = rateLimitStore.get(key);
-    const bucket =
-      existing && existing.resetAt > now
-        ? existing
-        : { count: 0, resetAt: now + options.durationMs };
-
-    bucket.count += 1;
-    rateLimitStore.set(key, bucket);
+    const bucket = await rateLimitStore.increment(key, options.durationMs, now);
 
     const remaining = Math.max(options.max - bucket.count, 0);
     c.header("X-RateLimit-Limit", String(options.max));
@@ -119,11 +119,10 @@ export const applicationRateLimit = createRateLimitMiddleware({
 
 export const rateLimitMiddleware = globalRateLimit;
 
+export async function closeRateLimitStore(): Promise<void> {
+  await closeRateLimitStoreConnection();
+}
+
 setInterval(() => {
-  const now = Date.now();
-  for (const [key, bucket] of rateLimitStore.entries()) {
-    if (bucket.resetAt <= now) {
-      rateLimitStore.delete(key);
-    }
-  }
+  memoryStore.pruneExpired(Date.now());
 }, 60 * 1000).unref?.();
