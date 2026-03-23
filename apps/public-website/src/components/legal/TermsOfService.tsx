@@ -19,10 +19,10 @@ export function TermsOfService() {
               1. Acceptance of Terms
             </h2>
             <p className='text-muted-foreground leading-relaxed'>
-              By accessing and using Smart Flow Metering Limited's services, including our
-              prepaid utility metering platform, you agree to be bound by these
-              Terms of Service. If you do not agree to these terms, please do
-              not use our services.
+              By accessing and using Smart Flow Metering Limited's services,
+              including our prepaid utility metering platform, you agree to be
+              bound by these Terms of Service. If you do not agree to these
+              terms, please do not use our services.
             </p>
           </section>
 
@@ -31,10 +31,11 @@ export function TermsOfService() {
               2. Description of Services
             </h2>
             <p className='text-muted-foreground leading-relaxed'>
-              Smart Flow Metering Limited provides prepaid utility metering solutions for
-              electricity, water, and gas. Our services include meter
-              installation, token generation via M-Pesa, consumption monitoring,
-              and utility management tools for landlords and tenants.
+              Smart Flow Metering Limited provides prepaid utility metering
+              solutions for electricity, water, and gas. Our services include
+              meter installation, token generation via M-Pesa, consumption
+              monitoring, and utility management tools for landlords and
+              tenants.
             </p>
           </section>
 
@@ -116,9 +117,9 @@ export function TermsOfService() {
               </a>{" "}
               or call{" "}
               <a
-                href='tel:+254725799783'
+                href='tel:+254725101001'
                 className='text-primary hover:underline'>
-                +254 725 799 783
+                +254 725 101001
               </a>
               .
             </p>

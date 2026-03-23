@@ -101,9 +101,9 @@ export function Footer() {
                 </li>
                 <li>
                   <a
-                    href='tel:+254725799783'
+                    href='tel:+254725101001'
                     className='hover:text-primary cursor-pointer'>
-                    +254 725 799 783
+                    +254 725 101001
                   </a>
                 </li>
               </ul>
@@ -113,8 +113,8 @@ export function Footer() {
 
         <div className='mt-12 border-t border-background/20 pt-8 text-center text-sm text-background/70'>
           <p>
-            &copy; {new Date().getFullYear()} Smart Flow Metering Limited. All rights
-            reserved.
+            &copy; {new Date().getFullYear()} Smart Flow Metering Limited. All
+            rights reserved.
           </p>
         </div>
       </div>

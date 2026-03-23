@@ -24,7 +24,7 @@ export function MeterHero({ product }: MeterHeroProps) {
                 <div
                   className={cn(
                     "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs uppercase font-bold tracking-wider bg-background/90 backdrop-blur-md border border-border/50 shadow-sm",
-                    product.color
+                    product.color,
                   )}>
                   <product.icon className='text-sm' />
                   {product.type}
@@ -40,7 +40,7 @@ export function MeterHero({ product }: MeterHeroProps) {
                   <span
                     className={cn(
                       "text-sm font-bold uppercase tracking-wider",
-                      product.color
+                      product.color,
                     )}>
                     {product.tagline}
                   </span>
@@ -82,7 +82,7 @@ export function MeterHero({ product }: MeterHeroProps) {
                     variant='outline'
                     className='rounded-full border-2'>
                     <a
-                      href='tel:+254725799783'
+                      href='tel:+254725101001'
                       className='inline-flex items-center gap-1.5'>
                       <MdPhone />
                       Call Us
