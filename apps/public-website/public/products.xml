@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
+<channel>
+<title>Smart Flow Metering Products</title>
+<link>https://www.smartmetering.africa</link>
+<description>Google Merchant product feed for Smart Flow Metering Limited</description>
+<item>
+<g:id>integrated</g:id>
+<title>Prepaid Integrated Sub Meter</title>
+<description>An affordable prepaid sub meter with keypad and meter in one compact unit. Tenants enter prepaid tokens directly on the device — the most popular token meter for Kenyan landlords.</description>
+<link>https://www.smartmetering.africa/meters/integrated</link>
+<g:image_link>https://www.smartmetering.africa/products/integrated-electric.avif</g:image_link>
+<g:availability>in stock</g:availability>
+<g:price>4500.00 KES</g:price>
+<g:condition>new</g:condition>
+<g:brand>Smart Flow Metering</g:brand>
+<g:product_type>Utilities > Electricity Meters</g:product_type>
+<g:google_product_category>Hardware > Electrical > Electrical Meters</g:google_product_category>
+</item>
+<item>
+<g:id>split</g:id>
+<title>Prepaid Split Sub Meter</title>
+<description>Maximum security prepaid split meter for landlords. The measurement unit stays locked in your DB board, while the tenant gets a wireless keypad (CIU). The best tamper-proof sub meter in Kenya.</description>
+<link>https://www.smartmetering.africa/meters/split</link>
+<g:image_link>https://www.smartmetering.africa/products/split-electric.avif</g:image_link>
+<g:availability>in stock</g:availability>
+<g:price>7500.00 KES</g:price>
+<g:condition>new</g:condition>
+<g:brand>Smart Flow Metering</g:brand>
+<g:product_type>Utilities > Electricity Meters</g:product_type>
+<g:google_product_category>Hardware > Electrical > Electrical Meters</g:google_product_category>
+</item>
+<item>
+<g:id>water</g:id>
+<title>Prepaid Water Sub Meter</title>
+<description>Prepaid water meter with smart valve control and leak detection. Tenants buy water tokens via M-Pesa. Auto-shutoff on zero credit protects your property from water wastage.</description>
+<link>https://www.smartmetering.africa/meters/water</link>
+<g:image_link>https://www.smartmetering.africa/products/water-prepaid.avif</g:image_link>
+<g:availability>in stock</g:availability>
+<g:price>12500.00 KES</g:price>
+<g:condition>new</g:condition>
+<g:brand>Smart Flow Metering</g:brand>
+<g:product_type>Utilities > Water Meters</g:product_type>
+<g:google_product_category>Hardware > Plumbing > Plumbing Meters > Water Meters</g:google_product_category>
+</item>
+<item>
+<g:id>three-phase</g:id>
+<title>Prepaid 3-Phase Sub Meter</title>
+<description>Heavy-duty prepaid 3-phase sub meter for commercial and industrial loads. Ensure your commercial tenants pay exactly for what they use with precision token metering.</description>
+<link>https://www.smartmetering.africa/meters/three-phase</link>
+<g:image_link>https://www.smartmetering.africa/products/3-phase-electric.avif</g:image_link>
+<g:availability>in stock</g:availability>
+<g:price>18500.00 KES</g:price>
+<g:condition>new</g:condition>
+<g:brand>Smart Flow Metering</g:brand>
+<g:product_type>Utilities > Electricity Meters</g:product_type>
+<g:google_product_category>Hardware > Electrical > Electrical Meters</g:google_product_category>
+</item>
+<item>
+<g:id>gas</g:id>
+<title>Prepaid Gas Sub Meter</title>
+<description>Prepaid gas meter for piped gas estates with safety shutoff valve. Tenants buy gas tokens via M-Pesa for precise, pay-as-you-go gas sub metering.</description>
+<link>https://www.smartmetering.africa/meters/gas</link>
+<g:image_link>https://www.smartmetering.africa/products/gas-prepaid.avif</g:image_link>
+<g:availability>in stock</g:availability>
+<g:price>9000.00 KES</g:price>
+<g:condition>new</g:condition>
+<g:brand>Smart Flow Metering</g:brand>
+<g:product_type>Utilities > Gas Meters</g:product_type>
+<g:google_product_category>Hardware > Plumbing > Plumbing Meters > Gas Meters</g:google_product_category>
+</item>
+</channel>
+</rss>

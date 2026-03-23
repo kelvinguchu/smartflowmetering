@@ -119,9 +119,9 @@ export function PrivacyPolicy() {
               </a>{" "}
               or call{" "}
               <a
-                href='tel:+254725799783'
+                href='tel:+254725101001'
                 className='text-primary hover:underline'>
-                +254 725 799 783
+                +254 725 101001
               </a>
               .
             </p>

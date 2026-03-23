@@ -31,7 +31,7 @@ export function InquiryCTA() {
               size='lg'
               className='bg-white text-black hover:bg-white/90'>
               <a
-                href='tel:+254725799783'
+                href='tel:+254725101001'
                 className='inline-flex items-center gap-1.5'>
                 <MdPhone />
                 Call Us

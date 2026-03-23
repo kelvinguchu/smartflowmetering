@@ -22,7 +22,7 @@ const contactSchema = z.object({
   email: z.email("Invalid email address").optional().or(z.literal("")),
   role: z.enum(
     ["landlord", "tenant", "property_manager", "technician", "other"],
-    { message: "Please select your role" }
+    { message: "Please select your role" },
   ),
   inquiryType: z.enum(
     [
@@ -33,7 +33,7 @@ const contactSchema = z.object({
       "partnership",
       "other",
     ],
-    { message: "Please select an inquiry type" }
+    { message: "Please select an inquiry type" },
   ),
   message: z.string().min(10, "Message must be at least 10 characters"),
 });
@@ -210,7 +210,7 @@ export function ContactInfo() {
               onValueChange={(value) =>
                 updateField(
                   "inquiryType",
-                  value as ContactFormData["inquiryType"]
+                  value as ContactFormData["inquiryType"],
                 )
               }>
               <SelectTrigger
@@ -283,14 +283,14 @@ export function ContactInfo() {
         </a>
 
         <a
-          href='tel:+254725799783'
+          href='tel:+254725101001'
           className='bg-card rounded-2xl border border-border/50 p-6 text-center hover:shadow-lg transition-shadow cursor-pointer group'>
           <div className='h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4'>
             <MdPhone className='text-2xl text-primary' />
           </div>
           <h3 className='font-bold font-heading mb-1'>Call Us</h3>
           <p className='text-sm text-muted-foreground group-hover:text-primary transition-colors'>
-            +254 725 799 783
+            +254 725 101001
           </p>
         </a>
 
